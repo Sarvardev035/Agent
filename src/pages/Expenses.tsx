@@ -35,11 +35,15 @@ const monthOptions = Array.from({ length: 6 }).map((_, idx) => {
 })
 
 const Expenses = () => {
-  const [items, setItems] = useState<Expense[]>([])
+  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0].value)
+  const [error, setError] = useState<string | null>(null)
+  const [month, setMonth] = useState(
+    new Date().toISOString().slice(0, 7)
+  )
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [editing, setEditing] = useState<Expense | null>(null)
   const [form, setForm] = useState<ExpenseForm>({
@@ -49,36 +53,42 @@ const Expenses = () => {
     category: 'FOOD',
     accountId: 0,
   })
-  const { accounts, refreshAccounts } = useFinanceStore()
 
-  const load = async () => {
+  const loadData = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const { data } = await api.get('/api/expenses', { params: { month: selectedMonth } })
-      setItems(safeArray<Expense>(data))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load expenses'
-      console.error('❌ expenses load failed:', msg)
-      toast.error(msg)
+      const [expRes, accRes] = await Promise.allSettled([
+        api.get('/api/expenses', { params: { month } }),
+        api.get('/api/accounts'),
+      ])
+      setExpenses(
+        safeArray(expRes.status === 'fulfilled' ? expRes.value.data : [])
+      )
+      setAccounts(
+        safeArray(accRes.status === 'fulfilled' ? accRes.value.data : [])
+      )
+      if (expRes.status === 'rejected') {
+        setError((expRes.reason as Error).message)
+      }
+    } catch (err: any) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    load()
-    refreshAccounts()
-  }, [selectedMonth])
+  useEffect(() => { loadData() }, [month])
 
   const filtered = useMemo(() => {
-    return items.filter(item => {
+    return expenses.filter(item => {
       const matchesCategory = selectedCategory ? item.category === selectedCategory : true
-      const matchesMonth = selectedMonth
-        ? item.date.startsWith(selectedMonth)
+      const matchesMonth = month
+        ? item.date.startsWith(month)
         : true
       return matchesCategory && matchesMonth
     })
-  }, [items, selectedCategory, selectedMonth])
+  }, [expenses, selectedCategory, month])
 
   const summary = useMemo(() => {
     const total = filtered.reduce((s, i) => s + i.amount, 0)
@@ -89,54 +99,39 @@ const Expenses = () => {
   const openNew = () => {
     setEditing(null)
     setForm({ amount: 0, date: format(new Date(), 'yyyy-MM-dd'), description: '', category: 'FOOD', accountId: 0 })
-    setModalOpen(true)
+    setShowModal(true)
   }
 
   const openEdit = (item: Expense) => {
     setEditing(item)
     setForm({ ...item })
-    setModalOpen(true)
+    setShowModal(true)
   }
 
-  const handleSubmit = async () => {
-    const autoCategory = Object.entries(keywordMap).find(([key]) =>
-      form.description?.toLowerCase().includes(key)
-    )?.[1]
-    const payload = { ...form, category: autoCategory ?? form.category, amount: Number(form.amount) }
-    const parsed = ExpenseSchema.safeParse(payload)
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message)
-      return
-    }
+  const handleAdd = async (formData: any) => {
     try {
-      if (editing) {
-        await api.put(`/api/expenses/${editing.id}`, parsed.data)
-        toast.success('Expense updated')
-      } else {
-        await api.post('/api/expenses', parsed.data)
-        toast.success('Expense added')
-      }
-      setModalOpen(false)
-      setEditing(null)
-      load()
-      refreshAccounts()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to save expense'
-      toast.error(msg)
+      await api.post('/api/expenses', {
+        amount:      Number(formData.amount),
+        date:        formData.date,
+        description: formData.description || '',
+        category:    formData.category,
+        accountId:   Number(formData.accountId),
+      })
+      toast.success('Expense added!')
+      setShowModal(false)
+      await loadData()
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add expense')
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirmId) return
+  const handleDelete = async (id: number) => {
     try {
-      await api.delete(`/api/expenses/${confirmId}`)
-      toast.success('Expense removed')
-      setConfirmId(null)
-      load()
-      refreshAccounts()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to delete'
-      toast.error(msg)
+      await api.delete(`/api/expenses/${id}`)
+      toast.success('Expense deleted')
+      setExpenses(prev => prev.filter(i => i.id !== id))
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete')
     }
   }
 
@@ -173,14 +168,14 @@ const Expenses = () => {
         {monthOptions.map(opt => (
           <button
             key={opt.value}
-            onClick={() => setSelectedMonth(opt.value)}
+            onClick={() => setMonth(opt.value)}
             type="button"
             style={{
               padding: '8px 12px',
               borderRadius: 10,
-              border: selectedMonth === opt.value ? '1px solid #ef4444' : '1px solid #e2e8f0',
-              background: selectedMonth === opt.value ? '#fff1f2' : '#fff',
-              color: selectedMonth === opt.value ? '#ef4444' : '#0f172a',
+              border: month === opt.value ? '1px solid #ef4444' : '1px solid #e2e8f0',
+              background: month === opt.value ? '#fff1f2' : '#fff',
+              color: month === opt.value ? '#ef4444' : '#0f172a',
               fontWeight: 700,
             }}
           >
@@ -315,7 +310,7 @@ const Expenses = () => {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit expense' : 'Add expense'}>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? 'Edit expense' : 'Add expense'}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
@@ -378,7 +373,7 @@ const Expenses = () => {
             </div>
           </div>
           <button
-            onClick={handleSubmit}
+            onClick={() => handleAdd(form)}
             type="button"
             style={{
               marginTop: 4,
@@ -399,7 +394,7 @@ const Expenses = () => {
       <ConfirmDialog
         open={confirmId !== null}
         onCancel={() => setConfirmId(null)}
-        onConfirm={handleDelete}
+        onConfirm={() => confirmId && handleDelete(confirmId)}
         message="Delete this expense?"
         confirmLabel="Delete"
       />

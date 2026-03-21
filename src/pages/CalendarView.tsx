@@ -27,12 +27,16 @@ const CalendarView = () => {
     const load = async () => {
       setLoading(true)
       try {
-        const [exp, inc] = await Promise.all([
+        const [expRes, incRes] = await Promise.allSettled([
           api.get('/api/expenses'),
           api.get('/api/income'),
         ])
-        setExpenses(safeArray<Expense>(exp.data))
-        setIncome(safeArray<Income>(inc.data))
+        setExpenses(
+          expRes.status === 'fulfilled' ? safeArray<Expense>(expRes.value.data) : []
+        )
+        setIncome(
+          incRes.status === 'fulfilled' ? safeArray<Income>(incRes.value.data) : []
+        )
         refreshAccounts()
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load calendar'

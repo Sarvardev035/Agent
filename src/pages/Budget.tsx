@@ -29,12 +29,16 @@ const Budget = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const [over, cats] = await Promise.all([
+      const [overRes, catsRes] = await Promise.allSettled([
         api.get('/api/budget'),
         api.get('/api/budget/categories'),
       ])
-      setOverview(over.data as BudgetOverview)
-      setCategories(safeArray<BudgetCategory>(cats.data) ?? [])
+      setOverview(
+        overRes.status === 'fulfilled' ? (overRes.value.data as BudgetOverview) : {}
+      )
+      setCategories(
+        safeArray<BudgetCategory>(catsRes.status === 'fulfilled' ? catsRes.value.data : [])
+      )
     } catch (err) {
       console.error('❌ budget load failed:', err)
       const msg = err instanceof Error ? err.message : 'Failed to load budget'

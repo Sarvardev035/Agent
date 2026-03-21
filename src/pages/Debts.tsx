@@ -40,8 +40,12 @@ const Debts = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/api/debts')
-      setItems(safeArray<Debt>(data))
+      const [debtsRes] = await Promise.allSettled([
+        api.get('/api/debts'),
+      ])
+      setItems(
+        safeArray(debtsRes.status === 'fulfilled' ? debtsRes.value.data : [])
+      )
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load debts'
       console.error('❌ debts load failed:', msg)

@@ -38,8 +38,16 @@ const Transfers = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await api.get('/api/transfers')
-      setItems(safeArray<Transfer>(data))
+      const [transRes, accRes] = await Promise.allSettled([
+        api.get('/api/transfers'),
+        api.get('/api/accounts'),
+      ])
+      setItems(
+        safeArray(transRes.status === 'fulfilled' ? transRes.value.data : [])
+      )
+      if (accRes.status === 'fulfilled') {
+        // Store accounts locally or update via callback
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load transfers'
       console.error('❌ transfers load failed:', msg)

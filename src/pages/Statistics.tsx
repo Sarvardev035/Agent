@@ -36,22 +36,32 @@ const Statistics = () => {
   const [chartReady, setChartReady] = useState(false)
   const [isSample, setIsSample] = useState(false)
 
-  useEffect(() => setChartReady(true), [])
+  useEffect(() => {
+    setTimeout(() => setChartReady(true), 150)
+  }, [])
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
-        const [exp, inc, brk, ivs] = await Promise.all([
+        const [expRes, incRes, brkRes, vsRes] = await Promise.allSettled([
           api.get('/api/statistics/expenses', { params: { period: '3m' } }),
           api.get('/api/statistics/income', { params: { period: '3m' } }),
           api.get('/api/statistics/breakdown'),
           api.get('/api/statistics/vs-income'),
         ])
-        setExpenseTrend(safeArray<TrendPoint>(exp.data) ?? [])
-        setIncomeTrend(safeArray<TrendPoint>(inc.data) ?? [])
-        setBreakdown(safeArray<BreakdownPoint>(brk.data) ?? [])
-        setVs(safeArray<VsPoint>(ivs.data) ?? [])
+        setExpenseTrend(
+          expRes.status === 'fulfilled' ? safeArray<TrendPoint>(expRes.value.data) : []
+        )
+        setIncomeTrend(
+          incRes.status === 'fulfilled' ? safeArray<TrendPoint>(incRes.value.data) : []
+        )
+        setBreakdown(
+          brkRes.status === 'fulfilled' ? safeArray<BreakdownPoint>(brkRes.value.data) : []
+        )
+        setVs(
+          vsRes.status === 'fulfilled' ? safeArray<VsPoint>(vsRes.value.data) : []
+        )
         setIsSample(false)
       } catch (err) {
         console.error('❌ statistics load failed:', err)
