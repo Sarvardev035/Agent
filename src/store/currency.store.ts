@@ -1,44 +1,28 @@
 import { create } from 'zustand'
-import { CurrencyExchange, SupportedCurrency } from '../lib/currency'
+import { fetchExchangeRates, convert as convertAmount } from '../lib/currency'
+
+type SupportedCurrency = 'USD' | 'EUR' | 'RUB' | 'UZS'
 
 interface CurrencyState {
-  rates: Record<string, Record<string, number>>
-  loading: Record<string, boolean>
-  getRate: (base: SupportedCurrency, target: SupportedCurrency) => Promise<number>
-  convert: (amount: number, from: SupportedCurrency, to: SupportedCurrency) => Promise<number>
+  rates: Record<string, number>
+  loading: boolean
+  refresh: () => Promise<void>
+  convert: (amount: number, from: SupportedCurrency, to: SupportedCurrency) => number
 }
 
 export const useCurrencyStore = create<CurrencyState>((set, get) => ({
   rates: {},
-  loading: {},
+  loading: false,
 
-  getRate: async (base, target) => {
-    if (base === target) return 1
-
-    const key = `${base}_${target}`
-    const existing = get().rates[base]?.[target]
-    if (existing) return existing
-
-    set(s => ({ loading: { ...s.loading, [key]: true } }))
+  refresh: async () => {
+    set({ loading: true })
     try {
-      const rate = await CurrencyExchange.getRate(base, target)
-      set(s => ({
-        rates: {
-          ...s.rates,
-          [base]: { ...s.rates[base], [target]: rate },
-        },
-      }))
-      return rate
+      const rates = await fetchExchangeRates()
+      set({ rates })
     } finally {
-      set(s => {
-        const { [key]: _, ...rest } = s.loading
-        return { loading: rest }
-      })
+      set({ loading: false })
     }
   },
 
-  convert: async (amount, from, to) => {
-    const rate = await get().getRate(from, to)
-    return CurrencyExchange.convert(amount, from, to, rate)
-  },
+  convert: (amount, from, to) => convertAmount(amount, from, to, get().rates),
 }))

@@ -1,38 +1,51 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap');
 
 :root {
-  --navy:        #0a1628;
-  --navy-800:    #0f2040;
-  --royal:       #1a3a6b;
-  --blue:        #2563eb;
-  --blue-dark:   #1d4ed8;
-  --blue-light:  #eff6ff;
-  --green:       #22c55e;
-  --green-bg:    #f0fdf4;
-  --red:         #ef4444;
-  --red-bg:      #fff5f5;
-  --amber:       #f59e0b;
-  --amber-bg:    #fffbeb;
-  --purple:      #7c3aed;
-  --bg:          #f1f5f9;
-  --surface:     #ffffff;
-  --border:      #e2e8f0;
-  --text-1:      #0f172a;
-  --text-2:      #475569;
-  --text-3:      #94a3b8;
-  --radius-sm:   8px;
-  --radius-md:   12px;
-  --radius-lg:   16px;
-  --radius-xl:   24px;
-  --shadow-sm:   0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md:   0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg:   0 12px 40px rgba(0,0,0,0.12);
+  /* Brand */
+  --navy:         #0a1628;
+  --navy-800:     #0f2040;
+  --royal:        #1a3a6b;
+  --blue:         #2563eb;
+  --blue-dark:    #1d4ed8;
+  --blue-light:   #eff6ff;
+  --purple:       #7c3aed;
+
+  /* Semantic */
+  --green:        #10b981;
+  --green-bg:     #ecfdf5;
+  --red:          #ef4444;
+  --red-bg:       #fff1f2;
+  --amber:        #f59e0b;
+  --amber-bg:     #fffbeb;
+
+  /* Surfaces */
+  --bg:           #f1f5f9;
+  --surface:      #ffffff;
+  --surface-2:    #f8fafc;
+  --border:       #e2e8f0;
+  --border-2:     rgba(0,0,0,0.06);
+
+  /* Text */
+  --text-1:       #0f172a;
+  --text-2:       #475569;
+  --text-3:       #94a3b8;
+
+  /* Radii */
+  --r-sm:  8px;
+  --r-md:  12px;
+  --r-lg:  16px;
+  --r-xl:  24px;
+
+  /* Shadows */
+  --sh-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --sh-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+  --sh-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
@@ -40,53 +53,87 @@ body {
   overflow-x: hidden;
 }
 
-/* Prevent text selection on UI elements */
-button, label { user-select: none; }
-
-/* Skeleton shimmer */
+/* ── Skeleton shimmer ── */
 @keyframes shimmer {
-  0%   { background-position: -1000px 0; }
-  100% { background-position:  1000px 0; }
+  0%   { background-position: -800px 0; }
+  100% { background-position:  800px 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg,#f0f4f8 25%,#e2e8f0 50%,#f0f4f8 75%);
-  background-size: 1000px 100%;
-  animation: shimmer 1.8s infinite;
-  border-radius: 8px;
+  background: linear-gradient(90deg,
+    #f0f4f8 0%, #e2e8f0 40%, #f0f4f8 80%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--r-sm);
 }
 
-/* Spin animation for loaders */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+/* ── Page enter animation ── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.page-enter { animation: pageIn 0.25s ease-out; }
 
-/* Pulse for debt open status dot */
+/* ── Pulse dot for open debts ── */
 @keyframes pulse-ring {
-  0%   { transform: scale(1);   opacity: 1; }
-  100% { transform: scale(2.2); opacity: 0; }
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
 }
 .pulse-dot {
-  position: relative;
-  display: inline-block;
-  width: 8px; height: 8px;
-  border-radius: 50%;
+  position: relative; display: inline-flex;
+  width: 8px; height: 8px; border-radius: 50%;
 }
 .pulse-dot::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: inherit;
-  animation: pulse-ring 1.5s ease-out infinite;
+  content: ''; position: absolute; inset: 0;
+  border-radius: 50%; background: inherit;
+  animation: pulse-ring 1.8s ease-out infinite;
 }
 
-/* Scrollbar */
+/* ── Card hover lift ── */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sh-md);
+}
+
+/* ── Glass card ── */
+.glass {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.5);
+}
+
+/* ── Number font feature ── */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-/* Mobile safe area */
+/* ── Mobile safe area for bottom nav ── */
 @supports (padding: env(safe-area-inset-bottom)) {
-  .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* ── Progress bar animate ── */
+@keyframes barGrow {
+  from { width: 0%; }
+}
+.progress-animate { animation: barGrow 0.9s cubic-bezier(0.4,0,0.2,1) forwards; }
+
+/* ── Flip card ── */
+.flip-card { perspective: 1000px; }
+.flip-card-inner {
+  transition: transform 0.55s ease;
+  transform-style: preserve-3d;
+  position: relative;
+}
+.flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
+.flip-card-front, .flip-card-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-card-back { transform: rotateY(180deg); }
