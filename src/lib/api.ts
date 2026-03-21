@@ -1,8 +1,10 @@
 import axios from 'axios'
 import { TokenStorage } from './security'
 
+const BASE_URL = 'https://finly.uyqidir.uz'
+
 const api = axios.create({
-  baseURL: '/',
+  baseURL: BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -13,12 +15,14 @@ const api = axios.create({
 api.interceptors.request.use(config => {
   const token = TokenStorage.get()
   if (token) config.headers.Authorization = `Bearer ${token}`
+  console.log('✅ API call to:', (config.baseURL ?? '') + (config.url ?? ''))
   return config
 })
 
 api.interceptors.response.use(
   r => r,
   err => {
+    console.error('❌ API error:', err.config?.url, err.message)
     if (err.response?.status === 401) {
       TokenStorage.clear()
       window.location.href = '/login'

@@ -8,11 +8,12 @@ import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { CATEGORY_META, smartDate, toArray } from '../lib/helpers'
-import { expensesService, Expense } from '../services/expenses.service'
+import { CATEGORY_META, smartDate, toArray, safeArray } from '../lib/helpers'
+import { Expense } from '../services/expenses.service'
 import { ExpenseSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
 import { useFinanceStore } from '../store/finance.store'
+import api from '../lib/api'
 
 const keywordMap: Record<string, string> = {
   coffee: 'FOOD',
@@ -53,8 +54,8 @@ const Expenses = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await expensesService.getAll({ month: selectedMonth })
-      setItems(toArray<Expense>(data))
+      const { data } = await api.get('/api/expenses', { params: { month: selectedMonth } })
+      setItems(safeArray<Expense>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load expenses'
       console.error('❌ expenses load failed:', msg)
@@ -109,10 +110,10 @@ const Expenses = () => {
     }
     try {
       if (editing) {
-        await expensesService.update(editing.id, parsed.data)
+        await api.put(`/api/expenses/${editing.id}`, parsed.data)
         toast.success('Expense updated')
       } else {
-        await expensesService.create(parsed.data)
+        await api.post('/api/expenses', parsed.data)
         toast.success('Expense added')
       }
       setModalOpen(false)
@@ -128,7 +129,7 @@ const Expenses = () => {
   const handleDelete = async () => {
     if (!confirmId) return
     try {
-      await expensesService.delete(confirmId)
+      await api.delete(`/api/expenses/${confirmId}`)
       toast.success('Expense removed')
       setConfirmId(null)
       load()

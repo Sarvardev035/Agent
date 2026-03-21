@@ -6,10 +6,11 @@ import { format } from 'date-fns'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
-import { expensesService, Expense } from '../services/expenses.service'
-import { incomeService, Income } from '../services/income.service'
+import { Expense } from '../services/expenses.service'
+import { Income } from '../services/income.service'
 import { useFinanceStore } from '../store/finance.store'
-import { toArray } from '../lib/helpers'
+import { toArray, safeArray } from '../lib/helpers'
+import api from '../lib/api'
 
 import 'react-calendar/dist/Calendar.css'
 
@@ -27,11 +28,11 @@ const CalendarView = () => {
       setLoading(true)
       try {
         const [exp, inc] = await Promise.all([
-          expensesService.getAll(),
-          incomeService.getAll(),
+          api.get('/api/expenses'),
+          api.get('/api/income'),
         ])
-        setExpenses(toArray<Expense>(exp.data))
-        setIncome(toArray<Income>(inc.data))
+        setExpenses(safeArray<Expense>(exp.data))
+        setIncome(safeArray<Income>(inc.data))
         refreshAccounts()
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load calendar'

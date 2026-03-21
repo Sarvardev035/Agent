@@ -6,11 +6,12 @@ import { ArrowLeftRight, Plus } from 'lucide-react'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
-import { transfersService, Transfer } from '../services/transfers.service'
+import { Transfer } from '../services/transfers.service'
 import { TransferSchema } from '../lib/security'
 import { useFinanceStore } from '../store/finance.store'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
-import { smartDate, toArray } from '../lib/helpers'
+import { smartDate, toArray, safeArray } from '../lib/helpers'
+import api from '../lib/api'
 
 interface TransferForm {
   fromAccountId: number
@@ -37,8 +38,8 @@ const Transfers = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await transfersService.getAll()
-      setItems(toArray<Transfer>(data))
+      const { data } = await api.get('/api/transfers')
+      setItems(safeArray<Transfer>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load transfers'
       console.error('❌ transfers load failed:', msg)
@@ -60,7 +61,7 @@ const Transfers = () => {
       return
     }
     try {
-      await transfersService.create(parsed.data)
+      await api.post('/api/transfers', parsed.data)
       toast.success('Transfer added')
       setModalOpen(false)
       load()

@@ -20,14 +20,13 @@ import ProgressRing from '../components/ui/ProgressRing'
 import CurrencyWidget from '../components/widgets/CurrencyWidget'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
-import { CATEGORY_META, getTimeOfDay, isThisMonth, toArray } from '../lib/helpers'
+import { CATEGORY_META, getTimeOfDay, isThisMonth, toArray, safeArray } from '../lib/helpers'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
-import { expensesService, Expense } from '../services/expenses.service'
-import { incomeService, Income } from '../services/income.service'
-import { transfersService } from '../services/transfers.service'
-import { debtsService, Debt } from '../services/debts.service'
-import { budgetService } from '../services/budget.service'
-import { accountsService, Account } from '../services/accounts.service'
+import api from '../lib/api'
+import { Expense } from '../services/expenses.service'
+import { Income } from '../services/income.service'
+import { Debt } from '../services/debts.service'
+import { Account } from '../services/accounts.service'
 import { generateNotifications, dismissNotification, BudgetCategory } from '../lib/notifications'
 import { ExpenseSchema, IncomeSchema, TransferSchema } from '../lib/security'
 import { useFinanceStore } from '../store/finance.store'
@@ -111,73 +110,51 @@ const Dashboard = () => {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const results = await Promise.allSettled([
-      accountsService
-        .getAll()
-        .catch(e => {
-          console.error('❌ accounts failed:', e.message)
-          return { data: [] }
-        }),
-      expensesService
-        .getAll()
-        .catch(e => {
-          console.error('❌ expenses failed:', e.message)
-          return { data: [] }
-        }),
-      incomeService
-        .getAll()
-        .catch(e => {
-          console.error('❌ income failed:', e.message)
-          return { data: [] }
-        }),
-      debtsService
-        .getAll()
-        .catch(e => {
-          console.error('❌ debts failed:', e.message)
-          return { data: [] }
-        }),
-      budgetService
-        .get()
-        .catch(e => {
-          console.error('❌ budget failed:', e.message)
-          return { data: {} }
-        }),
-    ])
+    try {
+      const [accRes, expRes, incRes, debtRes] = await Promise.allSettled([
+        api.get('/api/accounts'),
+        api.get('/api/expenses'),
+        api.get('/api/income'),
+        api.get('/api/debts'),
+      ])
 
-    const newWarnings: string[] = []
-    if (results[0].status === 'fulfilled')
-      setAccounts(toArray<Account>(results[0].value.data))
-    else newWarnings.push('Accounts failed to load')
+      const accounts = safeArray<Account>(
+        accRes.status === 'fulfilled' ? accRes.value.data : []
+      )
+      const expenses = safeArray<Expense>(
+        expRes.status === 'fulfilled' ? expRes.value.data : []
+      )
+      const incomes = safeArray<Income>(
+        incRes.status === 'fulfilled' ? incRes.value.data : []
+      )
+      const debts = safeArray<Debt>(
+        debtRes.status === 'fulfilled' ? debtRes.value.data : []
+      )
 
-    if (results[1].status === 'fulfilled')
-      setExpenses(toArray<Expense>(results[1].value.data))
-    else newWarnings.push('Expenses unavailable')
+      const totalBalance = accounts.reduce((s, a) => s + (a.balance ?? 0), 0)
+      const monthlyIncome = incomes
+        .filter(i => isThisMonth(i.date))
+        .reduce((s, i) => s + (i.amount ?? 0), 0)
+      const monthlyExpenses = expenses
+        .filter(e => isThisMonth(e.date))
+        .reduce((s, e) => s + (e.amount ?? 0), 0)
 
-    if (results[2].status === 'fulfilled')
-      setIncome(toArray<Income>(results[2].value.data))
-    else newWarnings.push('Income unavailable')
-
-    if (results[3].status === 'fulfilled')
-      setDebts(toArray<Debt>(results[3].value.data))
-    else newWarnings.push('Debts unavailable')
-
-    if (results[4].status === 'fulfilled') {
-      const payload = results[4].value.data as BudgetOverview
-      setBudget({
-        goal: payload.goal ?? 0,
-        spent: payload.spent ?? 0,
-        categories: toArray<BudgetCategory>(payload.categories),
-      })
-    } else newWarnings.push('Budget data unavailable')
-
-    setWarnings(newWarnings)
-    setLoading(false)
+      const recentTxns = [
+        ...expenses.map(e => ({ ...e, txnType: 'expense' as const })),
+        ...incomes.map(i => ({ ...i, txnType: 'income' as const })),
+      ]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 10)
+    } catch (err) {
+      console.error('Dashboard load error:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
     loadData()
-    refreshAccounts()
-  }, [loadData, refreshAccounts])
+  }, [loadData])
 
   const greeting = useMemo(() => {
     const tod = getTimeOfDay()
@@ -248,7 +225,7 @@ const Dashboard = () => {
       return
     }
     try {
-      await expensesService.create(parsed.data)
+      await api.post('/api/expenses', parsed.data)
       toast.success('Expense added')
       setExpenseModal(false)
       loadData()
@@ -266,7 +243,7 @@ const Dashboard = () => {
       return
     }
     try {
-      await incomeService.create(parsed.data)
+      await api.post('/api/income', parsed.data)
       toast.success('Income added')
       setIncomeModal(false)
       loadData()
@@ -287,7 +264,7 @@ const Dashboard = () => {
       return
     }
     try {
-      await transfersService.create(parsed.data)
+      await api.post('/api/transfers', parsed.data)
       toast.success('Transfer completed')
       setTransferModal(false)
       loadData()

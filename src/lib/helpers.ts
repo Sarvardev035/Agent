@@ -21,6 +21,17 @@ export const toArray = <T,>(data: unknown): T[] => {
   return []
 }
 
+export const safeArray = <T,>(data: unknown): T[] => {
+  if (!data) return []
+  if (Array.isArray(data)) return data as T[]
+  const d = data as Record<string, unknown>
+  if (Array.isArray(d.content)) return d.content as T[]
+  if (Array.isArray(d.data)) return d.data as T[]
+  if (Array.isArray(d.items)) return d.items as T[]
+  if (Array.isArray(d.results)) return d.results as T[]
+  return []
+}
+
 export const smartDate = (d: string): string => {
   try {
     const date = parseISO(d)

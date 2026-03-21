@@ -8,11 +8,12 @@ import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { CATEGORY_META, toArray } from '../lib/helpers'
-import { incomeService, Income } from '../services/income.service'
+import { CATEGORY_META, toArray, safeArray } from '../lib/helpers'
+import { Income } from '../services/income.service'
 import { IncomeSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
 import { useFinanceStore } from '../store/finance.store'
+import api from '../lib/api'
 
 type IncomeForm = Omit<Income, 'id'>
 
@@ -51,8 +52,8 @@ const IncomePage = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await incomeService.getAll({ month: selectedMonth })
-      setItems(toArray<Income>(data))
+      const { data } = await api.get('/api/income', { params: { month: selectedMonth } })
+      setItems(safeArray<Income>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load income'
       console.error('❌ income load failed:', msg)
@@ -105,10 +106,10 @@ const IncomePage = () => {
     }
     try {
       if (editing) {
-        await incomeService.update(editing.id, parsed.data)
+        await api.put(`/api/income/${editing.id}`, parsed.data)
         toast.success('Income updated')
       } else {
-        await incomeService.create(parsed.data)
+        await api.post('/api/income', parsed.data)
         toast.success('Income added')
       }
       setModalOpen(false)
@@ -124,7 +125,7 @@ const IncomePage = () => {
   const handleDelete = async () => {
     if (!confirmId) return
     try {
-      await incomeService.delete(confirmId)
+      await api.delete(`/api/income/${confirmId}`)
       toast.success('Income removed')
       setConfirmId(null)
       load()

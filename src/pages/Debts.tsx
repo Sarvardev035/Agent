@@ -7,10 +7,11 @@ import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { debtsService, Debt } from '../services/debts.service'
+import { Debt } from '../services/debts.service'
 import { DebtSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
-import { smartDate, toArray } from '../lib/helpers'
+import { smartDate, toArray, safeArray } from '../lib/helpers'
+import api from '../lib/api'
 
 interface DebtForm {
   personName: string
@@ -39,8 +40,8 @@ const Debts = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await debtsService.getAll()
-      setItems(toArray<Debt>(data))
+      const { data } = await api.get('/api/debts')
+      setItems(safeArray<Debt>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load debts'
       console.error('❌ debts load failed:', msg)
@@ -63,7 +64,7 @@ const Debts = () => {
       return
     }
     try {
-      await debtsService.create(parsed.data)
+      await api.post('/api/debts', parsed.data)
       toast.success('Debt added')
       setModalOpen(false)
       load()
@@ -75,7 +76,7 @@ const Debts = () => {
 
   const handleClose = async (id: number) => {
     try {
-      await debtsService.close(id)
+      await api.patch(`/api/debts/${id}`, { status: 'CLOSED' })
       toast.success('Marked as closed')
       load()
     } catch (err) {
@@ -87,7 +88,7 @@ const Debts = () => {
   const handleDelete = async () => {
     if (!confirmId) return
     try {
-      await debtsService.delete(confirmId)
+      await api.delete(`/api/debts/${confirmId}`)
       toast.success('Debt deleted')
       setConfirmId(null)
       load()
