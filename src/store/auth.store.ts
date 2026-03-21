@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { AxiosError } from 'axios'
 import { TokenStorage } from '../lib/security'
 import { authService } from '../services/auth.service'
 
@@ -15,6 +16,23 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   initAuth: () => void
+}
+
+type UnknownRecord = Record<string, unknown>
+
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {}
+
+const extractToken = (value: unknown): string | null => {
+  const record = asRecord(value)
+  const candidates = [
+    record.token,
+    record.accessToken,
+    record.access_token,
+    record.jwt,
+  ]
+  const found = candidates.find((v): v is string => typeof v === 'string' && v.length > 0)
+  return found ?? null
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -52,33 +70,45 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { data } = response
       console.log('📥 [Auth] Response data:', data)
 
-      // 3. Extract token
-      const token =
-        data.token ||
-        ((data as unknown) as Record<string, unknown>).accessToken ||
-        ((data as unknown) as Record<string, unknown>).access_token ||
-        ((data as unknown) as Record<string, unknown>).jwt
+      // 3. Extract token from multiple possible backend shapes
+      const root = asRecord(data)
+      const nested =
+        asRecord(root.data).token ||
+        asRecord(root.data).accessToken ||
+        asRecord(root.data).access_token ||
+        asRecord(root.data).jwt ||
+        asRecord(root.result).token ||
+        asRecord(root.result).accessToken ||
+        asRecord(root.result).access_token ||
+        asRecord(root.result).jwt
+
+      const token = extractToken(data) ?? (typeof nested === 'string' ? nested : null)
 
       if (!token) {
         console.error('❌ [Auth] No token found in response:', data)
         throw new Error('No token in response')
       }
 
-      TokenStorage.set(token as string)
+      const userFromRoot = asRecord(data).user
+      const userFromData = asRecord(asRecord(data).data).user
+      const resolvedUser = (userFromRoot ?? userFromData) as User | undefined
+
+      TokenStorage.set(token)
       set({
         isAuthenticated: true,
-        user: data.user || { id: 0, name: email.split('@')[0], email },
+        user: resolvedUser || { id: 0, name: email.split('@')[0], email },
         isLoading: false,
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       set({ isLoading: false })
 
       // 4. Detailed error handling
-      if (err.response) {
+      const axiosErr = err as AxiosError
+      if (axiosErr.response) {
         // Server responded with a status code
-        const status = err.response.status
+        const status = axiosErr.response.status
         console.error('🔴 [Auth] Server error status:', status)
-        console.error('🔴 [Auth] Server error data:', err.response.data)
+        console.error('🔴 [Auth] Server error data:', axiosErr.response.data)
 
         if (status === 404) {
           throw new Error('Connection error: API endpoint not found.')
@@ -89,13 +119,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         if (status >= 500) {
           throw new Error('Server error. Please try again later.')
         }
-      } else if (err.request) {
+      } else if (axiosErr.request) {
         // Request was made but no response received
-        console.error('⚠️ [Auth] No response received:', err.request)
+        console.error('⚠️ [Auth] No response received:', axiosErr.request)
         throw new Error('No response from server. Check your internet connection.')
       } else {
         // Something happened in setting up the request
-        console.error('❌ [Auth] Request setup error:', err.message)
+        const genericErr = err as Error
+        console.error('❌ [Auth] Request setup error:', genericErr.message)
       }
 
       throw err

@@ -2,10 +2,38 @@ import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { AxiosError } from 'axios'
 import { Eye, EyeOff, Zap, Loader2, AlertTriangle } from 'lucide-react'
 import { RegisterSchema } from '../../lib/security'
 import { authService } from '../../services/auth.service'
 import { TokenStorage } from '../../lib/security'
+
+type UnknownRecord = Record<string, unknown>
+
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {}
+
+const extractToken = (value: unknown): string | null => {
+  const root = asRecord(value)
+  const nestedData = asRecord(root.data)
+  const nestedResult = asRecord(root.result)
+  const candidates = [
+    root.token,
+    root.accessToken,
+    root.access_token,
+    root.jwt,
+    nestedData.token,
+    nestedData.accessToken,
+    nestedData.access_token,
+    nestedData.jwt,
+    nestedResult.token,
+    nestedResult.accessToken,
+    nestedResult.access_token,
+    nestedResult.jwt,
+  ]
+  const found = candidates.find((v): v is string => typeof v === 'string' && v.length > 0)
+  return found ?? null
+}
 
 export default function Register() {
   const navigate = useNavigate()
@@ -39,13 +67,29 @@ export default function Register() {
     setLoading(true)
     try {
       const { data } = await authService.register(result.data)
-      const token = data.token || ((data as unknown) as Record<string, unknown>).accessToken
-      if (token) TokenStorage.set(token as string)
+      const token = extractToken(data)
+      if (token) TokenStorage.set(token)
       toast.success('Account created! Welcome to Finly.')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Registration failed'
-      setError(msg.includes('exists') ? 'Email already registered' : msg)
+      const axiosErr = err as AxiosError
+      const status = axiosErr.response?.status
+
+      if (status === 400) {
+        const payload = asRecord(axiosErr.response?.data)
+        const apiMessage =
+          (typeof payload.message === 'string' && payload.message) ||
+          (typeof payload.error === 'string' && payload.error) ||
+          'Invalid registration data.'
+        setError(apiMessage)
+      } else if (status === 409) {
+        setError('Email already registered')
+      } else if (status === 404) {
+        setError('Connection error: API endpoint not found.')
+      } else {
+        const msg = err instanceof Error ? err.message : 'Registration failed'
+        setError(msg)
+      }
     } finally {
       setLoading(false)
     }
