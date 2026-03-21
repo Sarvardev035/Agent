@@ -1,17 +1,21 @@
 import axios, { AxiosError, AxiosResponse } from 'axios'
 import { TokenStorage } from './security'
 
-// API URL configuration — can be overridden via environment variable
-const apiBaseURL = import.meta.env.VITE_API_URL || 'https://finly.uyqidir.uz'
+// API URL configuration
+// HARDCODED to ensure it always hits the correct backend
+// The user reported issues with env variables, so we are making this explicit
+const API_URL = 'https://finly.uyqidir.uz'
+
+console.log('🔌 API Base URL configured to:', API_URL)
 
 const api = axios.create({
-  baseURL: apiBaseURL,
-  timeout: 10_000,
-  withCredentials: false,
+  baseURL: API_URL,
+  timeout: 15000, // Increased timeout
+  withCredentials: false, // Ensure we don't send cookies if not needed
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
+    // Removed X-Requested-With to reduce CORS preflight issues
   },
 })
 
@@ -66,7 +70,7 @@ api.interceptors.response.use(
     if (error.code === 'ERR_NETWORK') {
       return Promise.reject(
         new Error(
-          'Cannot reach backend server at ' + apiBaseURL + '. ' +
+          'Cannot reach backend server at ' + API_URL + '. ' +
           'Verify backend is running and CORS is configured.'
         )
       )

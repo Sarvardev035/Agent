@@ -42,9 +42,8 @@ export default function Login() {
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Login failed'
-      if (msg.includes('Network') || msg.includes('CORS')) {
-        setError('Cannot reach server. Please try again.')
-      } else if (msg.includes('401') || msg.includes('credentials')) {
+      // Show exact error message from API (includes URL and CORS hints)
+      if (msg.includes('401') || msg.includes('credentials')) {
         setError('Incorrect email or password.')
       } else {
         setError(msg)
@@ -276,6 +275,9 @@ export default function Login() {
               Privacy Policy
             </Link>
           </p>
+          <div style={{ textAlign: 'center', marginTop: 10, fontSize: 10, color: '#ccc' }}>
+            Backend: https://finly.uyqidir.uz
+          </div>
         </form>
 
         <div style={{
