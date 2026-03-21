@@ -43,12 +43,21 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
+    // 1. Handle 401 (Unauthorized)
     if (error.response?.status === 401) {
+      // If this is a login attempt, don't redirect — just let the error bubble up
+      // so the UI can show "Invalid credentials"
+      if (error.config?.url?.includes('/login')) {
+        return Promise.reject(error)
+      }
+
+      // For other requests, it means the token expired
       TokenStorage.clear()
       window.location.href = '/login'
       return Promise.reject(new Error('Session expired'))
     }
-    if (error.response?.status === 403) {
+
+    // 2. Handle 403 (Forbidden)
       return Promise.reject(new Error('Access denied'))
     }
     if (error.response?.status === 429) {

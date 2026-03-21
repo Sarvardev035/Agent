@@ -33,21 +33,71 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email, password) => {
     set({ isLoading: true })
     try {
-      const { data } = await authService.login({ email, password })
+      // 1. Log request details
+      const endpoint = '/api/auth/login'
+      const fullUrl = `https://finly.uyqidir.uz${endpoint}`
+      console.log('🚀 [Auth] Initiating login request')
+      console.log('🔗 [Auth] Full URL:', fullUrl)
+      console.log('📦 [Auth] Payload:', { email, password: '***' })
+
+      const response = await authService.login({ email, password })
+
+      // 2. Validate response status
+      console.log('✅ [Auth] Response status:', response.status)
+
+      if (response.status !== 200 && response.status !== 201) {
+        throw new Error(`Unexpected status code: ${response.status}`)
+      }
+
+      const { data } = response
+      console.log('📥 [Auth] Response data:', data)
+
+      // 3. Extract token
       const token =
         data.token ||
         ((data as unknown) as Record<string, unknown>).accessToken ||
         ((data as unknown) as Record<string, unknown>).access_token ||
         ((data as unknown) as Record<string, unknown>).jwt
-      if (!token) throw new Error('No token in response')
+
+      if (!token) {
+        console.error('❌ [Auth] No token found in response:', data)
+        throw new Error('No token in response')
+      }
+
       TokenStorage.set(token as string)
       set({
         isAuthenticated: true,
         user: data.user || { id: 0, name: email.split('@')[0], email },
         isLoading: false,
       })
-    } catch (err) {
+    } catch (err: any) {
       set({ isLoading: false })
+
+      // 4. Detailed error handling
+      if (err.response) {
+        // Server responded with a status code
+        const status = err.response.status
+        console.error('🔴 [Auth] Server error status:', status)
+        console.error('🔴 [Auth] Server error data:', err.response.data)
+
+        if (status === 404) {
+          throw new Error('Connection error: API endpoint not found.')
+        }
+        if (status === 401 || status === 403) {
+          throw new Error('Invalid email or password.')
+        }
+        if (status >= 500) {
+          throw new Error('Server error. Please try again later.')
+        }
+      } else if (err.request) {
+        // Request was made but no response received
+        console.error('⚠️ [Auth] No response received:', err.request)
+        throw new Error('No response from server. Check your internet connection.')
+      } else {
+        // Something happened in setting up the request
+        console.error('❌ [Auth] Request setup error:', err.message)
+      }
+
       throw err
     }
   },
