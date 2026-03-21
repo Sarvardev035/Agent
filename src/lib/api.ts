@@ -58,6 +58,7 @@ api.interceptors.response.use(
     }
 
     // 2. Handle 403 (Forbidden)
+    if (error.response?.status === 403) {
       return Promise.reject(new Error('Access denied'))
     }
     if (error.response?.status === 429) {
