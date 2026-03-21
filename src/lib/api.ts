@@ -2,7 +2,7 @@ import axios from 'axios'
 import { TokenStorage } from './security'
 
 const api = axios.create({
-  baseURL: 'https://finly.uyqidir.uz',
+  baseURL: '/',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

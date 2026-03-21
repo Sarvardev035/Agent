@@ -12,6 +12,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    proxy: {
+      '/api': {
+        target: 'https://finly.uyqidir.uz',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: 'ES2020',
