@@ -9,7 +9,8 @@ export default function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user, logout } = useAuthStore(s => ({ user: s.user, logout: s.logout }))
+  const user = useAuthStore(s => s.user)
+  const logout = useAuthStore(s => s.logout)
 
   const handleLogout = async () => {
     try {
