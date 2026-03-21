@@ -8,11 +8,11 @@ export interface AuthResponse {
 
 export const authService = {
   login: (data: LoginInput) =>
-    api.post<AuthResponse>('/auth/login', data),
+    api.post<AuthResponse>('/api/auth/login', data),
 
   register: (data: RegisterInput) =>
-    api.post<AuthResponse>('/auth/register', data),
+    api.post<AuthResponse>('/api/auth/register', data),
 
   logout: () =>
-    api.post('/auth/logout').catch(() => {}),
+    api.post('/api/auth/logout').catch(() => {}),
 }

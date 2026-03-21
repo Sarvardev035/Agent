@@ -10,12 +10,11 @@ console.log('🔌 API Base URL configured to:', API_URL)
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 15000, // Increased timeout
-  withCredentials: false, // Ensure we don't send cookies if not needed
+  timeout: 15000,
+  withCredentials: true, // Backend allows credentials, so we enable it
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    // Removed X-Requested-With to reduce CORS preflight issues
   },
 })
 
