@@ -37,7 +37,7 @@ const extractToken = (value: unknown): string | null => {
 
 export default function Register() {
   const navigate = useNavigate()
-  const [name, setName] = useState('')
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -58,7 +58,7 @@ export default function Register() {
     e.preventDefault()
     setError(null)
 
-    const result = RegisterSchema.safeParse({ name, email, password })
+    const result = RegisterSchema.safeParse({ fullName, email, password })
     if (!result.success) {
       setError(result.error.issues[0].message)
       return
@@ -167,8 +167,8 @@ export default function Register() {
             </label>
             <input
               type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
               placeholder="John Doe"
               required
               maxLength={100}
@@ -315,19 +315,19 @@ export default function Register() {
           {/* Submit button */}
           <button
             type="submit"
-            disabled={loading || !name || !email || !password}
+            disabled={loading || !fullName || !email || !password}
             style={{
               width: '100%', height: 48,
-              background: (loading || !name || !email || !password)
+              background: (loading || !fullName || !email || !password)
                 ? '#bfdbfe'
                 : 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
               color: '#ffffff', border: 'none',
               borderRadius: 12, fontSize: 15, fontWeight: 600,
-              cursor: (loading || !name || !email || !password) ? 'not-allowed' : 'pointer',
+              cursor: (loading || !fullName || !email || !password) ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center',
               justifyContent: 'center', gap: 8,
               transition: 'all 0.2s',
-              boxShadow: (loading || !name || !email || !password)
+              boxShadow: (loading || !fullName || !email || !password)
                 ? 'none'
                 : '0 4px 16px rgba(37,99,235,0.4)',
               letterSpacing: '0.01em',

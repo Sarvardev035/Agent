@@ -7,10 +7,10 @@ import EmptyState from '../components/ui/EmptyState'
 import ProgressRing from '../components/ui/ProgressRing'
 import ProgressBar from '../components/ui/ProgressBar'
 import Modal from '../components/ui/Modal'
-import { budgetService } from '../services/budget.service'
 import { BudgetCategory } from '../lib/notifications'
 import { formatCurrency } from '../lib/currency'
-import { CATEGORY_META } from '../lib/helpers'
+import { CATEGORY_META, safeArray } from '../lib/helpers'
+import api from '../lib/api'
 
 interface BudgetOverview {
   goal?: number
@@ -29,10 +29,14 @@ const Budget = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const [over, cats] = await Promise.all([budgetService.get(), budgetService.getCategories()])
+      const [over, cats] = await Promise.all([
+        api.get('/api/budget'),
+        api.get('/api/budget/categories'),
+      ])
       setOverview(over.data as BudgetOverview)
-      setCategories((cats.data as BudgetCategory[]) ?? [])
+      setCategories(safeArray<BudgetCategory>(cats.data) ?? [])
     } catch (err) {
+      console.error('❌ budget load failed:', err)
       const msg = err instanceof Error ? err.message : 'Failed to load budget'
       toast.error(msg)
     } finally {
@@ -55,7 +59,7 @@ const Budget = () => {
       return
     }
     try {
-      await budgetService.setCategory({ category: selectedCategory, limit })
+      await api.post('/api/budget/categories', { category: selectedCategory, limit })
       toast.success('Category limit saved')
       setModalOpen(false)
       load()

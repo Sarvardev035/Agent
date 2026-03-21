@@ -46,7 +46,7 @@ export const LoginSchema = z.object({
 })
 
 export const RegisterSchema = z.object({
-  name: z.string().min(1).max(100).transform(v => sanitize(v.trim())),
+  fullName: z.string().min(1).max(100).transform(v => sanitize(v.trim())),
   email: z.string().email().max(255).transform(v => v.toLowerCase().trim()),
   password: z
     .string()

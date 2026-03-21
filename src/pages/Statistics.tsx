@@ -4,9 +4,9 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieCh
 import { AlertTriangle } from 'lucide-react'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
-import { statsService } from '../services/stats.service'
-import { CATEGORY_META } from '../lib/helpers'
+import { CATEGORY_META, safeArray } from '../lib/helpers'
 import { formatCurrency } from '../lib/currency'
+import api from '../lib/api'
 
 interface TrendPoint { date: string; total: number }
 interface BreakdownPoint { category: string; value: number }
@@ -43,17 +43,18 @@ const Statistics = () => {
       setLoading(true)
       try {
         const [exp, inc, brk, ivs] = await Promise.all([
-          statsService.expenses('3m'),
-          statsService.income('3m'),
-          statsService.breakdown(),
-          statsService.vsIncome(),
+          api.get('/api/statistics/expenses', { params: { period: '3m' } }),
+          api.get('/api/statistics/income', { params: { period: '3m' } }),
+          api.get('/api/statistics/breakdown'),
+          api.get('/api/statistics/vs-income'),
         ])
-        setExpenseTrend((exp.data as TrendPoint[]) ?? [])
-        setIncomeTrend((inc.data as TrendPoint[]) ?? [])
-        setBreakdown((brk.data as BreakdownPoint[]) ?? [])
-        setVs((ivs.data as VsPoint[]) ?? [])
+        setExpenseTrend(safeArray<TrendPoint>(exp.data) ?? [])
+        setIncomeTrend(safeArray<TrendPoint>(inc.data) ?? [])
+        setBreakdown(safeArray<BreakdownPoint>(brk.data) ?? [])
+        setVs(safeArray<VsPoint>(ivs.data) ?? [])
         setIsSample(false)
-      } catch {
+      } catch (err) {
+        console.error('❌ statistics load failed:', err)
         setExpenseTrend(sampleTrend)
         setIncomeTrend(sampleTrend)
         setBreakdown(sampleBreakdown)

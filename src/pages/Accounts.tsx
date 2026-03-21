@@ -9,9 +9,11 @@ import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { useFinanceStore } from '../store/finance.store'
-import { accountsService, Account } from '../services/accounts.service'
+import { Account } from '../services/accounts.service'
 import { AccountSchema } from '../lib/security'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
+import api from '../lib/api'
+import { safeArray } from '../lib/helpers'
 
 interface AccountForm {
   name: string
@@ -45,7 +47,7 @@ const Accounts = () => {
       return
     }
     try {
-      await accountsService.create(parsed.data)
+      await api.post('/api/accounts', parsed.data)
       toast.success('Account created')
       setModalOpen(false)
       refreshAccounts()
@@ -58,7 +60,7 @@ const Accounts = () => {
   const handleDelete = async () => {
     if (!confirmId) return
     try {
-      await accountsService.delete(confirmId)
+      await api.delete(`/api/accounts/${confirmId}`)
       toast.success('Account deleted')
       setConfirmId(null)
       refreshAccounts()
