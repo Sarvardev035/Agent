@@ -20,7 +20,7 @@ import ProgressRing from '../components/ui/ProgressRing'
 import CurrencyWidget from '../components/widgets/CurrencyWidget'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
-import { CATEGORY_META, getTimeOfDay, isThisMonth } from '../lib/helpers'
+import { CATEGORY_META, getTimeOfDay, isThisMonth, toArray } from '../lib/helpers'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
 import { expensesService, Expense } from '../services/expenses.service'
 import { incomeService, Income } from '../services/income.service'
@@ -112,24 +112,53 @@ const Dashboard = () => {
   const loadData = useCallback(async () => {
     setLoading(true)
     const results = await Promise.allSettled([
-      accountsService.getAll(),
-      expensesService.getAll(),
-      incomeService.getAll(),
-      debtsService.getAll(),
-      budgetService.get(),
+      accountsService
+        .getAll()
+        .catch(e => {
+          console.error('❌ accounts failed:', e.message)
+          return { data: [] }
+        }),
+      expensesService
+        .getAll()
+        .catch(e => {
+          console.error('❌ expenses failed:', e.message)
+          return { data: [] }
+        }),
+      incomeService
+        .getAll()
+        .catch(e => {
+          console.error('❌ income failed:', e.message)
+          return { data: [] }
+        }),
+      debtsService
+        .getAll()
+        .catch(e => {
+          console.error('❌ debts failed:', e.message)
+          return { data: [] }
+        }),
+      budgetService
+        .get()
+        .catch(e => {
+          console.error('❌ budget failed:', e.message)
+          return { data: {} }
+        }),
     ])
 
     const newWarnings: string[] = []
-    if (results[0].status === 'fulfilled') setAccounts(results[0].value.data ?? [])
+    if (results[0].status === 'fulfilled')
+      setAccounts(toArray<Account>(results[0].value.data))
     else newWarnings.push('Accounts failed to load')
 
-    if (results[1].status === 'fulfilled') setExpenses(results[1].value.data ?? [])
+    if (results[1].status === 'fulfilled')
+      setExpenses(toArray<Expense>(results[1].value.data))
     else newWarnings.push('Expenses unavailable')
 
-    if (results[2].status === 'fulfilled') setIncome(results[2].value.data ?? [])
+    if (results[2].status === 'fulfilled')
+      setIncome(toArray<Income>(results[2].value.data))
     else newWarnings.push('Income unavailable')
 
-    if (results[3].status === 'fulfilled') setDebts(results[3].value.data ?? [])
+    if (results[3].status === 'fulfilled')
+      setDebts(toArray<Debt>(results[3].value.data))
     else newWarnings.push('Debts unavailable')
 
     if (results[4].status === 'fulfilled') {
@@ -137,7 +166,7 @@ const Dashboard = () => {
       setBudget({
         goal: payload.goal ?? 0,
         spent: payload.spent ?? 0,
-        categories: payload.categories ?? [],
+        categories: toArray<BudgetCategory>(payload.categories),
       })
     } else newWarnings.push('Budget data unavailable')
 
@@ -156,9 +185,13 @@ const Dashboard = () => {
     return `Good ${tod}${name}`
   }, [user?.name])
 
-  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
-  const expensesThisMonth = expenses.filter(e => isThisMonth(e.date)).reduce((s, e) => s + e.amount, 0)
-  const incomeThisMonth = income.filter(i => isThisMonth(i.date)).reduce((s, i) => s + i.amount, 0)
+  const totalBalance = accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0)
+  const expensesThisMonth = expenses
+    .filter(e => isThisMonth(e.date))
+    .reduce((s, e) => s + (e.amount ?? 0), 0)
+  const incomeThisMonth = income
+    .filter(i => isThisMonth(i.date))
+    .reduce((s, i) => s + (i.amount ?? 0), 0)
   const totalBalanceFormatted = formatCurrency(totalBalance)
   const expensesThisMonthFormatted = formatCurrency(expensesThisMonth)
   const incomeThisMonthFormatted = formatCurrency(incomeThisMonth)
@@ -202,7 +235,7 @@ const Dashboard = () => {
       const dayKey = format(date, 'yyyy-MM-dd')
       const total = expenses
         .filter(e => e.date === dayKey)
-        .reduce((s, e) => s + e.amount, 0)
+        .reduce((s, e) => s + (e.amount ?? 0), 0)
       return { date: format(date, 'MMM d'), total }
     })
     return days

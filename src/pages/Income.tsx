@@ -8,7 +8,7 @@ import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { CATEGORY_META } from '../lib/helpers'
+import { CATEGORY_META, toArray } from '../lib/helpers'
 import { incomeService, Income } from '../services/income.service'
 import { IncomeSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
@@ -52,9 +52,10 @@ const IncomePage = () => {
     setLoading(true)
     try {
       const { data } = await incomeService.getAll({ month: selectedMonth })
-      setItems(data ?? [])
+      setItems(toArray<Income>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load income'
+      console.error('❌ income load failed:', msg)
       toast.error(msg)
     } finally {
       setLoading(false)

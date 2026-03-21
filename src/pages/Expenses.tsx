@@ -8,7 +8,7 @@ import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { CATEGORY_META, smartDate } from '../lib/helpers'
+import { CATEGORY_META, smartDate, toArray } from '../lib/helpers'
 import { expensesService, Expense } from '../services/expenses.service'
 import { ExpenseSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
@@ -54,9 +54,10 @@ const Expenses = () => {
     setLoading(true)
     try {
       const { data } = await expensesService.getAll({ month: selectedMonth })
-      setItems(data ?? [])
+      setItems(toArray<Expense>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load expenses'
+      console.error('❌ expenses load failed:', msg)
       toast.error(msg)
     } finally {
       setLoading(false)

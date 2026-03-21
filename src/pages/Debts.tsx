@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { debtsService, Debt } from '../services/debts.service'
 import { DebtSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
-import { smartDate } from '../lib/helpers'
+import { smartDate, toArray } from '../lib/helpers'
 
 interface DebtForm {
   personName: string
@@ -40,9 +40,10 @@ const Debts = () => {
     setLoading(true)
     try {
       const { data } = await debtsService.getAll()
-      setItems(data ?? [])
+      setItems(toArray<Debt>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load debts'
+      console.error('❌ debts load failed:', msg)
       toast.error(msg)
     } finally {
       setLoading(false)

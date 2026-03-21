@@ -10,7 +10,7 @@ import { transfersService, Transfer } from '../services/transfers.service'
 import { TransferSchema } from '../lib/security'
 import { useFinanceStore } from '../store/finance.store'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
-import { smartDate } from '../lib/helpers'
+import { smartDate, toArray } from '../lib/helpers'
 
 interface TransferForm {
   fromAccountId: number
@@ -38,9 +38,10 @@ const Transfers = () => {
     setLoading(true)
     try {
       const { data } = await transfersService.getAll()
-      setItems(data ?? [])
+      setItems(toArray<Transfer>(data))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load transfers'
+      console.error('❌ transfers load failed:', msg)
       toast.error(msg)
     } finally {
       setLoading(false)

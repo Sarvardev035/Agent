@@ -9,6 +9,7 @@ import TransactionItem from '../components/ui/TransactionItem'
 import { expensesService, Expense } from '../services/expenses.service'
 import { incomeService, Income } from '../services/income.service'
 import { useFinanceStore } from '../store/finance.store'
+import { toArray } from '../lib/helpers'
 
 import 'react-calendar/dist/Calendar.css'
 
@@ -25,12 +26,16 @@ const CalendarView = () => {
     const load = async () => {
       setLoading(true)
       try {
-        const [exp, inc] = await Promise.all([expensesService.getAll(), incomeService.getAll()])
-        setExpenses(exp.data ?? [])
-        setIncome(inc.data ?? [])
+        const [exp, inc] = await Promise.all([
+          expensesService.getAll(),
+          incomeService.getAll(),
+        ])
+        setExpenses(toArray<Expense>(exp.data))
+        setIncome(toArray<Income>(inc.data))
         refreshAccounts()
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load calendar'
+        console.error('❌ calendar load failed:', msg)
         toast.error(msg)
       } finally {
         setLoading(false)

@@ -11,6 +11,16 @@ import {
 
 export { formatCurrency } from './currency'
 
+export const toArray = <T,>(data: unknown): T[] => {
+  if (!data) return []
+  if (Array.isArray(data)) return data as T[]
+  const obj = data as Record<string, unknown>
+  if (Array.isArray(obj.content)) return obj.content as T[]
+  if (Array.isArray(obj.data)) return obj.data as T[]
+  if (typeof data === 'object') return [data] as T[]
+  return []
+}
+
 export const smartDate = (d: string): string => {
   try {
     const date = parseISO(d)
