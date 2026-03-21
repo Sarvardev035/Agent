@@ -3,7 +3,7 @@ import api from '../lib/api'
 export interface Account {
   id: number
   name: string
-  type: 'CARD' | 'CASH' | 'BANK'
+  type: 'BANK_CARD' | 'CASH'
   currency: string
   balance: number
 }

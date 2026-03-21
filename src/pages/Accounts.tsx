@@ -13,11 +13,11 @@ import { Account } from '../services/accounts.service'
 import { AccountSchema } from '../lib/security'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
 import api from '../lib/api'
-import { safeArray } from '../lib/helpers'
+import { safeArray, mapAccountType } from '../lib/helpers'
 
 interface AccountForm {
   name: string
-  type: 'CARD' | 'CASH' | 'BANK'
+  type: 'BANK_CARD' | 'CASH'
   currency: string
   balance: number
 }
@@ -26,7 +26,7 @@ const Accounts = () => {
   const { accounts, refreshAccounts, isLoadingAccounts } = useFinanceStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmId, setConfirmId] = useState<number | null>(null)
-  const [form, setForm] = useState<AccountForm>({ name: '', type: 'CARD', currency: 'UZS', balance: 0 })
+  const [form, setForm] = useState<AccountForm>({ name: '', type: 'BANK_CARD', currency: 'UZS', balance: 0 })
   const [displayCurrency, setDisplayCurrency] = useState('USD')
   const { convert, rates, loading: rateLoading, lastUpdated, refresh } = useExchangeRates()
 
@@ -168,7 +168,7 @@ const Accounts = () => {
                     last4={String(acc.id).slice(-4)}
                     balance={acc.balance}
                     currency={acc.currency}
-                    type={acc.type}
+                    type={mapAccountType(acc.type)}
                     accountId={acc.id}
                   />
                   <button
@@ -215,9 +215,8 @@ const Accounts = () => {
                 onChange={e => setForm({ ...form, type: e.target.value as Account['type'] })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               >
-                <option value="CARD">Card</option>
+                <option value="BANK_CARD">Bank Card</option>
                 <option value="CASH">Cash</option>
-                <option value="BANK">Bank</option>
               </select>
             </div>
             <div>

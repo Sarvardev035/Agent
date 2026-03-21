@@ -20,7 +20,7 @@ import ProgressRing from '../components/ui/ProgressRing'
 import CurrencyWidget from '../components/widgets/CurrencyWidget'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
-import { CATEGORY_META, getTimeOfDay, isThisMonth, toArray, safeArray } from '../lib/helpers'
+import { CATEGORY_META, getTimeOfDay, isThisMonth, toArray, safeArray, mapAccountType } from '../lib/helpers'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
 import api from '../lib/api'
 import { Expense } from '../services/expenses.service'
@@ -355,7 +355,7 @@ const Dashboard = () => {
                       last4={String(acc.id).slice(-4)}
                       balance={acc.balance}
                       currency={acc.currency}
-                      type={acc.type}
+                      type={mapAccountType(acc.type)}
                       accountId={acc.id}
                     />
                   </div>

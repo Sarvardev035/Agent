@@ -5,7 +5,7 @@ import { safeArray } from '../lib/helpers'
 export interface Account {
   id: number
   name: string
-  type: 'CARD' | 'CASH' | 'BANK'
+  type: 'BANK_CARD' | 'CASH'
   currency: string
   balance: number
   createdAt?: string

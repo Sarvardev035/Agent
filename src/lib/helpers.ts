@@ -79,6 +79,17 @@ export const getBudgetColor = (pct: number) =>
       ? { bar: '#f59e0b', text: '#92400e', bg: '#fffbeb' }
       : { bar: '#10b981', text: '#065f46', bg: '#ecfdf5' }
 
+// Map backend account types to frontend types
+export const mapAccountType = (type: string): 'BANK_CARD' | 'CASH' => {
+  const typeMap: Record<string, 'BANK_CARD' | 'CASH'> = {
+    'CARD': 'BANK_CARD',
+    'BANK_CARD': 'BANK_CARD',
+    'BANK': 'BANK_CARD',
+    'CASH': 'CASH',
+  }
+  return typeMap[type] || 'BANK_CARD'
+}
+
 export const getTimeOfDay = () => {
   const h = new Date().getHours()
   return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'

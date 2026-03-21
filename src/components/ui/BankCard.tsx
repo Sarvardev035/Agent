@@ -6,16 +6,15 @@ interface BankCardProps {
   last4: string | number
   balance: number
   currency: string
-  type: 'CARD' | 'CASH' | 'BANK'
+  type: 'BANK_CARD' | 'CASH'
   accountId?: number
   institution?: string
   productType?: string
 }
 
 const typeIcon = {
-  CARD: WalletCards,
+  BANK_CARD: CreditCard,
   CASH: Wallet,
-  BANK: CreditCard,
 }
 
 const BankCard = ({ name, last4, balance, currency, type, accountId, institution, productType }: BankCardProps) => {

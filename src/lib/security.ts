@@ -95,7 +95,7 @@ export const IncomeSchema = z.object({
 
 export const AccountSchema = z.object({
   name: z.string().min(1).max(100).transform(v => sanitize(v.trim())),
-  type: z.enum(['CARD', 'CASH', 'BANK']),
+  type: z.enum(['BANK_CARD', 'CASH']),
   currency: z.enum(['UZS', 'USD', 'EUR', 'RUB']),
   balance: z.number().min(0),
 })
