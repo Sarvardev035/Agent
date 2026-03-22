@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { TokenStorage } from '../../lib/security'
 import { useAuthStore } from '../../store/auth.store'
+import Chatbot from '../Chatbot/Chatbot'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, group: 'MAIN' },
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { label: 'Budget', path: '/budget', icon: PieChart, group: 'MANAGE' },
   { label: 'Statistics', path: '/statistics', icon: BarChart3, group: 'MANAGE' },
   { label: 'Calendar', path: '/calendar', icon: Calendar, group: 'MANAGE' },
+  { label: 'Categories', path: '/categories', icon: Wallet, group: 'MANAGE' },
 ]
 
 type MobileTab = { path?: string; action?: () => void; icon: string; label: string }
@@ -45,6 +47,7 @@ const MoreItems = [
   { path: '/statistics', label: 'Statistics', icon: '📊' },
   { path: '/calendar', label: 'Calendar', icon: '📅' },
   { path: '/accounts', label: 'Accounts', icon: '💳' },
+  { path: '/categories', label: 'Categories', icon: '📂' },
 ]
 
 const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
@@ -489,6 +492,7 @@ const AppShell = () => {
       </main>
 
       {isMobile && <BottomNav onLogout={logout} />}
+      <Chatbot />
     </div>
   )
 }

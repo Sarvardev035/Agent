@@ -15,6 +15,7 @@ import Budget from './pages/Budget'
 import Statistics from './pages/Statistics'
 import CalendarView from './pages/CalendarView'
 import Accounts from './pages/Accounts'
+import Categories from './pages/Categories'
 import './index.css'
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
               <Route path="/statistics" element={<Statistics />} />
               <Route path="/calendar"   element={<CalendarView />} />
               <Route path="/accounts"   element={<Accounts />} />
+              <Route path="/categories" element={<Categories />} />
             </Route>
           </Route>
 
