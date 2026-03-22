@@ -82,6 +82,63 @@ body {
 
 h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; }
 
+.page-content > * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.card {
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.grid-2, .grid-3, .grid-4 {
+  width: 100%;
+  overflow: hidden;
+}
+
+h1, h2, h3, p {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.amount,
+.balance,
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.balance-large {
+  font-size: clamp(24px, 4vw, 40px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.stat-number {
+  font-size: clamp(18px, 2.5vw, 26px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.amount-positive {
+  color: #10b981;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-negative {
+  color: #ef4444;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .liquid-scene {
   position: fixed;
   inset: 0;

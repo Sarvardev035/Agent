@@ -13,6 +13,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
+import { SoundToggle } from '../ui/SoundToggle'
 
 type NavItem = {
   label: string
@@ -193,28 +194,37 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
             </div>
           )}
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            borderRadius: 12,
-            border: '1px solid var(--accent-border)',
-            background: 'var(--accent-gradient-warm)',
-            color: '#fff',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            cursor: 'pointer',
-            boxShadow: '0 12px 28px rgba(196,93,255,0.22)',
-          }}
-          type="button"
-        >
-          <LogOut size={16} />
-          {!collapsed && 'Logout'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              width: collapsed ? 40 : '100%',
+              padding: '10px 12px',
+              borderRadius: 12,
+              border: '1px solid var(--accent-border)',
+              background: 'var(--accent-gradient-warm)',
+              color: '#fff',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              cursor: 'pointer',
+              boxShadow: '0 12px 28px rgba(196,93,255,0.22)',
+              flexShrink: 0,
+            }}
+            type="button"
+          >
+            <LogOut size={16} />
+            {!collapsed && 'Logout'}
+          </button>
+          <SoundToggle />
+        </div>
+        {!collapsed && (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600, marginTop: 10 }}>
+            Interface sounds
+          </div>
+        )}
       </div>
     </aside>
   )

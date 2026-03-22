@@ -210,10 +210,11 @@ const Dashboard = () => {
         </p>
         <h2 style={{
           margin:'0 0 4px',
-          fontSize:'clamp(28px,5vw,42px)',
-          fontWeight:800, letterSpacing:'-0.02em',
+          fontWeight:800,
         }}>
-          {loading ? '—' : formatCurrency(summary.totalBalance)}
+          <span className="balance-large">
+            {loading ? '—' : formatCurrency(summary.totalBalance)}
+          </span>
         </h2>
         <p style={{ margin:'0 0 20px', opacity:0.6, fontSize:13 }}>
           Across {accounts.length} account{accounts.length !== 1 ? 's' : ''}
@@ -229,7 +230,9 @@ const Dashboard = () => {
             </p>
             <p style={{ margin:0, fontWeight:700, fontSize:16,
               color:'#4ade80' }}>
-              {loading ? '—' : formatCurrency(summary.totalIncome)}
+              <span className="amount amount-positive">
+                {loading ? '—' : formatCurrency(summary.totalIncome)}
+              </span>
             </p>
           </div>
           <div>
@@ -238,7 +241,9 @@ const Dashboard = () => {
             </p>
             <p style={{ margin:0, fontWeight:700, fontSize:16,
               color:'#f87171' }}>
-              {loading ? '—' : formatCurrency(summary.totalExpense)}
+              <span className="amount amount-negative">
+                {loading ? '—' : formatCurrency(summary.totalExpense)}
+              </span>
             </p>
           </div>
           <div>
@@ -247,7 +252,9 @@ const Dashboard = () => {
             </p>
             <p style={{ margin:0, fontWeight:700, fontSize:16,
               color:'#a78bfa' }}>
-              {loading ? '—' : formatCurrency(summary.savings)}
+              <span className="amount">
+                {loading ? '—' : formatCurrency(summary.savings)}
+              </span>
             </p>
           </div>
         </div>
@@ -289,9 +296,7 @@ const Dashboard = () => {
             }}>
               {card.icon} {card.label}
             </div>
-            <div style={{ fontSize:'clamp(18px,2.5vw,24px)',
-              fontWeight:800, color:card.color,
-            }}>
+            <div className="stat-number" style={{ color: card.color }}>
               {card.isCount
                 ? card.value
                 : card.isPct
@@ -427,10 +432,10 @@ const Dashboard = () => {
                     {smartDate(txn.date || txn.expenseDate || txn.incomeDate)}
                   </div>
                 </div>
-                <div style={{
-                  fontWeight:700,fontSize:14,flexShrink:0,
-                  color: txn.txnType==='expense' || txn.type === 'expense' ? '#ef4444' : '#10b981',
-                }}>
+                <div
+                  className={txn.txnType==='expense' || txn.type === 'expense' ? 'amount amount-negative' : 'amount amount-positive'}
+                  style={{ fontSize: 14, flexShrink: 0 }}
+                >
                   {txn.txnType==='expense' || txn.type === 'expense' ? '−' : '+'}
                   {formatCurrency(txn.amount, txn.currency)}
                 </div>
@@ -528,8 +533,8 @@ const Dashboard = () => {
                       </div>
                     </div>
                   </div>
-                  <div style={{
-                    fontSize:14,fontWeight:700,
+                  <div className="amount" style={{
+                    fontSize:14,
                     color:'var(--text-1)',
                   }}>
                     {formatCurrency(acc.balance, acc.currency)}

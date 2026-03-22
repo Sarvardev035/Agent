@@ -12,6 +12,7 @@ import { formatCurrency, smartDate } from '../utils/helpers'
 import { useFinance } from '../context/FinanceContext'
 import { safeArray } from '../lib/helpers'
 import { CURRENCIES } from '../lib/constants'
+import { sounds } from '../lib/sounds'
 
 type DebtType = 'DEBT' | 'RECEIVABLE'
 type DebtStatus = 'OPEN' | 'CLOSED'
@@ -57,6 +58,7 @@ const Debts = () => {
       )
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error('Failed to load debts')
     } finally {
       setLoading(false)
@@ -78,6 +80,7 @@ const Debts = () => {
   const handleSubmit = () => {
     setTimeout(async () => {
       if (!form.personName || !form.amount) {
+        sounds.error()
         toast.error('Please fill person and amount')
         return
       }
@@ -91,12 +94,14 @@ const Debts = () => {
           description: form.description,
           accountId: form.accountId || undefined,
         })
-        toast.success('Debt saved')
+        sounds.notification()
+        toast.success('Debt recorded!')
         setModalOpen(false)
         setForm(prev => ({ ...prev, amount: '', description: '' }))
         await Promise.allSettled([loadDebts(), refreshAccounts()])
       } catch (err) {
         console.error(err)
+        sounds.error()
         toast.error('Failed to save debt')
       }
     }, 0)
@@ -106,11 +111,13 @@ const Debts = () => {
     if (!confirmId) return
     try {
       await debtsApi.delete(confirmId)
+      sounds.success()
       toast.success('Debt removed')
       setConfirmId(null)
       await Promise.allSettled([loadDebts(), refreshAccounts()])
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error('Failed to delete debt')
     }
   }
@@ -119,6 +126,7 @@ const Debts = () => {
     if (!repayModal) return
     const paymentAmount = Number(repayModal.amount)
     if (!paymentAmount) {
+      sounds.error()
       toast.error('Enter repayment amount')
       return
     }
@@ -128,11 +136,13 @@ const Debts = () => {
           paymentAmount,
           accountId: repayModal.accountId || undefined,
         })
-        toast.success('Repayment recorded')
+        sounds.success()
+        toast.success('Repayment recorded! ✅')
         setRepayModal(null)
         await Promise.allSettled([loadDebts(), refreshAccounts()])
       } catch (err) {
         console.error(err)
+        sounds.error()
         toast.error('Failed to record repayment')
       }
     }, 0)
@@ -200,7 +210,7 @@ const Debts = () => {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>DEBTS</p>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { format, subMonths } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Info, Lightbulb, PieChart, Plus, ShieldAlert } from 'lucide-react'
@@ -13,6 +13,8 @@ import { formatCurrency, smartDate } from '../utils/helpers'
 import { categoriesService } from '../services/categories.service'
 import { safeArray } from '../lib/helpers'
 import { CURRENCIES } from '../lib/constants'
+import { budgetApi } from '../api/budgetApi'
+import { sounds } from '../lib/sounds'
 
 type ExpenseFormState = {
   amount: string
@@ -46,6 +48,8 @@ const Expenses = () => {
     accountId: '',
     currency: 'UZS',
   })
+  const [budgetWarning, setBudgetWarning] = useState<string | null>(null)
+  const lastBudgetWarningRef = useRef<string | null>(null)
 
   const loadCategories = async () => {
     try {
@@ -74,6 +78,7 @@ const Expenses = () => {
       setExpenses(list)
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error('Failed to load expenses')
     } finally {
       setLoading(false)
@@ -85,6 +90,55 @@ const Expenses = () => {
     loadCategories()
     refreshAccounts()
   }, [refreshAccounts])
+
+  useEffect(() => {
+    const checkBudget = async () => {
+      if (!formData.amount || !formData.categoryId) {
+        setBudgetWarning(null)
+        lastBudgetWarningRef.current = null
+        return
+      }
+
+      try {
+        const now = new Date()
+        const budgets = await budgetApi.get({
+          year: now.getFullYear(),
+          month: now.getMonth() + 1,
+        })
+        const budgetList = safeArray<any>(budgets.data)
+        const match = budgetList.find((b: any) => b.categoryId === formData.categoryId && b.type === 'EXPENSE')
+
+        if (!match) {
+          setBudgetWarning(null)
+          lastBudgetWarningRef.current = null
+          return
+        }
+
+        const monthlyLimit = Number(match.monthlyLimit ?? match.limit ?? 0)
+        const spent = Number(match.spent ?? match.spentAmount ?? 0)
+        const remainingBudget = Number(match.remaining ?? Math.max(monthlyLimit - spent, 0))
+        const amount = Number(formData.amount)
+
+        if (monthlyLimit > 0 && amount > remainingBudget) {
+          const warning =
+            `⚠️ Budget for this category: ${formatCurrency(monthlyLimit, match.currency || formData.currency)}. `
+            + `Remaining: ${formatCurrency(remainingBudget, match.currency || formData.currency)}. `
+            + `You are entering: ${formatCurrency(amount, formData.currency)}.`
+
+          setBudgetWarning(warning)
+          if (lastBudgetWarningRef.current !== warning) {
+            sounds.budgetWarning()
+            lastBudgetWarningRef.current = warning
+          }
+        } else {
+          setBudgetWarning(null)
+          lastBudgetWarningRef.current = null
+        }
+      } catch {}
+    }
+
+    void checkBudget()
+  }, [formData.amount, formData.categoryId, formData.currency])
 
   const filteredExpenses = useMemo(() => {
     const monthMatch = (date: string) => date?.startsWith(month)
@@ -120,10 +174,18 @@ const Expenses = () => {
   const handleSubmit = () => {
     setTimeout(async () => {
       if (!formData.amount || !formData.expenseDate || !formData.accountId || !formData.categoryId) {
+        sounds.error()
         toast.error('Please fill amount, date, category, account, and currency')
         return
       }
       try {
+        if (budgetWarning) {
+          sounds.budgetWarning()
+          toast('⚠️ This exceeds your budget for this category', {
+            icon: '⚠️',
+            style: { background: '#fffbeb', color: '#92400e' },
+          })
+        }
         await expensesApi.create({
           amount: Number(formData.amount),
           expenseDate: formData.expenseDate,
@@ -132,7 +194,8 @@ const Expenses = () => {
           accountId: formData.accountId,
           currency: formData.currency,
         })
-        toast.success('Expense added')
+        sounds.expense()
+        toast.success('Expense added!')
         setShowModal(false)
         setFormData({
           amount: '',
@@ -142,9 +205,12 @@ const Expenses = () => {
           accountId: '',
           currency: 'UZS',
         })
+        setBudgetWarning(null)
+        lastBudgetWarningRef.current = null
         await Promise.allSettled([loadExpenses(), refreshAccounts()])
       } catch (err) {
         console.error(err)
+        sounds.error()
         toast.error('Failed to add expense')
       }
     }, 0)
@@ -153,7 +219,7 @@ const Expenses = () => {
   const dailyTotals = (items: any[]) => items.reduce((sum, item) => sum + (item.amount || 0), 0)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
       <div
         style={{
           background: 'linear-gradient(120deg,#0f172a,#1e3a8a)',
@@ -364,7 +430,7 @@ const Expenses = () => {
         subtitle="Save a new expense entry with ISO date."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Amount</label>
               <input
@@ -387,7 +453,7 @@ const Expenses = () => {
               />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Category</label>
               <select
@@ -431,6 +497,25 @@ const Expenses = () => {
               )}
             </div>
           </div>
+          {budgetWarning && (
+            <div
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                borderRadius: 10,
+                padding: '10px 14px',
+                fontSize: 13,
+                color: '#92400e',
+                marginBottom: 12,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+              }}
+            >
+              <span style={{ flexShrink: 0 }}>⚠️</span>
+              <span>{budgetWarning}</span>
+            </div>
+          )}
           <div>
             <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Account</label>
             <select

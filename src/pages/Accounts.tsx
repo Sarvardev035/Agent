@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import BankCard from '../components/ui/BankCard'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
@@ -17,6 +17,7 @@ import api from '../lib/api'
 import { safeArray, mapAccountType } from '../lib/helpers'
 import { ACCOUNT_TYPES, CARD_TYPES, CURRENCIES } from '../lib/constants'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import { sounds } from '../lib/sounds'
 
 type AccountType = (typeof ACCOUNT_TYPES)[number]['value']
 type CurrencyCode = (typeof CURRENCIES)[number]
@@ -79,14 +80,17 @@ const Accounts = () => {
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
+      sounds.error()
       toast.error('Name is required')
       return
     }
     if (isCardAccount && cardNumberError) {
+      sounds.error()
       toast.error(cardNumberError)
       return
     }
     if (isCardAccount && cardTypeError) {
+      sounds.error()
       toast.error(cardTypeError)
       return
     }
@@ -97,6 +101,7 @@ const Accounts = () => {
       cardType: isCardAccount ? form.cardType || undefined : undefined,
     })
     if (!parsed.success) {
+      sounds.error()
       toast.error(parsed.error.issues[0].message)
       return
     }
@@ -113,7 +118,8 @@ const Accounts = () => {
             }
           : {}),
       })
-      toast.success('Account created')
+      sounds.success()
+      toast.success('Account created! 🎉')
       setModalOpen(false)
       setForm(getDefaultAccountForm())
       await refreshAccounts()
@@ -121,6 +127,7 @@ const Accounts = () => {
       const msg = err?.response?.data?.message
         || err?.response?.data?.error
         || (err instanceof Error ? err.message : 'Failed to create account')
+      sounds.error()
       toast.error(msg)
     }
   }
@@ -130,6 +137,7 @@ const Accounts = () => {
     setDeleting(true)
     try {
       await api.delete(`/api/accounts/${confirmId}`)
+      sounds.success()
       toast.success('Account deleted successfully')
       setConfirmId(null)
       await refreshAccounts()
@@ -154,6 +162,7 @@ const Accounts = () => {
         setConfirmId(null)
       } else {
         const msg = err instanceof Error ? err.message : 'Failed to delete account'
+        sounds.error()
         toast.error(msg)
         setConfirmId(null)
       }
@@ -163,35 +172,76 @@ const Accounts = () => {
   }
 
   return (
-    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="page-content page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 24,
+      }}>
         <div>
-          <p style={{ color: '#94a3b8', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>ACCOUNTS</p>
-          <h1 style={{ margin: '4px 0', fontSize: 22, fontWeight: 800 }}>Portfolio</h1>
-          <p style={{ margin: 0, color: '#64748b' }}>Manage your cash, cards, and banks.</p>
+          <p style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: 'var(--text-3)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            margin: '0 0 4px',
+          }}>
+            ACCOUNTS
+          </p>
+          <h1 style={{
+            fontSize: 'clamp(20px,3vw,28px)',
+            fontWeight: 800,
+            color: 'var(--text-1)',
+            margin: 0,
+          }}>
+            Portfolio
+          </h1>
+          <p style={{
+            fontSize: 13,
+            color: 'var(--text-3)',
+            margin: '4px 0 0',
+          }}>
+            Manage your cash, cards, and banks.
+          </p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
           type="button"
           style={{
-            display: 'inline-flex',
+            display: 'flex',
             alignItems: 'center',
             gap: 8,
+            padding: '11px 20px',
+            background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+            color: 'white',
             border: 'none',
-            background: '#2563eb',
-            color: '#fff',
-            padding: '10px 12px',
             borderRadius: 12,
-            fontWeight: 800,
-            boxShadow: '0 12px 30px rgba(37,99,235,0.3)',
+            fontSize: 14,
+            fontWeight: 600,
             cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = 'translateY(-2px)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(124,58,237,0.45)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = '0 4px 14px rgba(124,58,237,0.35)'
           }}
         >
-          <Plus size={16} /> New account
+          + Add Account
         </button>
       </div>
 
       <div
+        className="card"
         style={{
           background: '#fff',
           borderRadius: 16,
@@ -205,7 +255,7 @@ const Accounts = () => {
       >
         <div>
           <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>Portfolio value</p>
-          <div className="tabular" style={{ fontSize: 24, fontWeight: 800 }}>
+          <div className="balance-large">
             {rateLoading ? 'Loading...' : formatCurrency(portfolio, displayCurrency)}
           </div>
           <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: 12 }}>

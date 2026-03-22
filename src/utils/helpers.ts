@@ -1,17 +1,23 @@
 import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns'
 
 // Format currency — handles UZS, USD, EUR
-export const formatCurrency = (amount: number | null | undefined, currency: string = 'UZS') => {
+export const formatCurrency = (
+  amount: number | null | undefined,
+  currency: string = 'UZS'
+) => {
   if (amount === null || amount === undefined) return '—'
+  const num = Number(amount)
+  if (Number.isNaN(num)) return '—'
+
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount)
+      minimumFractionDigits: currency === 'UZS' ? 0 : 2,
+      maximumFractionDigits: currency === 'UZS' ? 0 : 2,
+    }).format(num)
   } catch {
-    return `${currency} ${Number(amount).toLocaleString()}`
+    return `${currency} ${num.toLocaleString('en-US')}`
   }
 }
 

@@ -11,6 +11,7 @@ import { useFinance } from '../context/FinanceContext'
 import { formatCurrency, smartDate } from '../utils/helpers'
 import { safeArray, safeObject } from '../lib/helpers'
 import api from '../lib/api'
+import { sounds } from '../lib/sounds'
 
 interface TransferForm {
   amount: string
@@ -48,6 +49,7 @@ const Transfers = () => {
       )
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error('Failed to load transfers')
     } finally {
       setLoading(false)
@@ -63,10 +65,12 @@ const Transfers = () => {
 
   const handleSubmit = async () => {
     if (!form.amount || !form.fromAccountId || !form.toAccountId) {
+      sounds.error()
       toast.error('Fill all required fields')
       return
     }
     if (form.fromAccountId === form.toAccountId) {
+      sounds.error()
       toast.error('Choose different accounts')
       return
     }
@@ -80,7 +84,8 @@ const Transfers = () => {
           transferDate: form.transferDate,
           exchangeRate: Number(form.exchangeRate) || 1,
         })
-        toast.success('Transfer created')
+        sounds.transfer()
+        toast.success('Transfer completed!')
         setModalOpen(false)
         setForm({
           amount: '',
@@ -93,6 +98,7 @@ const Transfers = () => {
         await Promise.allSettled([loadTransfers(), refreshAccounts()])
       } catch (err) {
         console.error(err)
+        sounds.error()
         toast.error('Failed to save transfer')
       }
     }, 0)
@@ -126,7 +132,7 @@ const Transfers = () => {
   }, [currenciesDiffer, form.amount, fromAccount?.currency, toAccount?.currency, rates])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>TRANSFERS</p>

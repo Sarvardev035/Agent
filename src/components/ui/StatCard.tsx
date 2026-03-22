@@ -87,7 +87,7 @@ const StatCard = ({
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div
-              className="tabular"
+              className="stat-number"
               style={{
                 fontSize: 30,
                 fontWeight: 800,

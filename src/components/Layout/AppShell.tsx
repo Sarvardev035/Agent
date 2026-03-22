@@ -8,6 +8,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useRouteScrollReveal } from '../../hooks/useRouteScrollReveal'
 import api from '../../lib/api'
 import { safeArray } from '../../lib/helpers'
+import { SoundToggle } from '../ui/SoundToggle'
 
 const AppShell = () => {
   const location = useLocation()
@@ -81,38 +82,41 @@ const AppShell = () => {
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Notifications"
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-1)',
-                position: 'relative',
-                backdropFilter: 'blur(14px) saturate(145%)',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-            >
-              <Bell size={18} />
-              {notifications.length > 0 && (
-                <span style={{
-                  position: 'absolute', top: -4, right: -4,
-                  background: '#ef4444', color: 'white',
-                  width: 18, height: 18, borderRadius: '50%',
-                  fontSize: 10, fontWeight: 700,
-                  display: 'flex', alignItems: 'center',
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SoundToggle />
+              <button
+                type="button"
+                aria-label="Notifications"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
-                }}>
-                  {notifications.length > 9 ? '9+' : notifications.length}
-                </span>
-              )}
-            </button>
+                  color: 'var(--text-1)',
+                  position: 'relative',
+                  backdropFilter: 'blur(14px) saturate(145%)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <Bell size={18} />
+                {notifications.length > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4,
+                    background: '#ef4444', color: 'white',
+                    width: 18, height: 18, borderRadius: '50%',
+                    fontSize: 10, fontWeight: 700,
+                    display: 'flex', alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    {notifications.length > 9 ? '9+' : notifications.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </header>
         )}
 

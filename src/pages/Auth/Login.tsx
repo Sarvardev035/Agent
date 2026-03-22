@@ -8,6 +8,7 @@ import {
   LoginSchema,
   loginRateLimiter,
 } from '../../lib/security'
+import { sounds } from '../../lib/sounds'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -25,12 +26,14 @@ export default function Login() {
     if (!loginRateLimiter.canProceed()) {
       const ms = loginRateLimiter.getRemainingMs()
       const mins = Math.ceil(ms / 60000)
+      sounds.error()
       setError(`Too many attempts. Try again in ${mins} minute(s).`)
       return
     }
 
     const result = LoginSchema.safeParse({ email, password })
     if (!result.success) {
+      sounds.error()
       setError(result.error.issues[0].message)
       return
     }
@@ -56,14 +59,17 @@ export default function Login() {
       if (user?.email) localStorage.setItem('finly_user_email', user.email)
       if (!user?.name) localStorage.setItem('finly_user_email', result.data.email)
       
+      sounds.success()
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Login failed'
       // Show exact error message from API (includes URL and CORS hints)
       if (msg.includes('401') || msg.includes('credentials')) {
+        sounds.error()
         setError('Incorrect email or password.')
       } else {
+        sounds.error()
         setError(msg)
       }
     } finally {

@@ -7,6 +7,7 @@ import { Eye, EyeOff, Zap, Loader2, AlertTriangle } from 'lucide-react'
 import { RegisterSchema } from '../../lib/security'
 import api from '../../lib/api'
 import { TokenStorage } from '../../lib/security'
+import { sounds } from '../../lib/sounds'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -60,6 +61,7 @@ export default function Register() {
 
     const result = RegisterSchema.safeParse({ fullName, email, password })
     if (!result.success) {
+      sounds.error()
       setError(result.error.issues[0].message)
       return
     }
@@ -81,6 +83,7 @@ export default function Register() {
       localStorage.setItem('finly_user_name', result.data.fullName)
       localStorage.setItem('finly_user_email', result.data.email)
       
+      sounds.success()
       toast.success('Account created! Welcome to Finly.')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
@@ -90,11 +93,14 @@ export default function Register() {
       const status = statusFromResponse || (Number.isNaN(statusFromMessage) ? undefined : statusFromMessage)
 
       if (status === 409 || (err instanceof Error && err.message?.includes('409'))) {
+        sounds.error()
         setError('This email is already registered. Please log in instead.')
       } else if (status === 400) {
+        sounds.error()
         setError('Please check your information and try again.')
       } else {
         const msg = err instanceof Error ? err.message : 'Registration failed. Try again.'
+        sounds.error()
         setError(msg)
       }
     } finally {

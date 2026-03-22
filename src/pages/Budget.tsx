@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Bitcoin, Plus, ShieldCheck, Sparkles } from 'lucide-react'
+import { Bitcoin, Plus, ShieldCheck } from 'lucide-react'
 import ProgressRing from '../components/ui/ProgressRing'
 import ProgressBar from '../components/ui/ProgressBar'
 import Skeleton from '../components/ui/Skeleton'
@@ -13,6 +13,7 @@ import { useFinance } from '../context/FinanceContext'
 import { categoriesService } from '../services/categories.service'
 import { safeArray } from '../lib/helpers'
 import { CURRENCIES } from '../lib/constants'
+import { sounds } from '../lib/sounds'
 
 interface CategoryBudget {
   categoryId: string
@@ -95,6 +96,7 @@ const Budget = () => {
       }
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error('Failed to load budget')
     } finally {
       setLoading(false)
@@ -108,6 +110,7 @@ const Budget = () => {
   const handleSaveGoal = async () => {
     const parsed = Number(goalInput || incomeGoal)
     if (!parsed || parsed <= 0) {
+      sounds.error()
       toast.error('Enter a valid budget amount')
       return
     }
@@ -120,13 +123,15 @@ const Budget = () => {
         year: currentYear,
         month: currentMonth,
       })
-      toast.success('Monthly budget saved')
+      sounds.notification()
+      toast.success('Budget limit set! 🎯')
       setGoalModal(false)
       setIncomeGoal(parsed)
       setGoalInput('')
       await Promise.allSettled([loadBudget(), refreshAccounts()])
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error(err instanceof Error ? err.message : 'Failed to save goal')
     } finally {
       setSavingGoal(false)
@@ -135,11 +140,13 @@ const Budget = () => {
 
   const handleSaveCategory = async () => {
     if (!selectedCategory) {
+      sounds.error()
       toast.error('Please select a category')
       return
     }
     const parsed = Number(categoryLimit)
     if (!parsed || parsed <= 0) {
+      sounds.error()
       toast.error('Limit must be positive')
       return
     }
@@ -153,7 +160,8 @@ const Budget = () => {
         year: currentYear,
         month: currentMonth,
       })
-      toast.success('Category limit saved')
+      sounds.notification()
+      toast.success('Budget limit set! 🎯')
       setCategoryModal(false)
       setCategoryLimit('')
       setSelectedCategory('')
@@ -161,6 +169,7 @@ const Budget = () => {
       await Promise.allSettled([loadBudget(), refreshAccounts()])
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error(err instanceof Error ? err.message : 'Failed to save category limit')
     } finally {
       setSavingCategory(false)
@@ -171,11 +180,24 @@ const Budget = () => {
     if (!incomeGoal) return 0
     return Math.min((actualIncome / incomeGoal) * 100, 150)
   }, [actualIncome, incomeGoal])
+  const remaining = incomeGoal - actualIncome
 
   const goalCurrencySymbol = goalCurrency
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+    <div
+      className="page-content"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+        padding: 'clamp(16px,3vw,28px)',
+        paddingBottom: 12,
+        maxWidth: '100%',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>BUDGET</p>
@@ -203,45 +225,71 @@ const Budget = () => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,320px),1fr))', gap: 16, alignItems: 'stretch' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,400px),1fr))',
+        gap: 16,
+        marginBottom: 20,
+        width: '100%',
+        overflow: 'hidden',
+      }}>
         <div
+          className="card"
           style={{
             background: '#fff',
             borderRadius: 16,
             padding: 16,
             boxShadow: 'var(--shadow-md)',
-            minHeight: 260,
-            display: 'flex',
-            gap: 16,
-            alignItems: 'center',
             border: '1px solid var(--border)',
+            width: '100%',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+            minHeight: 200,
           }}
         >
           {loading ? (
             <Skeleton height={220} />
           ) : incomeGoal ? (
-            <>
-              <ProgressRing percent={goalProgress} label="Budget vs spent" />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+              <div style={{ flexShrink: 0 }}>
+                <ProgressRing percent={goalProgress} size={100} label="Budget vs spent" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 4 }}>
                   Budget {formatCurrency(incomeGoal, goalCurrencySymbol)}
                 </div>
-                <div style={{ color: 'var(--text-2)' }}>
+                <div
+                  className="stat-number"
+                  style={{
+                    color: 'var(--text-2)',
+                    marginBottom: 8,
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                  }}
+                >
                   Spent {formatCurrency(actualIncome, goalCurrencySymbol)}
                 </div>
                 <div
                   style={{
-                    background: 'var(--blue-soft)',
-                    padding: 12,
-                    borderRadius: 12,
-                    color: 'var(--blue)',
-                    fontWeight: 800,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '6px 14px',
+                    background: remaining >= 0 ? '#ecfdf5' : '#fff1f2',
+                    color: remaining >= 0 ? '#166534' : '#be123c',
+                    borderRadius: 20,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  Remaining {formatCurrency(Math.max(incomeGoal - actualIncome, 0), goalCurrencySymbol)}
+                  {remaining >= 0 ? '✓ Remaining ' : '⚠ Over by '}
+                  {formatCurrency(Math.abs(remaining), goalCurrencySymbol)}
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             <EmptyState
               icon={<Bitcoin size={34} color="#f59e0b" />}
@@ -254,65 +302,89 @@ const Budget = () => {
         </div>
 
         <div
+          className="card"
           style={{
             background: '#fff',
             borderRadius: 16,
             padding: 16,
             boxShadow: 'var(--shadow-md)',
-            minHeight: 260,
             border: '1px solid var(--border)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
+            width: '100%',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Bitcoin size={18} color="#f59e0b" />
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Budget health</h3>
-            </div>
-            <button
-              onClick={() => setCategoryModal(true)}
-              type="button"
-              style={{
-                padding: '8px 12px',
-                borderRadius: 10,
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              Add category limit
-            </button>
+          <h3 style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: 'var(--text-1)',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <Bitcoin size={18} color="#f59e0b" />
+            Budget health
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              'Review your category caps',
+              'Keep below 90% to avoid alerts',
+              'Update anytime',
+            ].map(tip => (
+              <p
+                key={tip}
+                style={{
+                  fontSize: 13,
+                  color: 'var(--text-2)',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span style={{ color: '#7c3aed' }}>•</span> {tip}
+              </p>
+            ))}
           </div>
-          <div style={{ color: 'var(--text-2)', fontSize: 13, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <span>• Review your category caps</span>
-            <span>• Keep below 90% to avoid alerts</span>
-            <span>• Update anytime</span>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
             {['Review weekly', 'Automate savings', 'Track big purchases'].map(tip => (
               <span
                 key={tip}
                 style={{
-                  padding: '8px 10px',
-                  borderRadius: 10,
-                  background: 'var(--blue-soft)',
-                  color: 'var(--blue)',
-                  fontWeight: 700,
+                  padding: '5px 12px',
+                  background: 'rgba(124,58,237,0.08)',
+                  color: '#7c3aed',
+                  borderRadius: 20,
                   fontSize: 12,
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <Sparkles size={14} style={{ marginRight: 6 }} />
-                {tip}
+                ✦ {tip}
               </span>
             ))}
           </div>
+          <button
+            onClick={() => setCategoryModal(true)}
+            type="button"
+            style={{
+              marginTop: 16,
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Add category limit
+          </button>
         </div>
       </div>
 
       <div
+        className="card"
         style={{
           background: '#fff',
           borderRadius: 16,
@@ -320,6 +392,7 @@ const Budget = () => {
           boxShadow: 'var(--shadow-md)',
           border: '1px solid var(--border)',
           minHeight: 260,
+          overflow: 'hidden',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -350,7 +423,13 @@ const Budget = () => {
             onAction={() => setCategoryModal(true)}
           />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 12 }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,280px),1fr))',
+            gap: 12,
+            width: '100%',
+            overflow: 'hidden',
+          }}>
             {categories.map(cat => {
               const percent = cat.limit ? (cat.spent / cat.limit) * 100 : 0
               const palette = getBudgetColor(percent)
@@ -368,7 +447,10 @@ const Budget = () => {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontWeight: 800 }}>{cat.category}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    <div
+                      className="stat-number"
+                      style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 0, textAlign: 'right' }}
+                    >
                       {cat.currency} {formatCurrency(cat.spent, cat.currency).replace(`${cat.currency} `, '')} / {cat.currency} {formatCurrency(cat.limit, cat.currency).replace(`${cat.currency} `, '')}
                     </div>
                   </div>

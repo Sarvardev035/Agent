@@ -13,6 +13,7 @@ import { formatCurrency, smartDate } from '../utils/helpers'
 import { categoriesService } from '../services/categories.service'
 import { safeArray } from '../lib/helpers'
 import { CURRENCIES } from '../lib/constants'
+import { sounds } from '../lib/sounds'
 
 type IncomeFormState = {
   amount: string
@@ -74,6 +75,7 @@ const Income = () => {
       setIncome(list)
     } catch (err) {
       console.error(err)
+      sounds.error()
       toast.error('Failed to load income')
     } finally {
       setLoading(false)
@@ -120,6 +122,7 @@ const Income = () => {
   const handleSubmit = () => {
     setTimeout(async () => {
       if (!formData.amount || !formData.incomeDate || !formData.accountId || !formData.categoryId) {
+        sounds.error()
         toast.error('Please fill amount, date, account, category, and currency')
         return
       }
@@ -132,7 +135,8 @@ const Income = () => {
           accountId: formData.accountId,
           currency: formData.currency,
         })
-        toast.success('Income added')
+        sounds.income()
+        toast.success('Income recorded! 💰')
         setShowModal(false)
         setFormData({
           amount: '',
@@ -145,6 +149,7 @@ const Income = () => {
         await Promise.allSettled([loadIncome(), refreshAccounts()])
       } catch (err) {
         console.error(err)
+        sounds.error()
         toast.error('Failed to add income')
       }
     }, 0)
@@ -153,7 +158,7 @@ const Income = () => {
   const dailyTotals = (items: any[]) => items.reduce((sum, item) => sum + (item.amount || 0), 0)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
       <div
         style={{
           background: 'linear-gradient(120deg,#0f766e,#10b981)',
@@ -364,7 +369,7 @@ const Income = () => {
         subtitle="Use ISO date format YYYY-MM-DD."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Amount</label>
               <input
@@ -387,7 +392,7 @@ const Income = () => {
               />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Category</label>
               <select

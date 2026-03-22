@@ -37,16 +37,23 @@ export const convert = (
   return inUSD * (rates[to] ?? 1)
 }
 
-export const formatCurrency = (amount: number, currency = 'UZS'): string => {
+export const formatCurrency = (
+  amount: number | null | undefined,
+  currency = 'UZS'
+): string => {
+  if (amount === null || amount === undefined) return '—'
+  const num = Number(amount)
+  if (Number.isNaN(num)) return '—'
+
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-      minimumFractionDigits: 0,
+      minimumFractionDigits: currency === 'UZS' ? 0 : 2,
       maximumFractionDigits: currency === 'UZS' ? 0 : 2,
-    }).format(amount)
+    }).format(num)
   } catch {
-    return `${currency} ${amount.toLocaleString()}`
+    return `${currency} ${num.toLocaleString('en-US')}`
   }
 }
 

@@ -95,7 +95,7 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
               }}>
                 Balance
               </div>
-              <div style={{ fontSize: 17, fontWeight: 700 }}>
+              <div className="balance-large" style={{ fontSize: 17 }}>
                 {formatCurrency(balance, currency)}
               </div>
             </div>
@@ -136,7 +136,7 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
           }}>
             {type === 'CASH' ? 'Cash Wallet' : 'Bank Card'}
           </div>
-          <div style={{
+          <div className="balance" style={{
             fontSize: 15, fontWeight: 700, color: '#a78bfa',
           }}>
             {formatCurrency(balance, currency)}

@@ -121,10 +121,8 @@ const TransactionItem = ({
         }}
       >
         <div
-          className="tabular"
+          className={isExpense ? 'amount amount-negative' : 'amount amount-positive'}
           style={{
-            fontWeight: 800,
-            color: isExpense ? 'var(--red)' : 'var(--green)',
             fontSize: 15,
           }}
         >
