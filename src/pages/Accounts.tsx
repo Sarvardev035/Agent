@@ -7,11 +7,11 @@ import { Plus, Trash2 } from 'lucide-react'
 import BankCard from '../components/ui/BankCard'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
-import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
+import CardNumberField from '../components/ui/CardNumberField'
 import { useFinanceStore } from '../store/finance.store'
 import { Account } from '../services/accounts.service'
-import { AccountSchema } from '../lib/security'
+import { AccountSchema, getCardNumberError } from '../lib/security'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
 import api from '../lib/api'
 import { safeArray, mapAccountType } from '../lib/helpers'
@@ -25,7 +25,16 @@ interface AccountForm {
   type: AccountType
   currency: CurrencyCode
   initialBalance: string
+  cardNumber: string
 }
+
+const getDefaultAccountForm = (): AccountForm => ({
+  name: '',
+  type: 'CASH',
+  currency: 'UZS',
+  initialBalance: '',
+  cardNumber: '',
+})
 
 const Accounts = () => {
   const navigate = useNavigate()
@@ -34,14 +43,12 @@ const Accounts = () => {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<{ title: string; lines: string[]; accountId: string } | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [form, setForm] = useState<AccountForm>({
-    name: '',
-    type: 'CASH',
-    currency: 'UZS',
-    initialBalance: '',
-  })
+  const [form, setForm] = useState<AccountForm>(getDefaultAccountForm)
   const [displayCurrency, setDisplayCurrency] = useState('USD')
   const { convert, rates, loading: rateLoading, lastUpdated, refresh } = useExchangeRates()
+  const isCardAccount = form.type === 'BANK_CARD'
+  const cardNumberError = isCardAccount ? getCardNumberError(form.cardNumber) : null
+  const isSubmitDisabled = isCardAccount && Boolean(cardNumberError)
 
   useEffect(() => {
     let cancelled = false
@@ -67,9 +74,14 @@ const Accounts = () => {
       toast.error('Name is required')
       return
     }
+    if (isCardAccount && cardNumberError) {
+      toast.error(cardNumberError)
+      return
+    }
     const parsed = AccountSchema.safeParse({
       ...form,
       initialBalance: Number(form.initialBalance) || 0,
+      cardNumber: isCardAccount ? form.cardNumber : undefined,
     })
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
@@ -77,16 +89,20 @@ const Accounts = () => {
     }
     try {
       await api.post('/api/accounts', {
-        name: form.name.trim(),
-        type: form.type,
-        currency: form.currency,
-        initialBalance: Number(form.initialBalance) || 0,
+        name: parsed.data.name,
+        type: parsed.data.type,
+        currency: parsed.data.currency,
+        initialBalance: parsed.data.initialBalance,
+        ...(parsed.data.type === 'BANK_CARD' ? { cardNumber: parsed.data.cardNumber } : {}),
       })
       toast.success('Account created')
       setModalOpen(false)
-      refreshAccounts()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create account'
+      setForm(getDefaultAccountForm())
+      await refreshAccounts()
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+        || err?.response?.data?.error
+        || (err instanceof Error ? err.message : 'Failed to create account')
       toast.error(msg)
     }
   }
@@ -363,6 +379,14 @@ const Accounts = () => {
                 </div>
               </div>
 
+              {isCardAccount && (
+                <CardNumberField
+                  value={form.cardNumber}
+                  error={cardNumberError}
+                  onChange={cardNumber => setForm(prev => ({ ...prev, cardNumber }))}
+                />
+              )}
+
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
                   Initial Balance
@@ -386,7 +410,18 @@ const Accounts = () => {
                 />
               </div>
 
-              <button type="submit" className="btn-primary" style={{ width: '100%', height: 48, fontSize: 15 }}>
+              <button
+                type="submit"
+                disabled={isSubmitDisabled}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  height: 48,
+                  fontSize: 15,
+                  opacity: isSubmitDisabled ? 0.6 : 1,
+                  cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+                }}
+              >
                 Save Account
               </button>
             </form>

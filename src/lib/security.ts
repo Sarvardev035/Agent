@@ -21,6 +21,22 @@ export const TokenStorage = {
 export const sanitize = (s: string): string =>
   DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
 
+export const CARD_NUMBER_LENGTH = 16
+
+export const sanitizeCardNumber = (value: string): string =>
+  value.replace(/\D/g, '').slice(0, CARD_NUMBER_LENGTH)
+
+export const getCardNumberError = (value: string): string | null => {
+  const cardNumber = sanitizeCardNumber(value)
+
+  if (!cardNumber) return 'Card number is required'
+  if (/^0{16}$/.test(cardNumber)) return 'Card number cannot be all zeros'
+  if (cardNumber.startsWith('0')) return 'Card number cannot start with 0'
+  if (cardNumber.length !== CARD_NUMBER_LENGTH) return 'Card number must be exactly 16 digits'
+
+  return null
+}
+
 // ── Input Validation Schemas (Zod) ──────────────────────────────
 
 export const LoginSchema = z.object({
@@ -74,6 +90,18 @@ export const AccountSchema = z.object({
   type: z.enum(['BANK_CARD', 'CASH']),
   currency: z.enum(['UZS', 'USD', 'EUR']),
   initialBalance: z.number().min(0),
+  cardNumber: z.string().optional().transform(v => (v ? sanitizeCardNumber(v) : v)),
+}).superRefine((data, ctx) => {
+  if (data.type !== 'BANK_CARD') return
+
+  const error = getCardNumberError(data.cardNumber ?? '')
+  if (!error) return
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['cardNumber'],
+    message: error,
+  })
 })
 
 export const TransferSchema = z
