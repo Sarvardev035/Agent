@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Bitcoin, Plus, ShieldCheck } from 'lucide-react'
-import ProgressRing from '../components/ui/ProgressRing'
 import ProgressBar from '../components/ui/ProgressBar'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
 import { budgetApi } from '../api/budgetApi'
-import { statsApi } from '../api/statsApi'
 import { formatCurrency, getBudgetColor } from '../utils/helpers'
 import { useFinance } from '../context/FinanceContext'
 import { categoriesService } from '../services/categories.service'
@@ -26,8 +24,10 @@ interface CategoryBudget {
 const Budget = () => {
   const { refreshAccounts } = useFinance()
   const [loading, setLoading] = useState(true)
-  const [incomeGoal, setIncomeGoal] = useState<number>(0)
-  const [actualIncome, setActualIncome] = useState<number>(0)
+  const [budgetLimit, setBudgetLimit] = useState<number>(0)
+  const [totalSpent, setTotalSpent] = useState<number>(0)
+  const [budgetPercentUsed, setBudgetPercentUsed] = useState<number>(0)
+  const [budgetRemaining, setBudgetRemaining] = useState<number>(0)
   const [categories, setCategories] = useState<CategoryBudget[]>([])
   const [goalModal, setGoalModal] = useState(false)
   const [categoryModal, setCategoryModal] = useState(false)
@@ -47,9 +47,8 @@ const Budget = () => {
   const loadBudget = async () => {
     try {
       setLoading(true)
-      const [budgetRes, summaryRes, catsRes] = await Promise.allSettled([
+      const [budgetRes, catsRes] = await Promise.allSettled([
         budgetApi.get({ year: currentYear, month: currentMonth }),
-        statsApi.summary(),
         categoriesService.getByType('EXPENSE'),
       ])
 
@@ -74,7 +73,20 @@ const Budget = () => {
         budgetData.find(b => b.categoryId === id)?.category ||
         'Category'
 
-      setIncomeGoal(overallBudget?.monthlyLimit ?? overallBudget?.limit ?? 0)
+      const nextBudgetLimit = overallBudget?.monthlyLimit ?? overallBudget?.limit ?? 0
+      const nextTotalSpent = overallBudget?.spentAmount ?? overallBudget?.spent ?? 0
+      const rawPercent =
+        overallBudget?.percentageUsed
+        ?? (nextBudgetLimit > 0 ? (nextTotalSpent / nextBudgetLimit) * 100 : 0)
+
+      setBudgetLimit(nextBudgetLimit)
+      setTotalSpent(nextTotalSpent)
+      setBudgetPercentUsed(Math.min(Math.max(rawPercent, 0), 999))
+      setBudgetRemaining(
+        overallBudget?.remainingAmount
+        ?? overallBudget?.remaining
+        ?? (nextBudgetLimit - nextTotalSpent)
+      )
       if (overallBudget?.currency) {
         setGoalCurrency(overallBudget.currency)
       }
@@ -84,16 +96,10 @@ const Budget = () => {
           categoryId: item.categoryId || item.category,
           category: mapName(item.categoryId || item.category),
           limit: item.monthlyLimit ?? item.limit ?? 0,
-          spent: item.spent ?? item.spentAmount ?? 0,
+          spent: item.spentAmount ?? item.spent ?? 0,
           currency: item.currency ?? 'UZS',
         }))
       )
-
-      if (summaryRes.status === 'fulfilled') {
-        const summary = summaryRes.value.data?.data ?? summaryRes.value.data ?? {}
-        const expenseTotal = summary.totalExpense ?? summary.totalExpenses ?? summary.expenses ?? summary.expense ?? 0
-        setActualIncome(expenseTotal)
-      }
     } catch (err) {
       console.error(err)
       sounds.error()
@@ -108,7 +114,7 @@ const Budget = () => {
   }, [])
 
   const handleSaveGoal = async () => {
-    const parsed = Number(goalInput || incomeGoal)
+    const parsed = Number(goalInput || budgetLimit)
     if (!parsed || parsed <= 0) {
       sounds.error()
       toast.error('Enter a valid budget amount')
@@ -126,7 +132,7 @@ const Budget = () => {
       sounds.notification()
       toast.success('Budget limit set! 🎯')
       setGoalModal(false)
-      setIncomeGoal(parsed)
+      setBudgetLimit(parsed)
       setGoalInput('')
       await Promise.allSettled([loadBudget(), refreshAccounts()])
     } catch (err) {
@@ -176,13 +182,9 @@ const Budget = () => {
     }
   }
 
-  const goalProgress = useMemo(() => {
-    if (!incomeGoal) return 0
-    return Math.min((actualIncome / incomeGoal) * 100, 150)
-  }, [actualIncome, incomeGoal])
-  const remaining = incomeGoal - actualIncome
-
   const goalCurrencySymbol = goalCurrency
+  const ringPercent = Math.min(budgetPercentUsed, 100)
+  const pctColor = budgetPercentUsed >= 100 ? '#ef4444' : '#10b981'
 
   return (
     <div
@@ -205,7 +207,7 @@ const Budget = () => {
           <p style={{ margin: 0, color: 'var(--text-2)' }}>Track overall and per-category budgets.</p>
         </div>
         <button
-          onClick={() => setGoalModal(true)}
+          onClick={() => startTransition(() => setGoalModal(true))}
           type="button"
           style={{
             display: 'inline-flex',
@@ -236,7 +238,7 @@ const Budget = () => {
         <div
           className="card"
           style={{
-            background: '#fff',
+            background: 'var(--surface-strong)',
             borderRadius: 16,
             padding: 16,
             boxShadow: 'var(--shadow-md)',
@@ -249,33 +251,72 @@ const Budget = () => {
         >
           {loading ? (
             <Skeleton height={220} />
-          ) : incomeGoal ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-              <div style={{ flexShrink: 0 }}>
-                <ProgressRing percent={goalProgress} size={100} label="Budget vs spent" />
+          ) : budgetLimit ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', padding: 8 }}>
+              <div style={{ flexShrink: 0, position: 'relative' }}>
+                <svg width="90" height="90" viewBox="0 0 90 90">
+                  <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="8" />
+                  <circle
+                    cx="45"
+                    cy="45"
+                    r="38"
+                    fill="none"
+                    stroke={pctColor}
+                    strokeWidth="8"
+                    strokeDasharray={`${ringPercent * 2.39} 239`}
+                    strokeLinecap="round"
+                    transform="rotate(-90 45 45)"
+                    style={{ transition: 'stroke-dasharray 0.8s ease' }}
+                  />
+                </svg>
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: pctColor,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {Math.round(budgetPercentUsed)}%
+                  </span>
+                </div>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 4 }}>
-                  Budget {formatCurrency(incomeGoal, goalCurrencySymbol)}
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4, fontWeight: 500 }}>
+                  Budget limit: {formatCurrency(budgetLimit, goalCurrencySymbol)}
                 </div>
                 <div
                   className="stat-number"
                   style={{
-                    color: 'var(--text-2)',
+                    fontSize: 'clamp(14px,2.5vw,20px)',
+                    fontWeight: 800,
+                    color: 'var(--text-1)',
+                    letterSpacing: '-0.02em',
                     marginBottom: 8,
                     wordBreak: 'break-word',
                     overflowWrap: 'break-word',
                   }}
                 >
-                  Spent {formatCurrency(actualIncome, goalCurrencySymbol)}
+                  Spent: {formatCurrency(totalSpent, goalCurrencySymbol)}
                 </div>
                 <div
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
+                    gap: 6,
                     padding: '6px 14px',
-                    background: remaining >= 0 ? '#ecfdf5' : '#fff1f2',
-                    color: remaining >= 0 ? '#166534' : '#be123c',
+                    background: budgetRemaining >= 0 ? '#ecfdf5' : '#fff1f2',
+                    color: budgetRemaining >= 0 ? '#166534' : '#be123c',
                     borderRadius: 20,
                     fontSize: 13,
                     fontWeight: 600,
@@ -285,8 +326,9 @@ const Budget = () => {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {remaining >= 0 ? '✓ Remaining ' : '⚠ Over by '}
-                  {formatCurrency(Math.abs(remaining), goalCurrencySymbol)}
+                  {budgetRemaining >= 0
+                    ? `✓ ${formatCurrency(budgetRemaining, goalCurrencySymbol)} remaining`
+                    : `⚠ Over by ${formatCurrency(Math.abs(budgetRemaining), goalCurrencySymbol)}`}
                 </div>
               </div>
             </div>
@@ -296,7 +338,7 @@ const Budget = () => {
               title="No monthly budget"
               description="Set a monthly budget to start tracking progress."
               actionLabel="Set goal"
-              onAction={() => setGoalModal(true)}
+              onAction={() => startTransition(() => setGoalModal(true))}
             />
           )}
         </div>
@@ -304,7 +346,7 @@ const Budget = () => {
         <div
           className="card"
           style={{
-            background: '#fff',
+            background: 'var(--surface-strong)',
             borderRadius: 16,
             padding: 16,
             boxShadow: 'var(--shadow-md)',
@@ -366,7 +408,7 @@ const Budget = () => {
             ))}
           </div>
           <button
-            onClick={() => setCategoryModal(true)}
+            onClick={() => startTransition(() => setCategoryModal(true))}
             type="button"
             style={{
               marginTop: 16,
@@ -374,6 +416,7 @@ const Budget = () => {
               borderRadius: 10,
               border: '1px solid var(--border)',
               background: 'var(--surface)',
+              color: 'var(--text-1)',
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -386,7 +429,7 @@ const Budget = () => {
       <div
         className="card"
         style={{
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 16,
           padding: 16,
           boxShadow: 'var(--shadow-md)',
@@ -398,13 +441,14 @@ const Budget = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Category limits</h3>
           <button
-            onClick={() => setCategoryModal(true)}
+            onClick={() => startTransition(() => setCategoryModal(true))}
             type="button"
             style={{
               padding: '8px 12px',
               borderRadius: 10,
               border: '1px solid var(--border)',
-              background: '#fff',
+              background: 'var(--surface)',
+              color: 'var(--text-1)',
               fontWeight: 700,
               cursor: 'pointer',
             }}
@@ -420,7 +464,7 @@ const Budget = () => {
             title="No category limits"
             description="Create limits to keep spending in check."
             actionLabel="Add limit"
-            onAction={() => setCategoryModal(true)}
+            onAction={() => startTransition(() => setCategoryModal(true))}
           />
         ) : (
           <div style={{
@@ -442,7 +486,7 @@ const Budget = () => {
                     borderRadius: 14,
                     border: warn ? `2px solid ${palette.bar}` : '1px solid var(--border)',
                     boxShadow: warn ? '0 0 0 6px rgba(244,63,94,0.08)' : 'var(--shadow-sm)',
-                    background: '#fff',
+                    background: 'var(--surface)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -487,17 +531,17 @@ const Budget = () => {
           <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly budget ({goalCurrencySymbol})</label>
           <input
             type="number"
-            value={goalInput || incomeGoal || ''}
+            value={goalInput || budgetLimit || ''}
             onChange={e => setGoalInput(e.target.value)}
             placeholder="0.00"
-            style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+            style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
           />
           <div>
             <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Currency *</label>
             <select
               value={goalCurrency}
               onChange={e => setGoalCurrency(e.target.value as (typeof CURRENCIES)[number])}
-              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
             >
               <option value="UZS">🇺🇿 UZS</option>
               <option value="USD">🇺🇸 USD</option>
@@ -533,7 +577,7 @@ const Budget = () => {
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
               required
-              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
             >
               <option value="">Select a category</option>
               {categoryOptions.map(cat => (
@@ -560,7 +604,7 @@ const Budget = () => {
               min="1"
               step="any"
               required
-              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
             />
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
               Limit is in your account currency
@@ -571,7 +615,7 @@ const Budget = () => {
             <select
               value={categoryCurrency}
               onChange={e => setCategoryCurrency(e.target.value as (typeof CURRENCIES)[number])}
-              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
             >
               <option value="UZS">🇺🇿 UZS</option>
               <option value="USD">🇺🇸 USD</option>

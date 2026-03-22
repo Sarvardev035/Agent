@@ -1,3 +1,4 @@
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -9,12 +10,18 @@ import {
   BarChart3,
   Calendar,
   LogOut,
+  ChevronUp,
+  Moon,
+  Settings2,
+  Sun,
+  Volume2,
+  VolumeX,
   Wallet,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
-import { SoundToggle } from '../ui/SoundToggle'
-import { ThemeToggle } from '../ui/ThemeToggle'
 import BrandLogo from '../ui/BrandLogo'
+import { sounds } from '../../lib/sounds'
+import { useTheme } from '../../contexts/ThemeContext'
 
 type NavItem = {
   label: string
@@ -37,23 +44,57 @@ const NAV_ITEMS: NavItem[] = [
 
 interface SidebarProps {
   collapsed?: boolean
+  onRequestLogout: () => void
 }
 
-const Sidebar = ({ collapsed }: SidebarProps) => {
+const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const authStore = useAuthStore()
   const user = authStore.user
-  const initials =
-    user?.name
-      ? user.name
-          .split(' ')
-          .map(part => part[0])
-          .join('')
-          .slice(0, 2)
-          .toUpperCase()
-      : 'F'
+  const { isDark, setTheme } = useTheme()
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [muted, setMuted] = useState(() => sounds.getMuted())
+  const settingsRef = useRef<HTMLDivElement | null>(null)
+  const isTablet = Boolean(collapsed)
+  const storedName =
+    (typeof window !== 'undefined' && window.localStorage.getItem('finly_user_name')) || ''
+  const storedEmail =
+    (typeof window !== 'undefined' && window.localStorage.getItem('finly_user_email')) || ''
+  const displayName = user?.name || storedName || 'User'
+  const displayEmail = user?.email || storedEmail || ''
+  const initials = useMemo(
+    () =>
+      displayName
+        .split(' ')
+        .map(part => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'U',
+    [displayName]
+  )
 
-  const handleLogout = () => {
-    authStore.logout()
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleThemeToggle = () => {
+    startTransition(() => {
+      setTheme(isDark ? 'light' : 'dark')
+      sounds.click()
+    })
+  }
+
+  const handleSoundToggle = () => {
+    startTransition(() => {
+      const nextMuted = sounds.toggleMute()
+      setMuted(nextMuted)
+    })
   }
 
   return (
@@ -132,78 +173,179 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
       </nav>
 
       <div
+        ref={settingsRef}
         style={{
-          padding: collapsed ? '12px 8px' : '14px 12px',
+          padding: isTablet ? '12px 8px' : '12px 8px',
           borderTop: '1px solid var(--border)',
+          flexShrink: 0,
+          position: 'relative',
+          overflow: 'visible',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            marginBottom: 10,
-          }}
-        >
+        {!isTablet && (
           <div
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.1)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              color: '#fff',
-              display: 'grid',
-              placeItems: 'center',
-              fontWeight: 800,
-              letterSpacing: '0.01em',
-            }}
-          >
-            {initials}
-          </div>
-          {!collapsed && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>
-                {user?.name || 'Welcome'}
-              </span>
-              <span style={{ color: '#94a3b8', fontSize: 12 }}>{user?.email || 'finly user'}</span>
-            </div>
-          )}
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexDirection: collapsed ? 'column' : 'row',
-          }}
-        >
-          <ThemeToggle />
-          <SoundToggle />
-          <button
-            onClick={handleLogout}
-            className="logout-button"
-            style={{
-              width: collapsed ? 40 : '100%',
-              padding: '10px 12px',
-              borderRadius: 12,
-              fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              cursor: 'pointer',
-              flexShrink: 0,
+              gap: 10,
+              padding: '8px 12px',
+              marginBottom: 6,
             }}
-            type="button"
           >
-            <LogOut size={16} />
-            {!collapsed && 'Logout'}
-          </button>
-        </div>
-        {!collapsed && (
-          <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600, marginTop: 10 }}>
-            Theme, sound, and exit controls
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: 12,
+                flexShrink: 0,
+              }}
+            >
+              {initials}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  color: 'white',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {displayName}
+              </div>
+              <div
+                style={{
+                  color: 'rgba(255,255,255,0.4)',
+                  fontSize: 10,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {displayEmail}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          data-button-reset="true"
+          className={`settings-launcher${settingsOpen ? ' is-open' : ''}`}
+          onClick={() => startTransition(() => setSettingsOpen(prev => !prev))}
+          style={{
+            width: '100%',
+            justifyContent: isTablet ? 'center' : 'flex-start',
+            padding: isTablet ? '12px 0' : '12px 14px',
+          }}
+        >
+          <span className="settings-launcher__icon-wrap">
+            <Settings2 size={18} className="settings-launcher__icon" />
+          </span>
+          {!isTablet && <span style={{ flex: 1, textAlign: 'left' }}>Settings</span>}
+          {!isTablet && (
+            <ChevronUp
+              size={14}
+              style={{
+                opacity: 0.72,
+                transform: settingsOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+                transition: 'transform 0.2s ease',
+              }}
+            />
+          )}
+        </button>
+
+        {settingsOpen && (
+          <div
+            className="settings-panel"
+            style={{
+              bottom: 'calc(100% + 10px)',
+              ...(isTablet
+                ? {
+                    left: 'calc(100% + 10px)',
+                    width: 250,
+                  }
+                : {
+                    left: 8,
+                    right: 8,
+                  }),
+            }}
+          >
+            <div className="settings-panel__title">Settings</div>
+
+            <div className="settings-panel__row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: isDark ? '#c4b5fd' : '#fbbf24' }}>
+                  {isDark ? <Moon size={16} /> : <Sun size={16} />}
+                </span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
+                    {isDark ? 'Dark Mode' : 'Light Mode'}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                    2s scene transition
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-button-reset="true"
+                onClick={handleThemeToggle}
+                className={`settings-panel__switch${isDark ? ' is-on' : ''}`}
+                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                <span className="settings-panel__switch-thumb" />
+              </button>
+            </div>
+
+            <div className="settings-panel__row">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: muted ? '#fda4af' : '#86efac' }}>
+                  {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                </span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
+                    {muted ? 'Sound Off' : 'Sound On'}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                    Coin sounds and alerts
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-button-reset="true"
+                onClick={handleSoundToggle}
+                className={`settings-panel__switch${!muted ? ' is-success' : ''}`}
+                aria-label={muted ? 'Enable sounds' : 'Mute sounds'}
+              >
+                <span className="settings-panel__switch-thumb" />
+              </button>
+            </div>
+
+            <div className="settings-panel__divider" />
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__logout"
+              onClick={() => {
+                setSettingsOpen(false)
+                onRequestLogout()
+              }}
+            >
+              <LogOut size={16} />
+              <span>Log out</span>
+            </button>
           </div>
         )}
       </div>

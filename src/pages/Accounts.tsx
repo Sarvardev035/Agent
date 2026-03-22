@@ -243,10 +243,10 @@ const Accounts = () => {
       <div
         className="card"
         style={{
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 16,
           padding: 16,
-          boxShadow: 'var(--sh-sm)',
+          boxShadow: 'var(--shadow-sm)',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))',
           gap: 12,

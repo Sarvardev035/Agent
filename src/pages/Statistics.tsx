@@ -383,8 +383,8 @@ const Statistics = () => {
         gap: 16,
         paddingBottom: 12,
         width: '100%',
-        maxWidth: 1360,
-        margin: '0 auto',
+        maxWidth: '100%',
+        minWidth: 0,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>

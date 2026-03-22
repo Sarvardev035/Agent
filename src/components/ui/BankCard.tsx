@@ -24,11 +24,11 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
       onMouseLeave={canHover ? () => setFlipped(false) : undefined}
       style={{
         width: '100%',
-        maxWidth: 320,
-        height: 160,
+        maxWidth: '100%',
+        height: 'clamp(180px, 18vw, 220px)',
         flexShrink: 0,
         perspective: '1000px',
-        margin: '0 auto',
+        minWidth: 0,
       }}
     >
       <div style={{

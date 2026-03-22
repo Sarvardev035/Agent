@@ -90,6 +90,43 @@ export const sounds = {
     play(1000, 0.3, 'sine', 0.1, 0.1)
   },
 
+  frog: () => {
+    if (isMuted || typeof window === 'undefined') return
+
+    try {
+      const ctx = getCtx()
+
+      const makeRibbit = (startTime: number) => {
+        const osc1 = ctx.createOscillator()
+        const osc2 = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc1.connect(gain)
+        osc2.connect(gain)
+        gain.connect(ctx.destination)
+
+        osc1.type = 'sawtooth'
+        osc2.type = 'square'
+
+        osc1.frequency.setValueAtTime(180, ctx.currentTime + startTime)
+        osc1.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + startTime + 0.08)
+        osc2.frequency.setValueAtTime(200, ctx.currentTime + startTime)
+        osc2.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + startTime + 0.08)
+
+        gain.gain.setValueAtTime(0.18, ctx.currentTime + startTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + 0.12)
+
+        osc1.start(ctx.currentTime + startTime)
+        osc1.stop(ctx.currentTime + startTime + 0.15)
+        osc2.start(ctx.currentTime + startTime)
+        osc2.stop(ctx.currentTime + startTime + 0.15)
+      }
+
+      makeRibbit(0)
+      makeRibbit(0.2)
+    } catch {}
+  },
+
   transfer: () => {
     play(440, 0.15, 'sine', 0.2)
     play(554, 0.15, 'sine', 0.2, 0.15)

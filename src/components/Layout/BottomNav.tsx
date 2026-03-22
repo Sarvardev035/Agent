@@ -1,5 +1,5 @@
+import { startTransition, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   LayoutDashboard,
@@ -12,23 +12,25 @@ import {
   Calendar,
   LogOut,
 } from 'lucide-react'
-import { useAuthStore } from '../../store/auth.store'
 import MobileMenuButton from '../ui/MobileMenuButton'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { SoundToggle } from '../ui/SoundToggle'
 
-const BottomNav = () => {
+interface BottomNavProps {
+  onRequestLogout: () => void
+}
+
+const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
   const location = useLocation()
   const navigate = useNavigate()
   const [showMore, setShowMore] = useState(false)
-  const authStore = useAuthStore()
 
   const tabs = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Home' },
     { path: '/expenses', icon: TrendingDown, label: 'Expenses' },
     { path: '/income', icon: TrendingUp, label: 'Income' },
     { path: '/transfers', icon: ArrowLeftRight, label: 'Transfer' },
-    { action: () => setShowMore(true), label: 'More' },
+    { action: () => startTransition(() => setShowMore(true)), label: 'More' },
   ]
 
   const moreItems = [
@@ -37,10 +39,6 @@ const BottomNav = () => {
     { path: '/statistics', label: 'Statistics', icon: BarChart3 },
     { path: '/calendar', label: 'Calendar', icon: Calendar },
   ]
-
-  const logout = () => {
-    authStore.logout()
-  }
 
   return (
     <>
@@ -112,7 +110,7 @@ const BottomNav = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               style={{ position: 'fixed', inset: 0, background: 'rgba(10,14,28,0.38)', zIndex: 60, backdropFilter: 'blur(10px)' }}
-              onClick={() => setShowMore(false)}
+              onClick={() => startTransition(() => setShowMore(false))}
             />
             <motion.div
               initial={{ y: '100%' }}
@@ -152,7 +150,7 @@ const BottomNav = () => {
                     key={item.path}
                     onClick={() => {
                       navigate(item.path)
-                      setShowMore(false)
+                      startTransition(() => setShowMore(false))
                     }}
                     style={{
                       display: 'flex',
@@ -177,8 +175,8 @@ const BottomNav = () => {
                 ))}
                 <button
                   onClick={() => {
-                    setShowMore(false)
-                    logout()
+                    startTransition(() => setShowMore(false))
+                    onRequestLogout()
                   }}
                   style={{
                     display: 'flex',
