@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify'
 import { z } from 'zod'
+import { CARD_TYPE_VALUES } from './constants'
 
 // ── Token Security ──────────────────────────────────────────────
 
@@ -91,8 +92,17 @@ export const AccountSchema = z.object({
   currency: z.enum(['UZS', 'USD', 'EUR']),
   initialBalance: z.number().min(0),
   cardNumber: z.string().optional().transform(v => (v ? sanitizeCardNumber(v) : v)),
+  cardType: z.enum(CARD_TYPE_VALUES).optional(),
 }).superRefine((data, ctx) => {
   if (data.type !== 'BANK_CARD') return
+
+  if (!data.cardType) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['cardType'],
+      message: 'Card type is required for BANK_CARD accounts',
+    })
+  }
 
   const error = getCardNumberError(data.cardNumber ?? '')
   if (!error) return

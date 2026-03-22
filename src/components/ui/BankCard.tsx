@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatCurrency } from '../../utils/helpers'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 
 interface BankCardProps {
   name: string
@@ -14,16 +15,19 @@ interface BankCardProps {
 
 const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
   const [flipped, setFlipped] = useState(false)
+  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)')
 
   return (
     <div
-      onMouseEnter={() => setFlipped(true)}
-      onMouseLeave={() => setFlipped(false)}
+      onMouseEnter={canHover ? () => setFlipped(true) : undefined}
+      onMouseLeave={canHover ? () => setFlipped(false) : undefined}
       style={{
-        width: 'clamp(240px,80vw,280px)',
+        width: '100%',
+        maxWidth: 320,
         height: 160,
         flexShrink: 0,
         perspective: '1000px',
+        margin: '0 auto',
       }}
     >
       <div style={{
@@ -31,10 +35,10 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
         width: '100%',
         height: '100%',
         transformStyle: 'preserve-3d',
-        transform: flipped
+        transform: canHover && flipped
           ? 'rotateY(180deg)'
           : 'rotateY(0deg)',
-        transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)',
+        transition: canHover ? 'transform 0.6s cubic-bezier(0.4,0,0.2,1)' : 'none',
       }}>
 
         {/* FRONT FACE */}

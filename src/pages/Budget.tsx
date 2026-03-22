@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { PiggyBank, Plus, ShieldCheck, Sparkles } from 'lucide-react'
+import { Bitcoin, Plus, ShieldCheck, Sparkles } from 'lucide-react'
 import ProgressRing from '../components/ui/ProgressRing'
 import ProgressBar from '../components/ui/ProgressBar'
 import Skeleton from '../components/ui/Skeleton'
@@ -19,6 +19,7 @@ interface CategoryBudget {
   category: string
   limit: number
   spent: number
+  currency: (typeof CURRENCIES)[number]
 }
 
 const Budget = () => {
@@ -35,6 +36,8 @@ const Budget = () => {
   const [categoryLimit, setCategoryLimit] = useState('')
   const [categoryCurrency, setCategoryCurrency] = useState<(typeof CURRENCIES)[number]>('UZS')
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([])
+  const [savingGoal, setSavingGoal] = useState(false)
+  const [savingCategory, setSavingCategory] = useState(false)
 
   const now = new Date()
   const currentYear = now.getFullYear()
@@ -62,27 +65,32 @@ const Budget = () => {
       const budgetData =
         budgetRes.status === 'fulfilled' ? safeArray<any>(budgetRes.value.data) : []
 
+      const overallBudget = budgetData.find((item: any) => item.type === 'OVERALL')
+      const categoryBudgetItems = budgetData.filter((item: any) => item.type === 'EXPENSE' && item.categoryId)
+
       const mapName = (id: string) =>
         catList.find(cat => cat.id === id)?.name ||
         budgetData.find(b => b.categoryId === id)?.category ||
         'Category'
 
-      setIncomeGoal(
-        budgetData.reduce((sum, item) => sum + (item.monthlyLimit ?? item.limit ?? 0), 0)
-      )
+      setIncomeGoal(overallBudget?.monthlyLimit ?? overallBudget?.limit ?? 0)
+      if (overallBudget?.currency) {
+        setGoalCurrency(overallBudget.currency)
+      }
 
       setCategories(
-        budgetData.map((item: any) => ({
+        categoryBudgetItems.map((item: any) => ({
           categoryId: item.categoryId || item.category,
           category: mapName(item.categoryId || item.category),
           limit: item.monthlyLimit ?? item.limit ?? 0,
           spent: item.spent ?? item.spentAmount ?? 0,
+          currency: item.currency ?? 'UZS',
         }))
       )
 
       if (summaryRes.status === 'fulfilled') {
         const summary = summaryRes.value.data?.data ?? summaryRes.value.data ?? {}
-        const expenseTotal = summary.totalExpenses ?? summary.expenses ?? summary.expense ?? 0
+        const expenseTotal = summary.totalExpense ?? summary.totalExpenses ?? summary.expenses ?? summary.expense ?? 0
         setActualIncome(expenseTotal)
       }
     } catch (err) {
@@ -103,24 +111,26 @@ const Budget = () => {
       toast.error('Enter a valid budget amount')
       return
     }
-    setTimeout(async () => {
-      try {
-        await budgetApi.set({
-          monthlyLimit: parsed,
-          type: 'MONTHLY',
-          currency: goalCurrency,
-          year: currentYear,
-          month: currentMonth,
-        })
-        toast.success('Monthly budget saved')
-        setGoalModal(false)
-        setIncomeGoal(parsed)
-        await Promise.allSettled([loadBudget(), refreshAccounts()])
-      } catch (err) {
-        console.error(err)
-        toast.error('Failed to save goal')
-      }
-    }, 0)
+    setSavingGoal(true)
+    try {
+      await budgetApi.set({
+        monthlyLimit: parsed,
+        type: 'OVERALL',
+        currency: goalCurrency,
+        year: currentYear,
+        month: currentMonth,
+      })
+      toast.success('Monthly budget saved')
+      setGoalModal(false)
+      setIncomeGoal(parsed)
+      setGoalInput('')
+      await Promise.allSettled([loadBudget(), refreshAccounts()])
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Failed to save goal')
+    } finally {
+      setSavingGoal(false)
+    }
   }
 
   const handleSaveCategory = async () => {
@@ -133,27 +143,28 @@ const Budget = () => {
       toast.error('Limit must be positive')
       return
     }
-    setTimeout(async () => {
-      try {
-        await budgetApi.setCategory({
-          categoryId: selectedCategory,
-          monthlyLimit: parsed,
-          type: 'MONTHLY',
-          currency: categoryCurrency,
-          year: currentYear,
-          month: currentMonth,
-        })
-        toast.success('Category limit saved')
-        setCategoryModal(false)
-        setCategoryLimit('')
-        setSelectedCategory('')
-        setCategoryCurrency('UZS')
-        await Promise.allSettled([loadBudget(), refreshAccounts()])
-      } catch (err) {
-        console.error(err)
-        toast.error('Failed to save category limit')
-      }
-    }, 0)
+    setSavingCategory(true)
+    try {
+      await budgetApi.setCategory({
+        categoryId: selectedCategory,
+        monthlyLimit: parsed,
+        type: 'EXPENSE',
+        currency: categoryCurrency,
+        year: currentYear,
+        month: currentMonth,
+      })
+      toast.success('Category limit saved')
+      setCategoryModal(false)
+      setCategoryLimit('')
+      setSelectedCategory('')
+      setCategoryCurrency('UZS')
+      await Promise.allSettled([loadBudget(), refreshAccounts()])
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Failed to save category limit')
+    } finally {
+      setSavingCategory(false)
+    }
   }
 
   const goalProgress = useMemo(() => {
@@ -162,11 +173,10 @@ const Budget = () => {
   }, [actualIncome, incomeGoal])
 
   const goalCurrencySymbol = goalCurrency
-  const categoryCurrencySymbol = categoryCurrency
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>BUDGET</p>
           <h1 style={{ margin: '4px 0', fontSize: 22, fontWeight: 800 }}>Stay within goals</h1>
@@ -193,7 +203,7 @@ const Budget = () => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,320px),1fr))', gap: 16, alignItems: 'stretch' }}>
         <div
           style={{
             background: '#fff',
@@ -214,10 +224,10 @@ const Budget = () => {
               <ProgressRing percent={goalProgress} label="Budget vs spent" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>
-                  Budget {goalCurrencySymbol} {formatCurrency(incomeGoal).replace('UZS ', '')}
+                  Budget {formatCurrency(incomeGoal, goalCurrencySymbol)}
                 </div>
                 <div style={{ color: 'var(--text-2)' }}>
-                  Spent {goalCurrencySymbol} {formatCurrency(actualIncome).replace('UZS ', '')}
+                  Spent {formatCurrency(actualIncome, goalCurrencySymbol)}
                 </div>
                 <div
                   style={{
@@ -228,12 +238,13 @@ const Budget = () => {
                     fontWeight: 800,
                   }}
                 >
-                  Remaining {goalCurrencySymbol} {formatCurrency(Math.max(incomeGoal - actualIncome, 0)).replace('UZS ', '')}
+                  Remaining {formatCurrency(Math.max(incomeGoal - actualIncome, 0), goalCurrencySymbol)}
                 </div>
               </div>
             </>
           ) : (
             <EmptyState
+              icon={<Bitcoin size={34} color="#f59e0b" />}
               title="No monthly budget"
               description="Set a monthly budget to start tracking progress."
               actionLabel="Set goal"
@@ -257,7 +268,7 @@ const Budget = () => {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <PiggyBank size={18} color="#f59e0b" />
+              <Bitcoin size={18} color="#f59e0b" />
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Budget health</h3>
             </div>
             <button
@@ -332,6 +343,7 @@ const Budget = () => {
           <Skeleton height={200} />
         ) : categories.length === 0 ? (
           <EmptyState
+            icon={<Bitcoin size={34} color="#3b82f6" />}
             title="No category limits"
             description="Create limits to keep spending in check."
             actionLabel="Add limit"
@@ -357,7 +369,7 @@ const Budget = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontWeight: 800 }}>{cat.category}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                      {categoryCurrencySymbol} {formatCurrency(cat.spent).replace('UZS ', '')} / {categoryCurrencySymbol} {formatCurrency(cat.limit).replace('UZS ', '')}
+                      {cat.currency} {formatCurrency(cat.spent, cat.currency).replace(`${cat.currency} `, '')} / {cat.currency} {formatCurrency(cat.limit, cat.currency).replace(`${cat.currency} `, '')}
                     </div>
                   </div>
                   <div style={{ marginTop: 8 }}>
@@ -412,20 +424,21 @@ const Budget = () => {
           </div>
           <button
             onClick={handleSaveGoal}
+            disabled={savingGoal}
             type="button"
             style={{
               width: '100%',
               height: 48,
               borderRadius: 14,
               border: 'none',
-              background: 'linear-gradient(135deg,#f59e0b,#f43f5e)',
+              background: savingGoal ? '#cbd5e1' : 'linear-gradient(135deg,#f59e0b,#f43f5e)',
               color: '#fff',
               fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 12px 30px rgba(244,63,94,0.35)',
+              cursor: savingGoal ? 'not-allowed' : 'pointer',
+              boxShadow: savingGoal ? 'none' : '0 12px 30px rgba(244,63,94,0.35)',
             }}
           >
-            Save goal
+            {savingGoal ? 'Saving...' : 'Save goal'}
           </button>
         </div>
       </Modal>
@@ -456,7 +469,7 @@ const Budget = () => {
             )}
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit ({categoryCurrencySymbol}) *</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit ({categoryCurrency}) *</label>
             <input
               type="number"
               value={categoryLimit}
@@ -485,21 +498,21 @@ const Budget = () => {
           </div>
           <button
             onClick={handleSaveCategory}
-            disabled={!selectedCategory || !categoryLimit}
+            disabled={!selectedCategory || !categoryLimit || savingCategory}
             type="button"
             style={{
               width: '100%',
               height: 48,
               borderRadius: 14,
               border: 'none',
-              background: (!selectedCategory || !categoryLimit) ? '#cbd5e1' : 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
+              background: (!selectedCategory || !categoryLimit || savingCategory) ? '#cbd5e1' : 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
               color: '#fff',
               fontWeight: 800,
-              cursor: (!selectedCategory || !categoryLimit) ? 'not-allowed' : 'pointer',
-              boxShadow: (!selectedCategory || !categoryLimit) ? 'none' : '0 12px 30px rgba(37,99,235,0.35)',
+              cursor: (!selectedCategory || !categoryLimit || savingCategory) ? 'not-allowed' : 'pointer',
+              boxShadow: (!selectedCategory || !categoryLimit || savingCategory) ? 'none' : '0 12px 30px rgba(37,99,235,0.35)',
             }}
           >
-            Save category limit
+            {savingCategory ? 'Saving...' : 'Save category limit'}
           </button>
         </div>
       </Modal>

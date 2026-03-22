@@ -4,6 +4,15 @@ export const ACCOUNT_TYPES = [
   { value: 'BANK_CARD', valueLabel: 'BANK_CARD', label: 'Card', icon: '💳' },
 ] as const
 
+export const CARD_TYPE_VALUES = ['UZCARD', 'HUMO', 'VISA', 'MASTERCARD'] as const
+
+export const CARD_TYPES = [
+  { value: 'UZCARD', label: 'Uzcard' },
+  { value: 'HUMO', label: 'Humo' },
+  { value: 'VISA', label: 'Visa' },
+  { value: 'MASTERCARD', label: 'Mastercard' },
+] as const
+
 // Expense categories — must match backend enum EXACTLY
 export const EXPENSE_CATEGORIES = [
   { value: 'FOOD', label: 'Food', emoji: '🍔' },

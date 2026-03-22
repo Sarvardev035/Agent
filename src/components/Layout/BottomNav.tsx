@@ -43,18 +43,19 @@ const BottomNav = () => {
   return (
     <>
       <nav
-        className="safe-bottom"
+        className="safe-bottom bottom-nav"
         style={{
           position: 'fixed',
           bottom: 0,
           left: 0,
           right: 0,
-          background: '#ffffff',
-          borderTop: '1px solid #e2e8f0',
+          background: 'var(--surface-strong)',
+          borderTop: '1px solid var(--border)',
           height: 64,
           display: 'flex',
           zIndex: 50,
           paddingBottom: 'env(safe-area-inset-bottom)',
+          backdropFilter: 'blur(18px) saturate(145%)',
         }}
       >
         {tabs.map(tab => {
@@ -73,7 +74,7 @@ const BottomNav = () => {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: active ? '#3b82f6' : '#94a3b8',
+                color: active ? '#4b5fe8' : 'var(--text-3)',
                 position: 'relative',
                 fontSize: 10,
                 fontWeight: active ? 700 : 500,
@@ -90,7 +91,8 @@ const BottomNav = () => {
                     width: 4,
                     height: 4,
                     borderRadius: '50%',
-                    background: '#3b82f6',
+                    background: '#71e7ff',
+                    boxShadow: '0 0 12px rgba(113,231,255,0.7)',
                   }}
                 />
               )}
@@ -106,7 +108,7 @@ const BottomNav = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(10,14,28,0.38)', zIndex: 60, backdropFilter: 'blur(10px)' }}
               onClick={() => setShowMore(false)}
             />
             <motion.div
@@ -119,17 +121,20 @@ const BottomNav = () => {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                background: '#ffffff',
+                background: 'var(--surface-strong)',
                 borderRadius: '20px 20px 0 0',
                 padding: 24,
                 zIndex: 70,
+                borderTop: '1px solid var(--border)',
+                backdropFilter: 'blur(22px) saturate(145%)',
+                boxShadow: 'var(--shadow-lg)',
               }}
             >
               <div
                 style={{
                   width: 32,
                   height: 4,
-                  background: '#e2e8f0',
+                  background: 'rgba(100,120,255,0.35)',
                   borderRadius: 2,
                   margin: '0 auto 20px',
                 }}
@@ -148,12 +153,13 @@ const BottomNav = () => {
                       gap: 12,
                       padding: '12px 14px',
                       borderRadius: 12,
-                      border: '1px solid #e2e8f0',
-                      background: '#f8fafc',
-                      color: '#0f172a',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text-1)',
                       fontWeight: 600,
                       fontSize: 14,
                       cursor: 'pointer',
+                      backdropFilter: 'blur(14px) saturate(140%)',
                     }}
                     type="button"
                   >
@@ -173,12 +179,13 @@ const BottomNav = () => {
                     gap: 10,
                     padding: '12px 14px',
                     borderRadius: 12,
-                    border: 'none',
-                    background: 'rgba(244,63,94,0.1)',
-                    color: '#e11d48',
+                    border: '1px solid var(--accent-border)',
+                    background: 'var(--accent-gradient-warm)',
+                    color: '#fff',
                     fontWeight: 700,
                     fontSize: 14,
                     cursor: 'pointer',
+                    boxShadow: '0 14px 32px rgba(196,93,255,0.2)',
                   }}
                   type="button"
                 >

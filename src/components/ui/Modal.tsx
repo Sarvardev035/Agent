@@ -62,8 +62,8 @@ const Modal = ({ open, onClose, title, subtitle, footer, children }: ModalProps)
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(15,23,42,0.45)',
-              backdropFilter: 'blur(10px)',
+              background: 'rgba(12,16,30,0.34)',
+              backdropFilter: 'blur(12px)',
               zIndex: 90,
             }}
           />
@@ -90,13 +90,16 @@ const Modal = ({ open, onClose, title, subtitle, footer, children }: ModalProps)
               style={{
                 width: '100%',
                 maxWidth: isMobile ? undefined : 620,
-                background: 'var(--surface)',
+                background: 'var(--surface-strong)',
                 borderRadius: isMobile ? '20px 20px 0 0' : 'var(--radius-xl)',
-                boxShadow: 'var(--shadow-lg)',
+                boxShadow: 'var(--shadow-glass)',
                 padding: 20,
                 margin: isMobile ? '0 auto' : undefined,
                 transformOrigin: 'center',
                 border: '1px solid var(--border)',
+                backdropFilter: 'blur(20px) saturate(145%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(145%)',
+                overflow: 'hidden',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>

@@ -1,18 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bell, Zap } from 'lucide-react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
+import { useRouteScrollReveal } from '../../hooks/useRouteScrollReveal'
 import api from '../../lib/api'
 import { safeArray } from '../../lib/helpers'
 
 const AppShell = () => {
   const location = useLocation()
-  const isMobile = useMediaQuery('(max-width: 768px)')
-  const isTablet = useMediaQuery('(max-width: 1024px)')
+  const isCompactLayout = useMediaQuery('(max-width: 1024px)')
+  const isDesktopCondensed = useMediaQuery('(max-width: 1280px)')
   const [notifications, setNotifications] = useState<any[]>([])
+  const routeContentRef = useRef<HTMLDivElement | null>(null)
+
+  useRouteScrollReveal(routeContentRef, location.pathname)
 
   useEffect(() => {
     let cancelled = false
@@ -27,29 +31,35 @@ const AppShell = () => {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {!isMobile && <Sidebar collapsed={isTablet} />}
+      {!isCompactLayout && <Sidebar collapsed={isDesktopCondensed} />}
 
       <main
         style={{
-          marginLeft: isMobile ? 0 : isTablet ? 64 : 240,
-          padding: isMobile ? '16px 16px 88px' : '24px 32px',
+          marginLeft: isCompactLayout ? 0 : isDesktopCondensed ? 64 : 240,
+          padding: isCompactLayout ? '12px 12px 88px' : '24px 32px',
           minHeight: '100vh',
+          width: '100%',
+          maxWidth: '100%',
+          overflowX: 'hidden',
         }}
       >
-        {isMobile && (
+        {isCompactLayout && (
           <header
+            className="mobile-header"
             style={{
               position: 'sticky',
               top: 0,
               zIndex: 20,
               padding: '12px 4px',
-              background: 'rgba(241,245,249,0.95)',
-              backdropFilter: 'blur(8px)',
-              borderBottom: '1px solid #e2e8f0',
+              background: 'var(--surface-strong)',
+              backdropFilter: 'blur(18px) saturate(145%)',
+              borderBottom: '1px solid var(--border)',
               marginBottom: 12,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              borderRadius: 18,
+              boxShadow: 'var(--shadow-sm)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -57,12 +67,12 @@ const AppShell = () => {
                 style={{
                   padding: '6px 10px',
                   borderRadius: 999,
-                  background: 'linear-gradient(135deg,#1d4ed8,#38bdf8)',
+                  background: 'var(--accent-gradient-soft)',
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  boxShadow: '0 8px 18px rgba(30,64,175,0.32)',
+                  boxShadow: '0 12px 28px rgba(95,123,255,0.24)',
                 }}
               >
                 <Zap size={16} color="white" />
@@ -78,13 +88,15 @@ const AppShell = () => {
                 width: 38,
                 height: 38,
                 borderRadius: 12,
-                border: '1px solid #e2e8f0',
-                background: '#ffffff',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#0f172a',
+                color: 'var(--text-1)',
                 position: 'relative',
+                backdropFilter: 'blur(14px) saturate(145%)',
+                boxShadow: 'var(--shadow-sm)',
               }}
             >
               <Bell size={18} />
@@ -106,6 +118,8 @@ const AppShell = () => {
 
         <AnimatePresence mode="wait">
           <motion.div
+            ref={routeContentRef}
+            className="route-scroll-shell"
             key={location.pathname}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -117,7 +131,7 @@ const AppShell = () => {
         </AnimatePresence>
       </main>
 
-      {isMobile && <BottomNav />}
+      {isCompactLayout && <BottomNav />}
     </div>
   )
 }

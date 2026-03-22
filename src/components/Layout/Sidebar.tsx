@@ -58,15 +58,17 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
     <aside
       style={{
         width: collapsed ? 64 : 240,
-        background: '#0f172a',
+        background: 'var(--sidebar-surface)',
         color: '#cbd5e1',
         position: 'fixed',
         inset: 0,
         right: 'auto',
         display: 'flex',
         flexDirection: 'column',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
+        borderRight: '1px solid var(--border)',
+        backdropFilter: 'blur(22px) saturate(145%)',
         zIndex: 40,
+        boxShadow: 'var(--shadow-lg)',
       }}
     >
       <div
@@ -75,7 +77,7 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: '1px solid var(--border)',
         }}
       >
         <div
@@ -83,9 +85,10 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
             width: 36,
             height: 36,
             borderRadius: 12,
-            background: 'linear-gradient(135deg,#1d4ed8,#38bdf8)',
+            background: 'var(--accent-gradient-soft)',
             display: 'grid',
             placeItems: 'center',
+            boxShadow: '0 10px 24px rgba(100,120,255,0.22)',
           }}
         >
           <Zap size={18} color="#fff" />
@@ -135,8 +138,8 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
                   borderRadius: collapsed ? 12 : 10,
                   marginBottom: 4,
                   color: isActive ? '#fff' : '#cbd5e1',
-                  background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  borderLeft: !collapsed ? (isActive ? '3px solid var(--blue)' : '3px solid transparent') : undefined,
+                  background: isActive ? 'linear-gradient(135deg, rgba(113,231,255,0.2), rgba(196,93,255,0.18))' : 'transparent',
+                  borderLeft: !collapsed ? (isActive ? '3px solid rgba(113,231,255,0.9)' : '3px solid transparent') : undefined,
                   textDecoration: 'none',
                   fontWeight: 600,
                   fontSize: 14,
@@ -154,7 +157,7 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
       <div
         style={{
           padding: collapsed ? '12px 8px' : '14px 12px',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
+          borderTop: '1px solid var(--border)',
         }}
       >
         <div
@@ -170,7 +173,7 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
               width: 40,
               height: 40,
               borderRadius: '50%',
-              background: 'rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.1)',
               border: '1px solid rgba(255,255,255,0.2)',
               color: '#fff',
               display: 'grid',
@@ -196,8 +199,8 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
             width: '100%',
             padding: '10px 12px',
             borderRadius: 12,
-            border: 'none',
-            background: '#f43f5e',
+            border: '1px solid var(--accent-border)',
+            background: 'var(--accent-gradient-warm)',
             color: '#fff',
             fontWeight: 700,
             display: 'flex',
@@ -205,7 +208,7 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
             justifyContent: 'center',
             gap: 8,
             cursor: 'pointer',
-            boxShadow: '0 8px 18px rgba(244,63,94,0.28)',
+            boxShadow: '0 12px 28px rgba(196,93,255,0.22)',
           }}
           type="button"
         >

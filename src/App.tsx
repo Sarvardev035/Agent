@@ -31,17 +31,23 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
+        <div className="liquid-scene" aria-hidden="true">
+          <span className="liquid-scene__blob liquid-scene__blob--1" />
+          <span className="liquid-scene__blob liquid-scene__blob--2" />
+          <span className="liquid-scene__blob liquid-scene__blob--3" />
+        </div>
         <Toaster
           position="top-right"
           toastOptions={{
             style: {
               borderRadius: 14,
-              background: '#0b1224',
+              background: 'rgba(23, 28, 52, 0.78)',
               color: '#f8fafc',
               fontFamily: 'Plus Jakarta Sans, sans-serif',
               fontSize: 14,
-              boxShadow: '0 14px 40px rgba(15,23,42,0.4)',
-              border: '1px solid rgba(148,163,184,0.2)',
+              boxShadow: '0 18px 48px rgba(18,24,43,0.28)',
+              border: '1px solid rgba(255,255,255,0.16)',
+              backdropFilter: 'blur(20px) saturate(150%)',
             },
             success: { iconTheme: { primary: '#10b981', secondary: '#ffffff' }, duration: 3000 },
             error:   { iconTheme: { primary: '#ef4444', secondary: '#ffffff' }, duration: 4000 },

@@ -15,10 +15,12 @@ import { AccountSchema, getCardNumberError } from '../lib/security'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
 import api from '../lib/api'
 import { safeArray, mapAccountType } from '../lib/helpers'
-import { ACCOUNT_TYPES, CURRENCIES } from '../lib/constants'
+import { ACCOUNT_TYPES, CARD_TYPES, CURRENCIES } from '../lib/constants'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 
 type AccountType = (typeof ACCOUNT_TYPES)[number]['value']
 type CurrencyCode = (typeof CURRENCIES)[number]
+type CardType = (typeof CARD_TYPES)[number]['value']
 
 interface AccountForm {
   name: string
@@ -26,6 +28,7 @@ interface AccountForm {
   currency: CurrencyCode
   initialBalance: string
   cardNumber: string
+  cardType: CardType | ''
 }
 
 const getDefaultAccountForm = (): AccountForm => ({
@@ -34,6 +37,7 @@ const getDefaultAccountForm = (): AccountForm => ({
   currency: 'UZS',
   initialBalance: '',
   cardNumber: '',
+  cardType: '',
 })
 
 const Accounts = () => {
@@ -46,9 +50,13 @@ const Accounts = () => {
   const [form, setForm] = useState<AccountForm>(getDefaultAccountForm)
   const [displayCurrency, setDisplayCurrency] = useState('USD')
   const { convert, rates, loading: rateLoading, lastUpdated, refresh } = useExchangeRates()
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const isCardAccount = form.type === 'BANK_CARD'
   const cardNumberError = isCardAccount ? getCardNumberError(form.cardNumber) : null
-  const isSubmitDisabled = isCardAccount && Boolean(cardNumberError)
+  const cardTypeError = isCardAccount && !form.cardType
+    ? 'Card type is required for BANK_CARD accounts'
+    : null
+  const isSubmitDisabled = isCardAccount && (Boolean(cardNumberError) || Boolean(cardTypeError))
 
   useEffect(() => {
     let cancelled = false
@@ -78,10 +86,15 @@ const Accounts = () => {
       toast.error(cardNumberError)
       return
     }
+    if (isCardAccount && cardTypeError) {
+      toast.error(cardTypeError)
+      return
+    }
     const parsed = AccountSchema.safeParse({
       ...form,
       initialBalance: Number(form.initialBalance) || 0,
       cardNumber: isCardAccount ? form.cardNumber : undefined,
+      cardType: isCardAccount ? form.cardType || undefined : undefined,
     })
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
@@ -93,7 +106,12 @@ const Accounts = () => {
         type: parsed.data.type,
         currency: parsed.data.currency,
         initialBalance: parsed.data.initialBalance,
-        ...(parsed.data.type === 'BANK_CARD' ? { cardNumber: parsed.data.cardNumber } : {}),
+        ...(parsed.data.type === 'BANK_CARD'
+          ? {
+              cardNumber: parsed.data.cardNumber,
+              cardType: parsed.data.cardType,
+            }
+          : {}),
       })
       toast.success('Account created')
       setModalOpen(false)
@@ -227,7 +245,7 @@ const Accounts = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,280px),1fr))', gap: 12 }}>
         {isLoadingAccounts ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} height={180} />)
         ) : accounts.length === 0 ? (
@@ -274,11 +292,35 @@ const Accounts = () => {
       {modalOpen && (
         <div
           className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: isPhone ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            padding: isPhone ? '12px 12px 0' : '24px 16px',
+            zIndex: 100,
+          }}
           onClick={e => {
             if (e.target === e.currentTarget) setModalOpen(false)
           }}
         >
-          <div className="modal-box">
+          <div
+            className="modal-box"
+            style={{
+              width: '100%',
+              maxWidth: 620,
+              background: '#fff',
+              borderRadius: isPhone ? '24px 24px 0 0' : 20,
+              padding: isPhone ? 18 : 24,
+              boxShadow: 'var(--shadow-lg)',
+              border: '1px solid var(--border)',
+              maxHeight: isPhone ? '92vh' : 'min(90vh, 720px)',
+              overflowY: 'auto',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
               <h2 style={{ fontSize: 20, fontWeight: 700 }}>Add Account</h2>
               <button
@@ -326,7 +368,14 @@ const Accounts = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))',
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
                     Type *
@@ -380,11 +429,43 @@ const Accounts = () => {
               </div>
 
               {isCardAccount && (
-                <CardNumberField
-                  value={form.cardNumber}
-                  error={cardNumberError}
-                  onChange={cardNumber => setForm(prev => ({ ...prev, cardNumber }))}
-                />
+                <>
+                  <CardNumberField
+                    value={form.cardNumber}
+                    error={cardNumberError}
+                    onChange={cardNumber => setForm(prev => ({ ...prev, cardNumber }))}
+                  />
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Card Type *
+                    </label>
+                    <select
+                      value={form.cardType}
+                      onChange={e => setForm(prev => ({ ...prev, cardType: e.target.value as CardType | '' }))}
+                      style={{
+                        width: '100%',
+                        height: 44,
+                        padding: '0 14px',
+                        border: `1.5px solid ${cardTypeError ? '#ef4444' : '#e2e8f0'}`,
+                        borderRadius: 10,
+                        fontSize: 14,
+                        background: cardTypeError ? '#fef2f2' : '#f8fafc',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value="">Select card type</option>
+                      {CARD_TYPES.map(card => (
+                        <option key={card.value} value={card.value}>
+                          {card.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p style={{ margin: '6px 0 0', minHeight: 18, color: cardTypeError ? '#dc2626' : '#64748b', fontSize: 12 }}>
+                      {cardTypeError ?? 'Supported by the backend: Uzcard, Humo, Visa, and Mastercard.'}
+                    </p>
+                  </div>
+                </>
               )}
 
               <div style={{ marginBottom: 24 }}>
