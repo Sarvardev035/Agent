@@ -11,6 +11,7 @@ import { formatCurrency } from '../lib/currency'
 import { safeArray, safeObject } from '../lib/helpers'
 import { budgetsService } from '../services/budget.service'
 import { categoriesService } from '../services/categories.service'
+import { seedDefaultCategories } from '../lib/seedCategories'
 
 interface ApiCategory {
   id: string
@@ -40,6 +41,7 @@ const Budget = () => {
     setLoading(true)
     try {
       const now = new Date()
+      await seedDefaultCategories()
       const [budgetsRes, catsRes] = await Promise.all([
         budgetsService.getAll({ year: now.getFullYear(), month: now.getMonth() + 1 }),
         categoriesService.getByType('EXPENSE'),
