@@ -9,8 +9,6 @@ import {
   Cell,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -33,6 +31,7 @@ import StatCard from '../components/ui/StatCard'
 import { statsApi } from '../api/statsApi'
 import { formatCurrency, getCategoryMeta } from '../utils/helpers'
 import { safeArray } from '../lib/helpers'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 
 type Period = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 
@@ -130,6 +129,8 @@ const Statistics = () => {
   const [chartReady, setChartReady] = useState(false)
   const [loading, setLoading] = useState(true)
   const [backendNotice, setBackendNotice] = useState<string | null>(null)
+  const [visibleSections, setVisibleSections] = useState(0)
+  const stackCharts = useMediaQuery('(max-width: 1500px)')
 
   const [summary, setSummary] = useState<any>({})
   const [overview, setOverview] = useState<Overview>({})
@@ -146,6 +147,25 @@ const Statistics = () => {
     const t = setTimeout(() => setChartReady(true), 200)
     return () => clearTimeout(t)
   }, [])
+
+  useEffect(() => {
+    if (loading) {
+      setVisibleSections(0)
+      return
+    }
+
+    const totalSections = 6
+    let current = 0
+    const timer = window.setInterval(() => {
+      current += 1
+      setVisibleSections(current)
+      if (current >= totalSections) {
+        window.clearInterval(timer)
+      }
+    }, 140)
+
+    return () => window.clearInterval(timer)
+  }, [loading, period])
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -215,7 +235,9 @@ const Statistics = () => {
         setInsight(insightData && (insightData.title || insightData.message) ? insightData : null)
         setCashflow(
           cashflowData.map((item: any, idx: number) => ({
-            label: item.label || item.date || `P${idx + 1}`,
+            label: item.date
+              ? format(new Date(item.date), period === 'DAILY' ? 'MMM d' : 'MMM d')
+              : item.label || `P${idx + 1}`,
             income: Number(item.income ?? 0),
             expense: Number(item.expense ?? 0),
           }))
@@ -346,8 +368,25 @@ const Statistics = () => {
     )
   }
 
+  const revealStyle = (index: number) => ({
+    opacity: visibleSections >= index ? 1 : 0,
+    transform: visibleSections >= index ? 'translateY(0)' : 'translateY(18px)',
+    transition: 'opacity 0.45s ease, transform 0.45s ease',
+  })
+
   return (
-    <div className="page-content" style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+    <div
+      className="page-content"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+        paddingBottom: 12,
+        width: '100%',
+        maxWidth: 1360,
+        margin: '0 auto',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
           <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>STATISTICS</p>
@@ -398,7 +437,7 @@ const Statistics = () => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,240px),1fr))', gap: 12, ...revealStyle(1) }}>
         <StatCard label="Income total" value={totalIncome} prefix="UZS " changeType="up" isLoading={loading} icon={<TrendingUp size={18} />} />
         <StatCard label="Expense total" value={totalExpense} prefix="UZS " changeType="down" isLoading={loading} icon={<TrendingDown size={18} />} />
         <StatCard
@@ -421,7 +460,7 @@ const Statistics = () => {
 
       {analyticsReady ? (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,260px),1fr))', gap: 12, ...revealStyle(2) }}>
             <div className="card glass-card" style={{ padding: 18, borderRadius: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                 <Landmark size={18} color="#7c3aed" />
@@ -470,7 +509,15 @@ const Statistics = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 14 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: stackCharts ? '1fr' : 'minmax(0,1.12fr) minmax(360px,0.88fr)',
+              gap: 14,
+              alignItems: 'stretch',
+              ...revealStyle(3),
+            }}
+          >
             <div className="card glass-card" style={{ padding: 18, borderRadius: 18, minHeight: 340 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Cashflow</h3>
@@ -509,34 +556,28 @@ const Statistics = () => {
             <div className="card glass-card" style={{ padding: 18, borderRadius: 18, minHeight: 340 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Expense mix</h3>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Interactive breakdown</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Category bars</span>
               </div>
               {loading || !chartReady ? (
                 <Skeleton height={260} />
               ) : breakdown.length === 0 ? (
                 <EmptyState title="No category split" description="Add expenses first so the backend can group them by category." />
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 14 }}>
-                  <div style={{ width: '100%', minHeight: 240 }}>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={breakdown}
-                          dataKey="value"
-                          nameKey="category"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={58}
-                          outerRadius={92}
-                          paddingAngle={4}
-                        >
-                          {breakdown.map(item => {
+                <div style={{ display: 'grid', gap: 14 }}>
+                  <div style={{ width: '100%', minHeight: 250 }}>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart layout="vertical" data={breakdown.slice(0, 6)} margin={{ left: 8, right: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                        <XAxis type="number" hide />
+                        <YAxis type="category" dataKey="category" width={88} tick={{ fill: 'var(--text-2)', fontSize: 12 }} />
+                        <Tooltip content={customTooltip} />
+                        <Bar dataKey="value" radius={[0, 10, 10, 0]} name="Expense">
+                          {breakdown.slice(0, 6).map(item => {
                             const meta = getCategoryMeta(item.category)
                             return <Cell key={item.category} fill={meta.color} />
                           })}
-                        </Pie>
-                        <Tooltip content={customTooltip} />
-                      </PieChart>
+                        </Bar>
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                   <AnimatedBars
@@ -551,7 +592,15 @@ const Statistics = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 14 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: stackCharts ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)',
+              gap: 14,
+              alignItems: 'stretch',
+              ...revealStyle(4),
+            }}
+          >
             <div className="card glass-card" style={{ padding: 18, borderRadius: 18, minHeight: 320 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Account balances</h3>
@@ -597,7 +646,15 @@ const Statistics = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 14 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: stackCharts ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)',
+              gap: 14,
+              alignItems: 'stretch',
+              ...revealStyle(5),
+            }}
+          >
             <div className="card glass-card" style={{ padding: 18, borderRadius: 18, minHeight: 320 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Income growth</h3>
@@ -648,7 +705,15 @@ const Statistics = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 14 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: stackCharts ? '1fr' : 'minmax(0,1fr) minmax(0,1fr)',
+              gap: 14,
+              alignItems: 'stretch',
+              ...revealStyle(6),
+            }}
+          >
             <div className="card glass-card" style={{ padding: 18, borderRadius: 18, minHeight: 320 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Net savings trend</h3>
