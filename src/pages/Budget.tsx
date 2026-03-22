@@ -35,7 +35,7 @@ const Budget = () => {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
-  const [limit, setLimit] = useState<number>(0)
+  const [limit, setLimit] = useState<string>('')
 
   const load = async () => {
     setLoading(true)
@@ -78,7 +78,8 @@ const Budget = () => {
       toast.error('Select a category')
       return
     }
-    if (limit <= 0) {
+    const parsedLimit = Number(limit)
+    if (!parsedLimit || parsedLimit <= 0) {
       toast.error('Limit must be positive')
       return
     }
@@ -87,13 +88,14 @@ const Budget = () => {
       const now = new Date()
       await budgetsService.create({
         categoryId: selectedCategoryId,
-        type: 'MONTHLY',
-        monthlyLimit: Number(limit),
+        type: 'EXPENSE',
+        monthlyLimit: parsedLimit,
         year: now.getFullYear(),
         month: now.getMonth() + 1,
       })
       toast.success('Category limit saved')
       setModalOpen(false)
+      setLimit('')
       await load()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save limit'
@@ -271,7 +273,8 @@ const Budget = () => {
             <input
               type="number"
               value={limit}
-              onChange={e => setLimit(Number(e.target.value))}
+              placeholder="0"
+              onChange={e => setLimit(e.target.value)}
               style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
             />
           </div>
