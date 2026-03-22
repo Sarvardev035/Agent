@@ -10,6 +10,7 @@ import {
   Calendar,
   Zap,
   LogOut,
+  Wallet,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
 
@@ -22,6 +23,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, group: 'MAIN' },
+  { label: 'Accounts', path: '/accounts', icon: Wallet, group: 'MAIN' },
   { label: 'Expenses', path: '/expenses', icon: TrendingDown, group: 'MAIN' },
   { label: 'Income', path: '/income', icon: TrendingUp, group: 'MAIN' },
   { label: 'Transfers', path: '/transfers', icon: ArrowLeftRight, group: 'MAIN' },
