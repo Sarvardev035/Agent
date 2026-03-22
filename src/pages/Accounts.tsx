@@ -77,9 +77,6 @@ const Accounts = () => {
         type: form.type,
         currency: form.currency,
         initialBalance: Number(form.initialBalance) || 0,
-        cardNumber: null,
-        cardType: null,
-        expiryDate: null,
       })
       toast.success('Account created')
       setModalOpen(false)
