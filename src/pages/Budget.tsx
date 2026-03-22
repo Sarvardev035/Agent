@@ -115,6 +115,10 @@ const Budget = () => {
   }
 
   const handleSaveCategory = async () => {
+    if (!selectedCategory) {
+      toast.error('Please select a category')
+      return
+    }
     const parsed = Number(categoryLimit)
     if (!parsed || parsed <= 0) {
       toast.error('Limit must be positive')
@@ -132,6 +136,7 @@ const Budget = () => {
         toast.success('Category limit saved')
         setCategoryModal(false)
         setCategoryLimit('')
+        setSelectedCategory('')
         await Promise.allSettled([loadBudget(), refreshAccounts()])
       } catch (err) {
         console.error(err)
@@ -404,42 +409,58 @@ const Budget = () => {
       <Modal open={categoryModal} onClose={() => setCategoryModal(false)} title="Add category limit">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Category</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Category *</label>
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
+              required
               style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             >
+              <option value="">Select a category</option>
               {categoryOptions.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
               ))}
             </select>
+            {categoryOptions.length === 0 && (
+              <div style={{
+                fontSize: 12, color: '#f59e0b', marginTop: 4,
+              }}>
+                No categories found. Add expense categories first.
+              </div>
+            )}
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit ({currencySymbol})</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit ({currencySymbol}) *</label>
             <input
               type="number"
               value={categoryLimit}
               onChange={e => setCategoryLimit(e.target.value)}
-              placeholder="0.00"
+              placeholder="e.g. 500000"
+              min="1"
+              step="any"
+              required
               style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             />
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+              Limit is in your account currency
+            </div>
           </div>
           <button
             onClick={handleSaveCategory}
+            disabled={!selectedCategory || !categoryLimit}
             type="button"
             style={{
               width: '100%',
               height: 48,
               borderRadius: 14,
               border: 'none',
-              background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
+              background: (!selectedCategory || !categoryLimit) ? '#cbd5e1' : 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
               color: '#fff',
               fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 12px 30px rgba(37,99,235,0.35)',
+              cursor: (!selectedCategory || !categoryLimit) ? 'not-allowed' : 'pointer',
+              boxShadow: (!selectedCategory || !categoryLimit) ? 'none' : '0 12px 30px rgba(37,99,235,0.35)',
             }}
           >
             Save category limit

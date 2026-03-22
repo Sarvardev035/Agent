@@ -12,8 +12,11 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts'
-import { useAuthStore } from '../store/auth.store'
+import { useNavigate } from 'react-router-dom'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 import { formatCurrency, getCategoryMeta } from '../utils/helpers'
 import TransactionItem from '../components/ui/TransactionItem'
@@ -21,7 +24,7 @@ import EmptyState from '../components/ui/EmptyState'
 import ProgressBar from '../components/ui/ProgressBar'
 
 const Dashboard = () => {
-  const { user } = useAuthStore()
+  const navigate = useNavigate()
   const { stats, loading } = useDashboardStats()
   const [chartReady, setChartReady] = useState(false)
 
@@ -35,6 +38,13 @@ const Dashboard = () => {
     if (h < 12) return 'morning'
     if (h < 17) return 'afternoon'
     return 'evening'
+  }, [])
+
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  const userName = useMemo(() => {
+    return localStorage.getItem('finly_user_name')
+      || localStorage.getItem('finly_user_email')?.split('@')[0]
+      || 'there'
   }, [])
 
   const topCategories = useMemo(() => {
@@ -61,269 +71,570 @@ const Dashboard = () => {
       const dayExpense = stats?.expenses
         ? stats.expenses.filter((e: any) => format(new Date(e.date), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')).reduce((s: number, e: any) => s + (e.amount || 0), 0)
         : 0
-      return { name: label, income: dayIncome, expense: dayExpense }
+      return { label, income: dayIncome, expense: dayExpense }
     })
     return days
   }, [stats?.income, stats?.expenses])
 
+  const expByCategory = useMemo(() => {
+    if (!stats?.expenses) return []
+    const totals: Record<string, number> = {}
+    stats.expenses.forEach((e: any) => {
+      const key = e.category || e.categoryId || 'OTHER'
+      totals[key] = (totals[key] || 0) + (e.amount || 0)
+    })
+    return Object.entries(totals)
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount)
+  }, [stats?.expenses])
+
+  const recentTxns = useMemo(() => {
+    const combined: any[] = []
+    if (stats?.recentTransactions) {
+      combined.push(...stats.recentTransactions)
+    }
+    if (stats?.income) {
+      combined.push(...stats.income.map((i: any) => ({ ...i, txnType: 'income' })))
+    }
+    if (stats?.expenses) {
+      combined.push(...stats.expenses.map((e: any) => ({ ...e, txnType: 'expense' })))
+    }
+    return combined
+      .sort((a, b) => new Date(b.date || b.incomeDate || b.expenseDate || 0).getTime() - new Date(a.date || a.incomeDate || a.expenseDate || 0).getTime())
+      .slice(0, 8)
+  }, [stats?.recentTransactions, stats?.income, stats?.expenses])
+
+  const smartDate = (dateStr?: string) => {
+    if (!dateStr) return 'Today'
+    const date = new Date(dateStr)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    
+    if (format(date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) return 'Today'
+    if (format(date, 'yyyy-MM-dd') === format(yesterday, 'yyyy-MM-dd')) return 'Yesterday'
+    return format(date, 'MMM d')
+  }
+
+  const accounts = stats?.accounts || []
+  const summary = {
+    totalBalance: stats?.totalBalance ?? 0,
+    totalIncome: stats?.monthlyIncome ?? 0,
+    totalExpense: stats?.monthlyExpenses ?? 0,
+    savings: (stats?.monthlyIncome ?? 0) - (stats?.monthlyExpenses ?? 0),
+  }
+
+  const openDebts = [] // Placeholder
+  const budgetUsedPct = 0 // Placeholder
+
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-      {/* Hero header */}
-      <div className="flex items-start justify-between mb-6">
+    <div style={{ padding: 'clamp(16px,3vw,32px)' }}>
+      {/* ── ROW 1: Welcome header ── */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 20,
+      }}>
         <div>
-          <p className="text-sm text-slate-500 font-medium">{format(new Date(), 'EEEE, MMMM do')}</p>
-          <h1 style={{ fontFamily: 'Space Grotesk', fontSize: 26, fontWeight: 700 }}>
-            Good {timeOfDay}, {user?.name || 'Finly user'} 👋
+          <p style={{
+            fontSize: 13, color: 'var(--text-3)',
+            margin: '0 0 4px',
+          }}>
+            {format(new Date(), 'EEEE, MMMM do')}
+          </p>
+          <h1 style={{
+            fontSize: 'clamp(20px,3vw,28px)',
+            fontWeight: 800,
+            color: 'var(--text-1)',
+            margin: 0,
+            letterSpacing: '-0.02em',
+          }}>
+            Good {timeOfDay}, {capitalize(userName)} 👋
           </h1>
         </div>
-        <button className="relative p-2 rounded-xl bg-white border border-slate-200">
-          <Bell size={20} />
-        </button>
-      </div>
-
-      {/* Balance hero */}
-      <div
-        style={{
-          position: 'relative',
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)',
-          borderRadius: 20,
-          padding: 28,
-          color: '#ffffff',
-          overflow: 'hidden',
-          boxShadow: 'var(--shadow-lg)',
-          marginBottom: 18,
-        }}
-      >
-        <div style={{ position: 'absolute', top: -40, right: -20, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
-        <div style={{ position: 'absolute', top: -10, right: 40, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-        <div style={{ position: 'absolute', top: 30, right: 0, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-
-        <div style={{ letterSpacing: '0.12em', fontSize: 11, opacity: 0.7, fontWeight: 700 }}>TOTAL BALANCE</div>
-        <div style={{ fontSize: 36, fontFamily: 'Space Grotesk', fontWeight: 700, marginTop: 8 }}>
-          {loading ? (
-            <div className="skeleton" style={{ height: 32, width: 180 }} />
-          ) : (
-            <CountUp end={stats?.totalBalance || 0} duration={1.2} separator="," prefix="UZS " />
-          )}
-        </div>
-        <div style={{ opacity: 0.8, fontSize: 13, marginTop: 4 }}>
-          {loading ? <div className="skeleton" style={{ height: 14, width: 120 }} /> : `Across ${stats?.accounts?.length ?? 0} accounts`}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 18 }}>
-          <div style={{ color: '#10b981', fontWeight: 700 }}>
-            ↑ Income this month{' '}
-            {loading ? (
-              <div className="skeleton" style={{ height: 14, width: 90 }} />
-            ) : (
-              formatCurrency(stats?.monthlyIncome || 0)
-            )}
-          </div>
-          <div style={{ color: '#f43f5e', fontWeight: 700, textAlign: 'right' }}>
-            ↓ Expenses this month{' '}
-            {loading ? (
-              <div className="skeleton" style={{ height: 14, width: 90, marginLeft: 'auto' }} />
-            ) : (
-              formatCurrency(stats?.monthlyExpenses || 0)
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick stat pills */}
-      <div className="flex gap-3 overflow-auto pb-2 mb-4">
-        <div className="min-w-[160px]" style={{ background: 'var(--purple-soft)', color: '#6b21a8', padding: 14, borderRadius: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.7 }}>Net savings</div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>
-            {loading ? <div className="skeleton" style={{ height: 16, width: 90 }} /> : formatCurrency(stats?.netSavings || 0)}
-          </div>
-        </div>
-        <div className="min-w-[140px]" style={{ background: 'var(--blue-soft)', color: '#1d4ed8', padding: 14, borderRadius: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.7 }}>Accounts</div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>
-            {loading ? <div className="skeleton" style={{ height: 16, width: 50 }} /> : stats?.accounts?.length ?? 0}
-          </div>
-        </div>
-        <div className="min-w-[150px]" style={{ background: 'var(--amber-soft)', color: '#b45309', padding: 14, borderRadius: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.7 }}>Open debts</div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>{/* data unavailable yet */}—</div>
-        </div>
-        <div className="min-w-[150px]" style={{ background: 'var(--green-soft)', color: '#0f766e', padding: 14, borderRadius: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.7 }}>Budget used</div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>—</div>
-        </div>
-      </div>
-
-      {/* Accounts scroller */}
-      <div className="mb-5">
-        <div className="flex items-center justify-between mb-2">
-          <h3 style={{ fontWeight: 700, fontSize: 16 }}>My Accounts</h3>
-          <button style={{ color: '#3b82f6', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>
-            See all
+        {/* Notification bell */}
+        <div style={{ position: 'relative' }}>
+          <button style={{
+            background: 'var(--card-bg)',
+            border: '1px solid var(--border)',
+            borderRadius: 12, padding: '9px 12px',
+            cursor: 'pointer', display: 'flex',
+            alignItems: 'center', gap: 6,
+            color: 'var(--text-2)', fontSize: 13,
+            transition: 'all 0.2s',
+          }}>
+            🔔
           </button>
         </div>
-        <div className="flex gap-3 overflow-auto pb-2">
-          {loading ? (
-            Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="skeleton" style={{ width: 140, height: 90, borderRadius: 14 }} />
-            ))
-          ) : stats?.accounts?.length ? (
-            stats.accounts.map((acc: any) => (
-              <div
-                key={acc.id || acc.name}
-                style={{
-                  width: 160,
-                  minWidth: 160,
-                  background: '#fff',
-                  borderRadius: 14,
-                  padding: 12,
-                  boxShadow: 'var(--shadow-sm)',
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                <div style={{ fontWeight: 700, color: '#0f172a' }}>{acc.name || 'Account'}</div>
-                <div style={{ color: '#94a3b8', fontSize: 12 }}>{acc.type || 'Balance'}</div>
-                <div style={{ marginTop: 8, fontWeight: 800, fontSize: 16 }}>{formatCurrency(acc.balance || 0)}</div>
-              </div>
-            ))
-          ) : (
-            <EmptyState title="No accounts" description="Add an account to see balances here." />
-          )}
-        </div>
       </div>
 
-      {/* Two column grid */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-3">
-            <h3 style={{ fontWeight: 700, fontSize: 16 }}>Recent Activity</h3>
-            <button style={{ color: '#3b82f6', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>
-              View all →
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {loading ? (
-              Array.from({ length: 3 }).map((_, idx) => <div key={idx} className="skeleton" style={{ height: 48 }} />)
-            ) : stats?.recentTransactions?.length ? (
-              <AnimatePresence>
-                {stats.recentTransactions.slice(0, 8).map((tx: any) => (
-                  <TransactionItem
-                    key={tx.id || `${tx.type}-${tx.date}-${tx.amount}-${tx.description}`}
-                    type={tx.type}
-                    amount={tx.amount || 0}
-                    category={tx.category || tx.categoryId || 'OTHER'}
-                    date={tx.date}
-                    description={tx.description}
-                    currency={tx.currency || 'UZS'}
-                    accountLabel={tx.accountName}
-                  />
-                ))}
-              </AnimatePresence>
-            ) : (
-              <EmptyState title="No transactions yet" description="Start by adding income or expenses to see activity." />
-            )}
-          </div>
-        </div>
+      {/* ── ROW 2: Hero balance card ── */}
+      <div style={{
+        background: 'linear-gradient(135deg,#0a1628 0%,#0f2040 40%,#1d4ed8 100%)',
+        borderRadius: 20,
+        padding: 'clamp(20px,3vw,28px)',
+        marginBottom: 20,
+        position: 'relative',
+        overflow: 'hidden',
+        color: 'white',
+      }}>
+        {/* Decorative circles */}
+        <div style={{
+          position:'absolute', right:-40, top:-40,
+          width:200, height:200, borderRadius:'50%',
+          background:'rgba(255,255,255,0.05)',
+        }}/>
+        <div style={{
+          position:'absolute', right:40, top:20,
+          width:120, height:120, borderRadius:'50%',
+          background:'rgba(255,255,255,0.04)',
+        }}/>
 
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 style={{ fontWeight: 700, fontSize: 16 }}>Budget Health</h3>
-            <button style={{ color: '#3b82f6', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>
-              View budget →
-            </button>
+        <p style={{ margin:'0 0 4px', fontSize:11,
+          textTransform:'uppercase', letterSpacing:'0.1em',
+          opacity:0.6, fontWeight:600,
+        }}>
+          TOTAL BALANCE
+        </p>
+        <h2 style={{
+          margin:'0 0 4px',
+          fontSize:'clamp(28px,5vw,42px)',
+          fontWeight:800, letterSpacing:'-0.02em',
+        }}>
+          {loading ? '—' : formatCurrency(summary.totalBalance)}
+        </h2>
+        <p style={{ margin:'0 0 20px', opacity:0.6, fontSize:13 }}>
+          Across {accounts.length} account{accounts.length !== 1 ? 's' : ''}
+        </p>
+        <div style={{
+          display:'flex', gap:32, flexWrap:'wrap',
+          borderTop:'1px solid rgba(255,255,255,0.1)',
+          paddingTop:16,
+        }}>
+          <div>
+            <p style={{ margin:'0 0 2px', opacity:0.6, fontSize:12 }}>
+              ↑ Income this month
+            </p>
+            <p style={{ margin:0, fontWeight:700, fontSize:16,
+              color:'#4ade80' }}>
+              {loading ? '—' : formatCurrency(summary.totalIncome)}
+            </p>
           </div>
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 14,
-              border: '1px solid #e2e8f0',
-              padding: 14,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-            }}
-          >
-            {loading ? (
-              Array.from({ length: 4 }).map((_, idx) => <div key={idx} className="skeleton" style={{ height: 18 }} />)
-            ) : topCategories.length ? (
-              topCategories.map(cat => {
-                const meta = getCategoryMeta(cat.key)
-                const percent = 0 // placeholder until budget limit data exists
-                return (
-                  <div key={cat.key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 16 }}>{meta.emoji}</span>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{meta.label}</span>
-                      </div>
-                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatCurrency(cat.amount || 0)}</span>
-                    </div>
-                    <ProgressBar percent={percent} color={meta.color} showPercent={false} height={8} />
-                  </div>
-                )
-              })
-            ) : (
-              <EmptyState title="No budget data" description="Set category limits to monitor your budget health." />
-            )}
+          <div>
+            <p style={{ margin:'0 0 2px', opacity:0.6, fontSize:12 }}>
+              ↓ Expenses this month
+            </p>
+            <p style={{ margin:0, fontWeight:700, fontSize:16,
+              color:'#f87171' }}>
+              {loading ? '—' : formatCurrency(summary.totalExpense)}
+            </p>
+          </div>
+          <div>
+            <p style={{ margin:'0 0 2px', opacity:0.6, fontSize:12 }}>
+              💰 Net Savings
+            </p>
+            <p style={{ margin:0, fontWeight:700, fontSize:16,
+              color:'#a78bfa' }}>
+              {loading ? '—' : formatCurrency(summary.savings)}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+      {/* ── ROW 3: Quick stat pills ── */}
+      <div style={{
+        display:'grid',
+        gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,200px),1fr))',
+        gap:12,
+        marginBottom:20,
+      }}>
         {[
-          { label: 'Expense', icon: <TrendingDown size={18} />, color: '#fef2f2' },
-          { label: 'Income', icon: <TrendingUp size={18} />, color: '#ecfdf3' },
-          { label: 'Transfer', icon: <ArrowLeftRight size={18} />, color: '#eef2ff' },
-          { label: 'Add Debt', icon: <HandCoins size={18} />, color: '#fffbeb' },
-        ].map(action => (
-          <button
-            key={action.label}
+          { label:'Net Savings',   value:summary.savings,      color:'#7c3aed', bg:'#f5f3ff', icon:'💰' },
+          { label:'Accounts',      value:accounts.length,          color:'#2563eb', bg:'#eff6ff', icon:'💳', isCount:true },
+          { label:'Open Debts',    value:openDebts.length,         color:'#f59e0b', bg:'#fffbeb', icon:'🤝', isCount:true },
+          { label:'Budget Health', value:budgetUsedPct,            color:'#10b981', bg:'#ecfdf5', icon:'🎯', isPct:true },
+        ].map(card => (
+          <motion.div key={card.label}
+            whileHover={{ y: -4 }}
             style={{
-              background: action.color,
-              border: '1px solid #e2e8f0',
-              borderRadius: 14,
-              padding: '12px 10px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 6,
-              fontWeight: 700,
-              cursor: 'pointer',
+              borderLeft:`4px solid ${card.color}`,
+              background:card.bg,
+              cursor:'pointer',
+              padding:'16px',
+              borderRadius:'12px',
+              border:`1px solid ${card.color}20`,
+              transition:'all 0.2s',
             }}
-            type="button"
           >
-            {action.icon}
-            {action.label}
-          </button>
+            <div style={{ fontSize:11,fontWeight:700,
+              color:card.color,textTransform:'uppercase',
+              letterSpacing:'0.06em',marginBottom:6,
+            }}>
+              {card.icon} {card.label}
+            </div>
+            <div style={{ fontSize:'clamp(18px,2.5vw,24px)',
+              fontWeight:800, color:card.color,
+            }}>
+              {card.isCount
+                ? card.value
+                : card.isPct
+                  ? `${Math.round(card.value)}%`
+                  : formatCurrency(card.value)}
+            </div>
+          </motion.div>
         ))}
       </div>
 
-      {/* Last 7 days chart */}
-      <div style={{ marginTop: 20 }}>
-        <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Last 7 days</h3>
-        {!chartReady ? (
-          <div className="skeleton" style={{ height: 220 }} />
-        ) : (
-          <div style={{ width: '100%', minHeight: 220, background: '#fff', borderRadius: 14, padding: 12, border: '1px solid #e2e8f0' }}>
-            <ResponsiveContainer width="100%" height={200} minHeight={200}>
-              <BarChart data={last7DaysData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip
-                  contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-sm)' }}
-                  formatter={(value: any) => formatCurrency(value as number)}
-                />
-                <Legend />
-                <Bar dataKey="income" fill="#10b981" isAnimationActive animationBegin={200} />
-                <Bar dataKey="expense" fill="#f43f5e" isAnimationActive animationBegin={200} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+      {/* ── ROW 4: Quick Actions ── */}
+      <div style={{ marginBottom:20 }}>
+        <h3 style={{ fontSize:15,fontWeight:700,
+          color:'var(--text-1)',marginBottom:12,
+        }}>
+          Quick Actions
+        </h3>
+        <div style={{
+          display:'grid',
+          gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',
+          gap:10,
+        }}>
+          {[
+            { label:'+ Expense',  color:'#ef4444', bg:'#fff1f2', path:'/expenses',  icon:'📉' },
+            { label:'+ Income',   color:'#10b981', bg:'#ecfdf5', path:'/income',    icon:'📈' },
+            { label:'Transfer',   color:'#2563eb', bg:'#eff6ff', path:'/transfers', icon:'↔️' },
+            { label:'+ Debt',     color:'#f59e0b', bg:'#fffbeb', path:'/debts',     icon:'🤝' },
+          ].map(action => (
+            <motion.button key={action.label}
+              whileHover={{ y: -4 }}
+              onClick={() => navigate(action.path)}
+              style={{
+                background:action.bg,
+                border:`1.5px solid ${action.color}30`,
+                borderRadius:14,
+                padding:'14px 10px',
+                cursor:'pointer',
+                display:'flex',
+                flexDirection:'column',
+                alignItems:'center',
+                gap:6,
+                color:action.color,
+                fontWeight:700,
+                fontSize:13,
+                transition:'all 0.2s',
+              }}
+            >
+              <span style={{ fontSize:22 }}>{action.icon}</span>
+              {action.label}
+            </motion.button>
+          ))}
+        </div>
       </div>
-    </motion.div>
+
+      {/* ── ROW 5: Two column — Transactions + Accounts ── */}
+      <div style={{
+        display:'grid',
+        gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth > 1024 ? '1fr 380px' : '1fr',
+        gap:16,
+        marginBottom:20,
+      }}>
+        {/* Recent Transactions */}
+        <div style={{
+          background:'var(--card-bg)',
+          borderRadius:'14px',
+          padding:'16px',
+          border:'1px solid var(--border)',
+          boxShadow:'var(--shadow-sm)',
+        }}>
+          <div style={{
+            display:'flex',justifyContent:'space-between',
+            alignItems:'center',marginBottom:16,
+          }}>
+            <h3 style={{ fontSize:16,fontWeight:700,
+              color:'var(--text-1)',margin:0,
+            }}>
+              Recent Activity
+            </h3>
+            <button
+              onClick={() => navigate('/expenses')}
+              style={{
+                background:'none',border:'none',
+                color:'#7c3aed',fontSize:13,
+                fontWeight:600,cursor:'pointer',
+              }}
+            >
+              View all →
+            </button>
+          </div>
+          {loading ? (
+            [...Array(5)].map((_,i)=>(
+              <div key={i} className="skeleton"
+                style={{height:52,marginBottom:8}}/>
+            ))
+          ) : recentTxns.length === 0 ? (
+            <div style={{
+              textAlign:'center',padding:'32px 16px',
+              color:'var(--text-3)',
+            }}>
+              <div style={{fontSize:32,marginBottom:8}}>📋</div>
+              <p style={{margin:0,fontSize:14}}>No transactions yet</p>
+              <p style={{margin:'4px 0 0',fontSize:12}}>
+                Add your first expense or income
+              </p>
+            </div>
+          ) : (
+            recentTxns.map((txn:any,i:number) => (
+              <div key={i} style={{
+                display:'flex',alignItems:'center',
+                gap:12,padding:'10px 0',
+                borderBottom: i < recentTxns.length-1
+                  ? '1px solid var(--border)' : 'none',
+              }}>
+                <div style={{
+                  width:38,height:38,borderRadius:10,
+                  background: txn.txnType==='expense' || txn.type === 'expense'
+                    ? '#fff1f2' : '#ecfdf5',
+                  display:'flex',alignItems:'center',
+                  justifyContent:'center',fontSize:18,flexShrink:0,
+                }}>
+                  {txn.txnType==='expense' || txn.type === 'expense' ? '📉' : '📈'}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{
+                    fontSize:14,fontWeight:600,
+                    color:'var(--text-1)',
+                    whiteSpace:'nowrap',overflow:'hidden',
+                    textOverflow:'ellipsis',
+                  }}>
+                    {txn.description || 'Transaction'}
+                  </div>
+                  <div style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>
+                    {smartDate(txn.date || txn.expenseDate || txn.incomeDate)}
+                  </div>
+                </div>
+                <div style={{
+                  fontWeight:700,fontSize:14,flexShrink:0,
+                  color: txn.txnType==='expense' || txn.type === 'expense' ? '#ef4444' : '#10b981',
+                }}>
+                  {txn.txnType==='expense' || txn.type === 'expense' ? '−' : '+'}
+                  {formatCurrency(txn.amount, txn.currency)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Right column: My Accounts */}
+        <div style={{
+          background:'var(--card-bg)',
+          borderRadius:'14px',
+          padding:'16px',
+          border:'1px solid var(--border)',
+          boxShadow:'var(--shadow-sm)',
+        }}>
+          <div style={{
+            display:'flex',justifyContent:'space-between',
+            alignItems:'center',marginBottom:16,
+          }}>
+            <h3 style={{
+              fontSize:16,fontWeight:700,
+              color:'var(--text-1)',margin:0,
+            }}>
+              My Accounts
+            </h3>
+            <button
+              onClick={() => navigate('/accounts')}
+              style={{
+                background:'none',border:'none',
+                color:'#7c3aed',fontSize:13,
+                fontWeight:600,cursor:'pointer',
+              }}
+            >
+              See all →
+            </button>
+          </div>
+          {accounts.length === 0 ? (
+            <div style={{
+              textAlign:'center',padding:'24px 16px',
+              color:'var(--text-3)',
+            }}>
+              <div style={{fontSize:32,marginBottom:8}}>💳</div>
+              <p style={{margin:'0 0 12px',fontSize:14}}>
+                No accounts yet
+              </p>
+              <button
+                onClick={() => navigate('/accounts')}
+                style={{
+                  background:'linear-gradient(135deg,#7c3aed,#2563eb)',
+                  color:'white',border:'none',borderRadius:10,
+                  padding:'8px 16px',fontSize:13,
+                  fontWeight:600,cursor:'pointer',
+                }}
+              >
+                + Add Account
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              display:'flex',flexDirection:'column',gap:10,
+            }}>
+              {accounts.slice(0,4).map((acc:any) => (
+                <motion.div key={acc.id}
+                  whileHover={{ x: 4 }}
+                  style={{
+                  display:'flex',alignItems:'center',
+                  justifyContent:'space-between',
+                  padding:'12px 14px',
+                  background:'var(--surface-2)',
+                  borderRadius:12,
+                  border:'1px solid var(--border)',
+                  transition:'all 0.15s',
+                  cursor:'pointer',
+                }}
+                >
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{
+                      width:36,height:36,borderRadius:10,
+                      background:'linear-gradient(135deg,#7c3aed,#2563eb)',
+                      display:'flex',alignItems:'center',
+                      justifyContent:'center',fontSize:16,
+                    }}>
+                      {acc.type==='CASH' ? '💵' : '💳'}
+                    </div>
+                    <div>
+                      <div style={{
+                        fontSize:13,fontWeight:600,
+                        color:'var(--text-1)',
+                      }}>
+                        {acc.name}
+                      </div>
+                      <div style={{fontSize:11,color:'var(--text-3)'}}>
+                        {acc.type} · {acc.currency}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize:14,fontWeight:700,
+                    color:'var(--text-1)',
+                  }}>
+                    {formatCurrency(acc.balance, acc.currency)}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── ROW 6: Charts ── */}
+      {chartReady && (
+        <div style={{
+          display:'grid',
+          gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth > 1024 ? '1fr 1fr' : '1fr',
+          gap:16,
+          marginBottom:20,
+        }}>
+          {/* 7-day spending chart */}
+          <div style={{
+            background:'var(--card-bg)',
+            borderRadius:'14px',
+            padding:'16px',
+            border:'1px solid var(--border)',
+            boxShadow:'var(--shadow-sm)',
+          }}>
+            <h3 style={{
+              fontSize:15,fontWeight:700,
+              color:'var(--text-1)',marginBottom:16,
+            }}>
+              Last 7 Days
+            </h3>
+            <div style={{width:'100%',minHeight:200}}>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={last7DaysData}>
+                  <CartesianGrid strokeDasharray="3 3"
+                    stroke="var(--border)" vertical={false}/>
+                  <XAxis dataKey="label"
+                    tick={{fill:'var(--text-3)',fontSize:11}}
+                    axisLine={false} tickLine={false}/>
+                  <YAxis hide/>
+                  <Tooltip
+                    contentStyle={{
+                      background:'var(--card-bg)',
+                      border:'1px solid var(--border)',
+                      borderRadius:10,fontSize:12,
+                    }}
+                    formatter={(value: any) => formatCurrency(value as number)}
+                  />
+                  <Bar dataKey="expense" fill="#ef4444"
+                    radius={[6,6,0,0]} name="Expenses"/>
+                  <Bar dataKey="income" fill="#10b981"
+                    radius={[6,6,0,0]} name="Income"/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Expenses by category pie */}
+          <div style={{
+            background:'var(--card-bg)',
+            borderRadius:'14px',
+            padding:'16px',
+            border:'1px solid var(--border)',
+            boxShadow:'var(--shadow-sm)',
+          }}>
+            <h3 style={{
+              fontSize:15,fontWeight:700,
+              color:'var(--text-1)',marginBottom:16,
+            }}>
+              Spending Breakdown
+            </h3>
+            {expByCategory.length === 0 ? (
+              <div style={{
+                display:'flex',alignItems:'center',
+                justifyContent:'center',height:200,
+                color:'var(--text-3)',fontSize:13,
+                flexDirection:'column',gap:8,
+              }}>
+                <span style={{fontSize:32}}>🥧</span>
+                No spending data yet
+              </div>
+            ) : (
+              <div style={{width:'100%',minHeight:200}}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={expByCategory}
+                      dataKey="amount"
+                      nameKey="category"
+                      cx="40%" cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={3}
+                    >
+                      {expByCategory.map((_:any,i:number)=>(
+                        <Cell key={i} fill={[
+                          '#7c3aed','#2563eb','#10b981',
+                          '#f59e0b','#ef4444','#06b6d4',
+                        ][i%6]}/>
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        background:'var(--card-bg)',
+                        border:'1px solid var(--border)',
+                        borderRadius:10,fontSize:12,
+                      }}
+                      formatter={(value: any) => formatCurrency(value as number)}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
