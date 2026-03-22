@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { TokenStorage } from '../../lib/security'
 import { useAuthStore } from '../../store/auth.store'
+import { ThemeToggle } from '../ui/ThemeToggle'
 import Chatbot from '../Chatbot/Chatbot'
 import {
   AlertDialog,
@@ -488,6 +489,7 @@ const AppShell = () => {
               >
                 <Bell size={18} />
               </button>
+              <ThemeToggle />
               <div
                 aria-label="Account avatar"
                 style={{
