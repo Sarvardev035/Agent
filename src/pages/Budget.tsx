@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { PiggyBank, Plus, Trash2 } from 'lucide-react'
@@ -37,8 +37,10 @@ const Budget = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [limit, setLimit] = useState<string>('')
 
-  const load = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
+    setItems([])
+    setCategories([])
     try {
       const now = new Date()
       await seedDefaultCategories()
@@ -56,11 +58,23 @@ const Budget = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      if (!cancelled) {
+        await loadData()
+      }
+    }
+
     load()
-  }, [])
+
+    return () => {
+      cancelled = true
+    }
+  }, [loadData])
 
   const overview = useMemo(() => {
     const goal = items.reduce((sum, item) => sum + (item.monthlyLimit || 0), 0)
@@ -96,7 +110,7 @@ const Budget = () => {
       toast.success('Category limit saved')
       setModalOpen(false)
       setLimit('')
-      await load()
+      await loadData()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save limit'
       toast.error(msg)

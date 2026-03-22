@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -36,8 +36,9 @@ const Transfers = () => {
   const { accounts, refreshAccounts } = useFinanceStore()
   const { convert } = useExchangeRates()
 
-  const load = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
+    setItems([])
     try {
       const res = await transfersService.getAll()
       setItems(safeArray<Transfer>(res.data))
@@ -49,11 +50,23 @@ const Transfers = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [refreshAccounts])
 
   useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      if (!cancelled) {
+        await loadData()
+      }
+    }
+
     load()
-  }, [])
+
+    return () => {
+      cancelled = true
+    }
+  }, [loadData])
 
   const handleSubmit = async () => {
     const parsed = TransferSchema.safeParse({
@@ -81,7 +94,7 @@ const Transfers = () => {
       })
       toast.success('Transfer added')
       setModalOpen(false)
-      await load()
+      await loadData()
       await refreshAccounts()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save transfer'

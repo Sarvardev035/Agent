@@ -256,10 +256,9 @@ const AppShell = () => {
     return joined.toUpperCase()
   }, [user?.name])
 
+  const authStore = useAuthStore()
   const logout = () => {
-    TokenStorage.clear()
-    localStorage.clear()
-    window.location.href = '/login'
+    authStore.logout()
   }
 
   return (

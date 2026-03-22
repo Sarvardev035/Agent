@@ -24,29 +24,43 @@ const CalendarView = () => {
   const { accounts, refreshAccounts } = useFinanceStore()
 
   useEffect(() => {
+    let cancelled = false
+
     const load = async () => {
       setLoading(true)
+      setExpenses([])
+      setIncome([])
       try {
         const [expRes, incRes] = await Promise.allSettled([
           api.get('/api/expenses'),
           api.get('/api/incomes'),
         ])
-        setExpenses(
-          expRes.status === 'fulfilled' ? safeArray<Expense>(expRes.value.data) : []
-        )
-        setIncome(
-          incRes.status === 'fulfilled' ? safeArray<Income>(incRes.value.data) : []
-        )
-        refreshAccounts()
+        if (!cancelled) {
+          setExpenses(
+            expRes.status === 'fulfilled' ? safeArray<Expense>(expRes.value.data) : []
+          )
+          setIncome(
+            incRes.status === 'fulfilled' ? safeArray<Income>(incRes.value.data) : []
+          )
+          refreshAccounts()
+        }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to load calendar'
-        console.error('❌ calendar load failed:', msg)
-        toast.error(msg)
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Failed to load calendar'
+          console.error('❌ calendar load failed:', msg)
+          toast.error(msg)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
     load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const transactionsByDate = useMemo(() => {

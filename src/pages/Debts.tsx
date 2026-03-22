@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -53,8 +53,9 @@ const Debts = () => {
   const [repayForm, setRepayForm] = useState<RepayForm>({ paymentAmount: '', accountId: '' })
   const { accounts, refreshAccounts } = useFinanceStore()
 
-  const load = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
+    setItems([])
     try {
       const res = await debtsService.getAll()
       setItems(Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []))
@@ -66,11 +67,23 @@ const Debts = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [refreshAccounts])
 
   useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      if (!cancelled) {
+        await loadData()
+      }
+    }
+
     load()
-  }, [])
+
+    return () => {
+      cancelled = true
+    }
+  }, [loadData])
 
   const filtered = useMemo(() => items.filter(i => i.type === tab), [items, tab])
 
@@ -101,7 +114,7 @@ const Debts = () => {
       })
       toast.success('Debt added')
       setModalOpen(false)
-      await load()
+      await loadData()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save debt'
       toast.error(msg)
@@ -118,7 +131,7 @@ const Debts = () => {
       toast.success('Repayment recorded')
       setShowRepayModal(null)
       setRepayForm({ paymentAmount: '', accountId: '' })
-      await load()
+      await loadData()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to repay debt'
       toast.error(msg)
@@ -131,7 +144,7 @@ const Debts = () => {
       await debtsService.delete(confirmId)
       toast.success('Debt deleted')
       setConfirmId(null)
-      await load()
+      await loadData()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to delete debt'
       toast.error(msg)

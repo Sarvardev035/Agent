@@ -21,29 +21,42 @@ const Statistics = () => {
   const [incVsExp, setIncVsExp] = useState<VsPoint[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadStats = async () => {
-    setLoading(true)
-    try {
-      const now = new Date()
-      const endDate = now.toISOString().slice(0, 10)
-      const startDate = new Date(now.setFullYear(now.getFullYear() - 1)).toISOString().slice(0, 10)
-
-      const [tsRes, catRes, ivseRes] = await Promise.allSettled([
-        analyticsService.timeseries({ period, startDate, endDate }),
-        analyticsService.expensesByCategory({ from: startDate, to: endDate }),
-        analyticsService.incomeVsExpense({ from: startDate, to: endDate }),
-      ])
-
-      setTimeseries(safeArray(tsRes.status === 'fulfilled' ? tsRes.value.data : []))
-      setCategoryData(safeArray(catRes.status === 'fulfilled' ? catRes.value.data : []))
-      setIncVsExp(safeArray(ivseRes.status === 'fulfilled' ? ivseRes.value.data : []))
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
+    let cancelled = false
+
+    const loadStats = async () => {
+      setLoading(true)
+      setTimeseries([])
+      setCategoryData([])
+      setIncVsExp([])
+      try {
+        const now = new Date()
+        const endDate = now.toISOString().slice(0, 10)
+        const startDate = new Date(now.setFullYear(now.getFullYear() - 1)).toISOString().slice(0, 10)
+
+        const [tsRes, catRes, ivseRes] = await Promise.allSettled([
+          analyticsService.timeseries({ period, startDate, endDate }),
+          analyticsService.expensesByCategory({ from: startDate, to: endDate }),
+          analyticsService.incomeVsExpense({ from: startDate, to: endDate }),
+        ])
+
+        if (!cancelled) {
+          setTimeseries(safeArray(tsRes.status === 'fulfilled' ? tsRes.value.data : []))
+          setCategoryData(safeArray(catRes.status === 'fulfilled' ? catRes.value.data : []))
+          setIncVsExp(safeArray(ivseRes.status === 'fulfilled' ? ivseRes.value.data : []))
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
     loadStats()
+
+    return () => {
+      cancelled = true
+    }
   }, [period])
 
   const pieData = useMemo(

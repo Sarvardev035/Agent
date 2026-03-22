@@ -24,13 +24,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       let shouldBeDark = false;
 
       if (theme === 'auto') {
-        shouldBeDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          shouldBeDark = true;
+        } else {
+          const hour = new Date().getHours();
+          shouldBeDark = hour >= 18 || hour < 6;
+        }
       } else {
         shouldBeDark = theme === 'dark';
       }
 
       setIsDark(shouldBeDark);
       root.classList.toggle('dark', shouldBeDark);
+      root.setAttribute('data-theme', shouldBeDark ? 'dark' : 'light');
     };
 
     updateTheme();
@@ -43,6 +49,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return () => mediaQuery.removeEventListener('change', handler);
     }
   }, [theme]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    if (!saved || saved === 'auto') {
+      const interval = setInterval(() => {
+        const hour = new Date().getHours();
+        const shouldBeDark = hour >= 18 || hour < 6;
+        const root = document.documentElement;
+        root.classList.toggle('dark', shouldBeDark);
+      }, 60 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme: setThemeState, isDark }}>

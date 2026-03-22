@@ -163,7 +163,19 @@ const Dashboard = () => {
   }, [])
 
   useEffect(() => {
-    loadDashboard()
+    let cancelled = false
+
+    const load = async () => {
+      if (!cancelled) {
+        await loadDashboard()
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
   }, [loadDashboard])
 
   useEffect(() => {

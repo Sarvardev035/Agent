@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format, subMonths } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -50,8 +50,9 @@ const IncomePage = () => {
   const { categories } = useCategories('INCOME')
   const { accounts, refreshAccounts } = useFinanceStore()
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
+    setIncomes([])
     try {
       const res = await incomesService.getAll()
       const all = safeArray<Income>(res.data)
@@ -64,11 +65,23 @@ const IncomePage = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [month, refreshAccounts])
 
   useEffect(() => {
-    loadData()
-  }, [month])
+    let cancelled = false
+
+    const load = async () => {
+      if (!cancelled) {
+        await loadData()
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [loadData])
 
   const filtered = useMemo(() => {
     return incomes.filter(item => {
