@@ -105,7 +105,16 @@ const Income = () => {
   }, [filtered])
 
   const handleChange = (key: keyof IncomeFormState, value: string) => {
-    setFormData(prev => ({ ...prev, [key]: value }))
+    if (key === 'accountId') {
+      const selectedAccount = accounts.find(acc => acc.id === value)
+      setFormData(prev => ({
+        ...prev,
+        accountId: value,
+        currency: selectedAccount?.currency || 'UZS',
+      }))
+    } else {
+      setFormData(prev => ({ ...prev, [key]: value }))
+    }
   }
 
   const handleSubmit = () => {
@@ -399,7 +408,15 @@ const Income = () => {
               <select
                 value={formData.currency}
                 onChange={e => handleChange('currency', e.target.value)}
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+                disabled={!!formData.accountId}
+                style={{ 
+                  width: '100%', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: 12, 
+                  padding: 10,
+                  opacity: formData.accountId ? 0.6 : 1,
+                  cursor: formData.accountId ? 'not-allowed' : 'pointer',
+                }}
               >
                 {CURRENCIES.map(cur => (
                   <option key={cur} value={cur}>
@@ -407,6 +424,11 @@ const Income = () => {
                   </option>
                 ))}
               </select>
+              {formData.accountId && (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                  Currency auto-selected from account
+                </div>
+              )}
             </div>
           </div>
           <div>
