@@ -14,6 +14,7 @@ import { ExpenseSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
 import { useFinanceStore } from '../store/finance.store'
 import api from '../lib/api'
+import { ACCOUNT_TYPES, CURRENCIES, EXPENSE_CATEGORIES } from '../lib/constants'
 
 const keywordMap: Record<string, string> = {
   coffee: 'FOOD',
@@ -27,7 +28,13 @@ const keywordMap: Record<string, string> = {
   movie: 'ENTERTAINMENT',
 }
 
-type ExpenseForm = Omit<Expense, 'id'>
+type ExpenseFormState = {
+  amount: string
+  date: string
+  description: string
+  category: Expense['category']
+  accountId: number
+}
 
 const monthOptions = Array.from({ length: 6 }).map((_, idx) => {
   const d = subMonths(new Date(), idx)
@@ -46,8 +53,8 @@ const Expenses = () => {
   const [showModal, setShowModal] = useState(false)
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [editing, setEditing] = useState<Expense | null>(null)
-  const [form, setForm] = useState<ExpenseForm>({
-    amount: 0,
+  const [form, setForm] = useState<ExpenseFormState>({
+    amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
     category: 'FOOD',
@@ -59,11 +66,12 @@ const Expenses = () => {
     setError(null)
     try {
       const [expRes, accRes] = await Promise.allSettled([
-        api.get('/api/expenses', { params: { month } }),
+        api.get('/api/expenses'),
         api.get('/api/accounts'),
       ])
+      const allExpenses = safeArray<Expense>(expRes.status === 'fulfilled' ? expRes.value.data : [])
       setExpenses(
-        safeArray(expRes.status === 'fulfilled' ? expRes.value.data : [])
+        allExpenses.filter(e => e.date && e.date.startsWith(month))
       )
       setAccounts(
         safeArray(accRes.status === 'fulfilled' ? accRes.value.data : [])
@@ -98,20 +106,24 @@ const Expenses = () => {
 
   const openNew = () => {
     setEditing(null)
-    setForm({ amount: 0, date: format(new Date(), 'yyyy-MM-dd'), description: '', category: 'FOOD', accountId: 0 })
+    setForm({ amount: '', date: format(new Date(), 'yyyy-MM-dd'), description: '', category: 'FOOD', accountId: 0 })
     setShowModal(true)
   }
 
   const openEdit = (item: Expense) => {
     setEditing(item)
-    setForm({ ...item })
+    setForm({
+      ...item,
+      amount: String(item.amount),
+      description: item.description || '',
+    })
     setShowModal(true)
   }
 
   const handleAdd = async (formData: any) => {
     try {
       await api.post('/api/expenses', {
-        amount:      Number(formData.amount),
+        amount:      Number(formData.amount) || 0,
         date:        formData.date,
         description: formData.description || '',
         category:    formData.category,
@@ -318,7 +330,10 @@ const Expenses = () => {
               <input
                 type="number"
                 value={form.amount}
-                onChange={e => setForm({ ...form, amount: Number(e.target.value) })}
+                placeholder="0.00"
+                min="0"
+                step="any"
+                onChange={e => setForm({ ...form, amount: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
@@ -349,9 +364,9 @@ const Expenses = () => {
                 onChange={e => setForm({ ...form, category: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               >
-                {['FOOD', 'TRANSPORT', 'HEALTH', 'ENTERTAINMENT', 'UTILITIES', 'OTHER'].map(cat => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_META[cat]?.label ?? cat}
+                {EXPENSE_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.emoji} {cat.label}
                   </option>
                 ))}
               </select>

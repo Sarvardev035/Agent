@@ -14,10 +14,8 @@ import {
   LogOut,
   Zap,
   Bell,
-  ChevronRight,
 } from 'lucide-react'
 import { TokenStorage } from '../../lib/security'
-import BottomNav from './BottomNav'
 import { useAuthStore } from '../../store/auth.store'
 
 const NAV_ITEMS = [
@@ -32,24 +30,200 @@ const NAV_ITEMS = [
   { label: 'Calendar', path: '/calendar', icon: Calendar, group: 'MANAGE' },
 ]
 
-const BottomTabs = NAV_ITEMS.slice(0, 4)
+type MobileTab = { path?: string; action?: () => void; icon: string; label: string }
+
+const MobileTabs: MobileTab[] = [
+  { path: '/dashboard', icon: '🏠', label: 'Home' },
+  { path: '/expenses', icon: '📉', label: 'Expenses' },
+  { path: '/income', icon: '📈', label: 'Income' },
+  { path: '/transfers', icon: '↔️', label: 'Transfer' },
+]
+
+const MoreItems = [
+  { path: '/debts', label: 'Debts', icon: '🤝' },
+  { path: '/budget', label: 'Budget', icon: '🎯' },
+  { path: '/statistics', label: 'Statistics', icon: '📊' },
+  { path: '/calendar', label: 'Calendar', icon: '📅' },
+  { path: '/accounts', label: 'Accounts', icon: '💳' },
+]
+
+const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [showMore, setShowMore] = useState(false)
+
+  return (
+    <>
+      <nav
+        className="safe-bottom"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 64,
+          background: '#ffffff',
+          borderTop: '1px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          zIndex: 50,
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
+        {[...MobileTabs, { action: () => setShowMore(true), icon: '⋯', label: 'More' }].map(tab => {
+          const isActive = 'path' in tab && tab.path ? location.pathname === tab.path : false
+          return (
+            <button
+              key={tab.label}
+              onClick={() => {
+                if ('action' in tab && tab.action) tab.action()
+                else if ('path' in tab && tab.path) navigate(tab.path)
+              }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: isActive ? '#7c3aed' : '#94a3b8',
+                fontSize: 10,
+                fontWeight: isActive ? 600 : 400,
+                padding: '8px 0',
+                transition: 'color 0.15s ease',
+                position: 'relative',
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{tab.icon}</span>
+              <span>{tab.label}</span>
+              {isActive && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 32,
+                    height: 3,
+                    background: '#7c3aed',
+                    borderRadius: '0 0 4px 4px',
+                  }}
+                />
+              )}
+            </button>
+          )
+        })}
+      </nav>
+
+      {showMore && (
+        <>
+          <div
+            onClick={() => setShowMore(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.4)',
+              zIndex: 60,
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: 'white',
+              borderRadius: '20px 20px 0 0',
+              padding: '16px 16px 32px',
+              zIndex: 70,
+              boxShadow: '0 -8px 32px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 4,
+                background: '#e2e8f0',
+                borderRadius: 2,
+                margin: '0 auto 20px',
+              }}
+            />
+            {MoreItems.map(item => (
+              <button
+                key={item.path}
+                onClick={() => {
+                  navigate(item.path)
+                  setShowMore(false)
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '13px 16px',
+                  background: 'none',
+                  border: 'none',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  fontSize: 15,
+                  color: '#0f172a',
+                  fontWeight: 500,
+                  transition: 'background 0.15s',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+              >
+                <span style={{ fontSize: 22 }}>{item.icon}</span>
+                {item.label}
+                <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>›</span>
+              </button>
+            ))}
+            <button
+              onClick={() => {
+                setShowMore(false)
+                onLogout()
+              }}
+              style={{
+                width: '100%',
+                padding: '13px',
+                marginTop: 8,
+                background: '#fff1f2',
+                border: 'none',
+                borderRadius: 12,
+                color: '#ef4444',
+                fontWeight: 600,
+                fontSize: 15,
+                cursor: 'pointer',
+              }}
+            >
+              🚪 Log out
+            </button>
+          </div>
+        </>
+      )}
+    </>
+  )
+}
 
 const AppShell = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
+  const [isTablet, setIsTablet] = useState(window.innerWidth > 768 && window.innerWidth <= 1024)
   const user = useAuthStore(s => s.user)
 
   useEffect(() => {
-    const handler = () => setWindowWidth(window.innerWidth)
+    const handler = () => {
+      setIsMobile(window.innerWidth <= 768)
+      setIsTablet(window.innerWidth > 768 && window.innerWidth <= 1024)
+    }
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
-
-  const isDesktop = windowWidth > 1024
-  const isTablet = windowWidth > 768 && windowWidth <= 1024
-  const isMobile = windowWidth <= 768
 
   const initials = useMemo(() => {
     if (!user?.name) return 'F'
@@ -60,8 +234,8 @@ const AppShell = () => {
 
   const logout = () => {
     TokenStorage.clear()
-    navigate('/login', { replace: true })
-    setMobileMenuOpen(false)
+    localStorage.clear()
+    window.location.href = '/login'
   }
 
   return (
@@ -314,98 +488,7 @@ const AppShell = () => {
         </AnimatePresence>
       </main>
 
-      {isMobile && <BottomNav tabs={BottomTabs} onMoreOpen={() => setMobileMenuOpen(true)} />}
-
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setMobileMenuOpen(false)}
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.5)',
-                zIndex: 60,
-              }}
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-              style={{
-                position: 'fixed',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                background: 'white',
-                borderRadius: '20px 20px 0 0',
-                padding: '20px 16px 32px',
-                zIndex: 70,
-              }}
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 4,
-                  background: '#e2e8f0',
-                  borderRadius: 2,
-                  margin: '0 auto 20px',
-                }}
-              />
-              {NAV_ITEMS.slice(4).map(item => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={({ isActive }) => ({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '13px 16px',
-                    borderRadius: 12,
-                    color: isActive ? '#2563eb' : '#475569',
-                    background: isActive ? '#eff6ff' : 'transparent',
-                    textDecoration: 'none',
-                    fontSize: 15,
-                    fontWeight: 500,
-                    marginBottom: 4,
-                  })}
-                >
-                  <item.icon size={20} />
-                  {item.label}
-                  <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.4 }} />
-                </NavLink>
-              ))}
-              <button
-                onClick={logout}
-                style={{
-                  width: '100%',
-                  padding: '13px',
-                  borderRadius: 12,
-                  background: '#fff1f2',
-                  border: 'none',
-                  color: '#ef4444',
-                  fontWeight: 600,
-                  fontSize: 15,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  marginTop: 8,
-                }}
-              >
-                <LogOut size={18} />
-                Log out
-              </button>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {isMobile && <BottomNav onLogout={logout} />}
     </div>
   )
 }

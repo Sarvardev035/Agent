@@ -12,10 +12,11 @@ import { DebtSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
 import { smartDate, toArray, safeArray } from '../lib/helpers'
 import api from '../lib/api'
+import { CURRENCIES, DEBT_TYPES } from '../lib/constants'
 
 interface DebtForm {
   personName: string
-  amount: number
+  amount: string
   currency: string
   dueDate: string
   type: 'LENT' | 'BORROWED'
@@ -30,7 +31,7 @@ const Debts = () => {
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [form, setForm] = useState<DebtForm>({
     personName: '',
-    amount: 0,
+    amount: '',
     currency: 'UZS',
     dueDate: format(new Date(), 'yyyy-MM-dd'),
     type: 'LENT',
@@ -62,7 +63,7 @@ const Debts = () => {
   const filtered = useMemo(() => items.filter(i => i.type === tab), [items, tab])
 
   const handleSubmit = async () => {
-    const parsed = DebtSchema.safeParse({ ...form, amount: Number(form.amount) })
+    const parsed = DebtSchema.safeParse({ ...form, amount: Number(form.amount) || 0 })
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
       return
@@ -283,7 +284,10 @@ const Debts = () => {
               <input
                 type="number"
                 value={form.amount}
-                onChange={e => setForm({ ...form, amount: Number(e.target.value) })}
+                placeholder="0.00"
+                min="0"
+                step="any"
+                onChange={e => setForm({ ...form, amount: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
@@ -296,7 +300,7 @@ const Debts = () => {
                 onChange={e => setForm({ ...form, currency: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               >
-                {['UZS', 'USD', 'EUR', 'RUB'].map(cur => (
+                {CURRENCIES.map(cur => (
                   <option key={cur} value={cur}>
                     {cur}
                   </option>
@@ -321,8 +325,11 @@ const Debts = () => {
                 onChange={e => setForm({ ...form, type: e.target.value as DebtForm['type'] })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               >
-                <option value="LENT">Lent</option>
-                <option value="BORROWED">Borrowed</option>
+                {DEBT_TYPES.map(t => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

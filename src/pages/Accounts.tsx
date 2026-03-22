@@ -14,19 +14,23 @@ import { AccountSchema } from '../lib/security'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
 import api from '../lib/api'
 import { safeArray, mapAccountType } from '../lib/helpers'
+import { ACCOUNT_TYPES, CURRENCIES } from '../lib/constants'
+
+type AccountType = (typeof ACCOUNT_TYPES)[number]['value']
+type CurrencyCode = (typeof CURRENCIES)[number]
 
 interface AccountForm {
   name: string
-  type: 'BANK_CARD' | 'CASH'
-  currency: string
-  balance: number
+  type: AccountType
+  currency: CurrencyCode
+  balance: string
 }
 
 const Accounts = () => {
   const { accounts, refreshAccounts, isLoadingAccounts } = useFinanceStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmId, setConfirmId] = useState<number | null>(null)
-  const [form, setForm] = useState<AccountForm>({ name: '', type: 'BANK_CARD', currency: 'UZS', balance: 0 })
+  const [form, setForm] = useState<AccountForm>({ name: '', type: 'CASH', currency: 'UZS', balance: '' })
   const [displayCurrency, setDisplayCurrency] = useState('USD')
   const { convert, rates, loading: rateLoading, lastUpdated, refresh } = useExchangeRates()
 
@@ -41,7 +45,11 @@ const Accounts = () => {
   }, [accounts, convert, displayCurrency])
 
   const handleSubmit = async () => {
-    const parsed = AccountSchema.safeParse({ ...form, balance: Number(form.balance) })
+    if (!form.name.trim()) {
+      toast.error('Name is required')
+      return
+    }
+    const parsed = AccountSchema.safeParse({ ...form, balance: Number(form.balance) || 0 })
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
       return
@@ -121,7 +129,7 @@ const Accounts = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {['USD', 'EUR', 'RUB', 'UZS'].map(cur => (
+          {CURRENCIES.map(cur => (
             <button
               key={cur}
               onClick={() => setDisplayCurrency(cur)}
@@ -197,70 +205,144 @@ const Accounts = () => {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add account">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Name</label>
-            <input
-              value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={{ fontWeight: 700, fontSize: 13 }}>Type</label>
-              <select
-                value={form.type}
-                onChange={e => setForm({ ...form, type: e.target.value as Account['type'] })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+      {modalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={e => {
+            if (e.target === e.currentTarget) setModalOpen(false)
+          }}
+        >
+          <div className="modal-box">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700 }}>Add Account</h2>
+              <button
+                onClick={() => setModalOpen(false)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: 8,
+                  width: 32,
+                  height: 32,
+                  cursor: 'pointer',
+                  fontSize: 16,
+                  color: '#64748b',
+                }}
               >
-                <option value="BANK_CARD">Bank Card</option>
-                <option value="CASH">Cash</option>
-              </select>
+                ✕
+              </button>
             </div>
-            <div>
-              <label style={{ fontWeight: 700, fontSize: 13 }}>Currency</label>
-              <select
-                value={form.currency}
-                onChange={e => setForm({ ...form, currency: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                {['UZS', 'USD', 'EUR', 'RUB'].map(cur => (
-                  <option key={cur} value={cur}>
-                    {cur}
-                  </option>
-                ))}
-              </select>
-            </div>
+
+            <form
+              onSubmit={e => {
+                e.preventDefault()
+                handleSubmit()
+              }}
+            >
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                  Account Name *
+                </label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. My Uzcard"
+                  required
+                  style={{
+                    width: '100%',
+                    height: 44,
+                    padding: '0 14px',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: 10,
+                    fontSize: 14,
+                    background: '#f8fafc',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Type *
+                  </label>
+                  <select
+                    value={form.type}
+                    onChange={e => setForm({ ...form, type: e.target.value as AccountType })}
+                    style={{
+                      width: '100%',
+                      height: 44,
+                      padding: '0 14px',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: 10,
+                      fontSize: 14,
+                      background: '#f8fafc',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {ACCOUNT_TYPES.map(t => (
+                      <option key={t.value} value={t.value}>
+                        {t.icon} {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Currency *
+                  </label>
+                  <select
+                    value={form.currency}
+                    onChange={e => setForm({ ...form, currency: e.target.value as CurrencyCode })}
+                    style={{
+                      width: '100%',
+                      height: 44,
+                      padding: '0 14px',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: 10,
+                      fontSize: 14,
+                      background: '#f8fafc',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {CURRENCIES.map(cur => (
+                      <option key={cur} value={cur}>
+                        {cur}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                  Initial Balance
+                </label>
+                <input
+                  type="number"
+                  value={form.balance}
+                  onChange={e => setForm({ ...form, balance: e.target.value })}
+                  placeholder="0"
+                  min="0"
+                  step="any"
+                  style={{
+                    width: '100%',
+                    height: 44,
+                    padding: '0 14px',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: 10,
+                    fontSize: 14,
+                    background: '#f8fafc',
+                  }}
+                />
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ width: '100%', height: 48, fontSize: 15 }}>
+                Save Account
+              </button>
+            </form>
           </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Balance</label>
-            <input
-              type="number"
-              value={form.balance}
-              onChange={e => setForm({ ...form, balance: Number(e.target.value) })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            />
-          </div>
-          <button
-            onClick={handleSubmit}
-            type="button"
-            style={{
-              marginTop: 4,
-              padding: '12px',
-              borderRadius: 12,
-              background: '#2563eb',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Save account
-          </button>
         </div>
-      </Modal>
+      )}
 
       <ConfirmDialog
         open={confirmId !== null}

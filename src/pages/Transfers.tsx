@@ -16,7 +16,7 @@ import api from '../lib/api'
 interface TransferForm {
   fromAccountId: number
   toAccountId: number
-  amount: number
+  amount: string
   date: string
   note?: string
 }
@@ -26,7 +26,7 @@ const Transfers = () => {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState<TransferForm>({
-    amount: 0,
+    amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     note: '',
     fromAccountId: 0,
@@ -234,7 +234,10 @@ const Transfers = () => {
               <input
                 type="number"
                 value={form.amount}
-                onChange={e => setForm({ ...form, amount: Number(e.target.value) })}
+                placeholder="0.00"
+                min="0"
+                step="any"
+                onChange={e => setForm({ ...form, amount: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
@@ -256,14 +259,14 @@ const Transfers = () => {
               style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
             />
           </div>
-          {form.amount > 0 && form.fromAccountId && form.toAccountId && (() => {
+          {Number(form.amount) > 0 && form.fromAccountId && form.toAccountId && (() => {
             const from = accounts.find(a => a.id === form.fromAccountId)
             const to = accounts.find(a => a.id === form.toAccountId)
             if (!from || !to) return null
-            const preview = convert(form.amount, from.currency, to.currency)
+            const preview = convert(Number(form.amount) || 0, from.currency, to.currency)
             return (
               <div style={{ background: '#f8fafc', borderRadius: 10, padding: 10, color: '#0f172a' }}>
-                {formatCurrency(form.amount, from.currency)} ≈ {formatCurrency(preview, to.currency)}
+                {formatCurrency(Number(form.amount) || 0, from.currency)} ≈ {formatCurrency(preview, to.currency)}
               </div>
             )
           })()}

@@ -14,8 +14,15 @@ import { IncomeSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
 import { useFinanceStore } from '../store/finance.store'
 import api from '../lib/api'
+import { INCOME_CATEGORIES } from '../lib/constants'
 
-type IncomeForm = Omit<Income, 'id'>
+type IncomeForm = {
+  amount: string
+  date: string
+  description: string
+  category: Income['category']
+  accountId: number
+}
 
 const keywordMap: Record<string, string> = {
   salary: 'SALARY',
@@ -45,7 +52,7 @@ const IncomePage = () => {
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [editing, setEditing] = useState<Income | null>(null)
   const [form, setForm] = useState<IncomeForm>({
-    amount: 0,
+    amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     description: '',
     category: 'SALARY',
@@ -57,11 +64,12 @@ const IncomePage = () => {
     setError(null)
     try {
       const [incRes, accRes] = await Promise.allSettled([
-        api.get('/api/income', { params: { month } }),
+        api.get('/api/income'),
         api.get('/api/accounts'),
       ])
+      const allIncomes = safeArray<Income>(incRes.status === 'fulfilled' ? incRes.value.data : [])
       setIncomes(
-        safeArray(incRes.status === 'fulfilled' ? incRes.value.data : [])
+        allIncomes.filter(i => i.date && i.date.startsWith(month))
       )
       setAccounts(
         safeArray(accRes.status === 'fulfilled' ? accRes.value.data : [])
@@ -94,20 +102,24 @@ const IncomePage = () => {
 
   const openNew = () => {
     setEditing(null)
-    setForm({ amount: 0, date: format(new Date(), 'yyyy-MM-dd'), description: '', category: 'SALARY', accountId: 0 })
+    setForm({ amount: '', date: format(new Date(), 'yyyy-MM-dd'), description: '', category: 'SALARY', accountId: 0 })
     setShowModal(true)
   }
 
   const openEdit = (item: Income) => {
     setEditing(item)
-    setForm({ ...item })
+    setForm({
+      ...item,
+      amount: String(item.amount),
+      description: item.description || '',
+    })
     setShowModal(true)
   }
 
   const handleAdd = async (formData: any) => {
     try {
       await api.post('/api/income', {
-        amount:      Number(formData.amount),
+        amount:      Number(formData.amount) || 0,
         date:        formData.date,
         description: formData.description || '',
         category:    formData.category,
@@ -314,7 +326,10 @@ const IncomePage = () => {
               <input
                 type="number"
                 value={form.amount}
-                onChange={e => setForm({ ...form, amount: Number(e.target.value) })}
+                placeholder="0.00"
+                min="0"
+                step="any"
+                onChange={e => setForm({ ...form, amount: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
@@ -345,9 +360,9 @@ const IncomePage = () => {
                 onChange={e => setForm({ ...form, category: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               >
-                {['SALARY', 'FREELANCE', 'BUSINESS', 'INVESTMENT', 'GIFT', 'OTHER'].map(cat => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_META[cat]?.label ?? cat}
+                {INCOME_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.emoji} {cat.label}
                   </option>
                 ))}
               </select>
