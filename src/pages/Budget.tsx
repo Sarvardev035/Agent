@@ -1,191 +1,225 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { PiggyBank, Plus, Trash2 } from 'lucide-react'
-import Skeleton from '../components/ui/Skeleton'
-import EmptyState from '../components/ui/EmptyState'
+import { PiggyBank, Plus, ShieldCheck, Sparkles } from 'lucide-react'
 import ProgressRing from '../components/ui/ProgressRing'
 import ProgressBar from '../components/ui/ProgressBar'
+import Skeleton from '../components/ui/Skeleton'
+import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
-import { formatCurrency } from '../lib/currency'
-import { safeArray, safeObject } from '../lib/helpers'
-import { budgetsService } from '../services/budget.service'
+import { budgetApi } from '../api/budgetApi'
+import { statsApi } from '../api/statsApi'
+import { formatCurrency, getBudgetColor } from '../utils/helpers'
+import { useFinance } from '../context/FinanceContext'
 import { categoriesService } from '../services/categories.service'
-import { seedDefaultCategories } from '../lib/seedCategories'
+import { safeArray } from '../lib/helpers'
 
-interface ApiCategory {
-  id: string
-  name: string
-  type: 'EXPENSE' | 'INCOME'
-}
-
-interface BudgetItem {
-  id: string
+interface CategoryBudget {
   categoryId: string
-  categoryName?: string
-  monthlyLimit: number
-  spentAmount?: number
-  year: number
-  month: number
+  category: string
+  limit: number
+  spent: number
 }
 
 const Budget = () => {
-  const [items, setItems] = useState<BudgetItem[]>([])
-  const [categories, setCategories] = useState<ApiCategory[]>([])
+  const { refreshAccounts } = useFinance()
   const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [selectedCategoryId, setSelectedCategoryId] = useState('')
-  const [limit, setLimit] = useState<string>('')
+  const [incomeGoal, setIncomeGoal] = useState<number>(0)
+  const [actualIncome, setActualIncome] = useState<number>(0)
+  const [categories, setCategories] = useState<CategoryBudget[]>([])
+  const [goalModal, setGoalModal] = useState(false)
+  const [categoryModal, setCategoryModal] = useState(false)
+  const [goalInput, setGoalInput] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [categoryLimit, setCategoryLimit] = useState('')
+  const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setItems([])
-    setCategories([])
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+
+  const loadBudget = async () => {
     try {
-      const now = new Date()
-      await seedDefaultCategories()
-      const [budgetsRes, catsRes] = await Promise.all([
-        budgetsService.getAll({ year: now.getFullYear(), month: now.getMonth() + 1 }),
+      setLoading(true)
+      const [budgetRes, summaryRes, catsRes] = await Promise.allSettled([
+        budgetApi.get({ year: currentYear, month: currentMonth }),
+        statsApi.summary(),
         categoriesService.getByType('EXPENSE'),
       ])
-      setItems(safeArray<BudgetItem>(budgetsRes.data))
-      setCategories(safeArray<ApiCategory>(catsRes.data))
+
+      const catList =
+        catsRes.status === 'fulfilled'
+          ? safeArray<any>(catsRes.value.data).map(cat => ({
+              id: cat.id ?? cat.categoryId ?? cat.name,
+              name: cat.name ?? cat.category ?? 'Category',
+            }))
+          : []
+      setCategoryOptions(catList)
+      if (!selectedCategory && catList[0]) setSelectedCategory(catList[0].id)
+
+      const budgetData =
+        budgetRes.status === 'fulfilled' ? safeArray<any>(budgetRes.value.data) : []
+
+      const mapName = (id: string) =>
+        catList.find(cat => cat.id === id)?.name ||
+        budgetData.find(b => b.categoryId === id)?.category ||
+        'Category'
+
+      setIncomeGoal(
+        budgetData.reduce((sum, item) => sum + (item.monthlyLimit ?? item.limit ?? 0), 0)
+      )
+
+      setCategories(
+        budgetData.map((item: any) => ({
+          categoryId: item.categoryId || item.category,
+          category: mapName(item.categoryId || item.category),
+          limit: item.monthlyLimit ?? item.limit ?? 0,
+          spent: item.spent ?? item.spentAmount ?? 0,
+        }))
+      )
+
+      if (summaryRes.status === 'fulfilled') {
+        const summary = summaryRes.value.data?.data ?? summaryRes.value.data ?? {}
+        const expenseTotal = summary.totalExpenses ?? summary.expenses ?? summary.expense ?? 0
+        setActualIncome(expenseTotal)
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load budget'
-      toast.error(msg)
-      setItems([])
-      setCategories([])
+      console.error(err)
+      toast.error('Failed to load budget')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
   useEffect(() => {
-    let cancelled = false
+    loadBudget()
+  }, [])
 
-    const load = async () => {
-      if (!cancelled) {
-        await loadData()
-      }
-    }
-
-    load()
-
-    return () => {
-      cancelled = true
-    }
-  }, [loadData])
-
-  const overview = useMemo(() => {
-    const goal = items.reduce((sum, item) => sum + (item.monthlyLimit || 0), 0)
-    const spent = items.reduce((sum, item) => sum + (item.spentAmount || 0), 0)
-    return { goal, spent }
-  }, [items])
-
-  const pct = useMemo(() => {
-    if (!overview.goal) return 0
-    return Math.min((overview.spent / overview.goal) * 100, 150)
-  }, [overview.goal, overview.spent])
-
-  const handleSaveCategory = async () => {
-    if (!selectedCategoryId) {
-      toast.error('Select a category')
+  const handleSaveGoal = async () => {
+    const parsed = Number(goalInput || incomeGoal)
+    if (!parsed || parsed <= 0) {
+      toast.error('Enter a valid budget amount')
       return
     }
-    const parsedLimit = Number(limit)
-    if (!parsedLimit || parsedLimit <= 0) {
+    setTimeout(async () => {
+      try {
+        await budgetApi.set({ monthlyLimit: parsed, year: currentYear, month: currentMonth })
+        toast.success('Monthly budget saved')
+        setGoalModal(false)
+        setIncomeGoal(parsed)
+        await Promise.allSettled([loadBudget(), refreshAccounts()])
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to save goal')
+      }
+    }, 0)
+  }
+
+  const handleSaveCategory = async () => {
+    const parsed = Number(categoryLimit)
+    if (!parsed || parsed <= 0) {
       toast.error('Limit must be positive')
       return
     }
-
-    try {
-      const now = new Date()
-      await budgetsService.create({
-        categoryId: selectedCategoryId,
-        type: 'EXPENSE',
-        monthlyLimit: parsedLimit,
-        year: now.getFullYear(),
-        month: now.getMonth() + 1,
-      })
-      toast.success('Category limit saved')
-      setModalOpen(false)
-      setLimit('')
-      await loadData()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to save limit'
-      toast.error(msg)
-    }
+    setTimeout(async () => {
+      try {
+        await budgetApi.setCategory({
+          categoryId: selectedCategory,
+          monthlyLimit: parsed,
+          type: 'MONTHLY',
+          year: currentYear,
+          month: currentMonth,
+        })
+        toast.success('Category limit saved')
+        setCategoryModal(false)
+        setCategoryLimit('')
+        await Promise.allSettled([loadBudget(), refreshAccounts()])
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to save category limit')
+      }
+    }, 0)
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await budgetsService.delete(id)
-      toast.success('Budget deleted')
-      setItems(prev => prev.filter(i => i.id !== id))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to delete budget'
-      toast.error(msg)
-    }
-  }
+  const goalProgress = useMemo(() => {
+    if (!incomeGoal) return 0
+    return Math.min((actualIncome / incomeGoal) * 100, 150)
+  }, [actualIncome, incomeGoal])
 
   return (
-    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <p style={{ color: '#94a3b8', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>BUDGET</p>
+          <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>BUDGET</p>
           <h1 style={{ margin: '4px 0', fontSize: 22, fontWeight: 800 }}>Stay within goals</h1>
-          <p style={{ margin: 0, color: '#64748b' }}>Track overall and per-category budgets.</p>
+          <p style={{ margin: 0, color: 'var(--text-2)' }}>Track overall and per-category budgets.</p>
         </div>
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => setGoalModal(true)}
           type="button"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
             border: 'none',
-            background: '#2563eb',
+            background: 'linear-gradient(135deg,#f59e0b,#f43f5e)',
             color: '#fff',
             padding: '10px 12px',
             borderRadius: 12,
             fontWeight: 800,
-            boxShadow: '0 12px 30px rgba(37,99,235,0.3)',
+            boxShadow: '0 12px 30px rgba(244,63,94,0.28)',
             cursor: 'pointer',
           }}
         >
-          <Plus size={16} /> Set category limit
+          <Plus size={16} /> Set monthly budget
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr)', gap: 16, alignItems: 'stretch' }}>
         <div
           style={{
             background: '#fff',
             borderRadius: 16,
             padding: 16,
-            boxShadow: 'var(--sh-sm)',
-            minHeight: 240,
+            boxShadow: 'var(--shadow-md)',
+            minHeight: 260,
             display: 'flex',
-            alignItems: 'center',
             gap: 16,
+            alignItems: 'center',
+            border: '1px solid var(--border)',
           }}
         >
           {loading ? (
-            <Skeleton height={200} />
-          ) : (
+            <Skeleton height={220} />
+          ) : incomeGoal ? (
             <>
-              <ProgressRing percent={pct} label="Overall" />
+              <ProgressRing percent={goalProgress} label="Budget vs spent" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>Goal {formatCurrency(overview.goal)}</div>
-                <div style={{ color: '#94a3b8' }}>Spent {formatCurrency(overview.spent)}</div>
-                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 12 }}>
-                  <div style={{ fontWeight: 800 }}>Remaining</div>
-                  <div style={{ color: '#2563eb', fontWeight: 800 }}>
-                    {formatCurrency(Math.max(overview.goal - overview.spent, 0))}
-                  </div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>
+                  Budget {formatCurrency(incomeGoal)}
+                </div>
+                <div style={{ color: 'var(--text-2)' }}>
+                  Spent {formatCurrency(actualIncome)}
+                </div>
+                <div
+                  style={{
+                    background: 'var(--blue-soft)',
+                    padding: 12,
+                    borderRadius: 12,
+                    color: 'var(--blue)',
+                    fontWeight: 800,
+                  }}
+                >
+                  Remaining {formatCurrency(Math.max(incomeGoal - actualIncome, 0))}
                 </div>
               </div>
             </>
+          ) : (
+            <EmptyState
+              title="No monthly budget"
+              description="Set a monthly budget to start tracking progress."
+              actionLabel="Set goal"
+              onAction={() => setGoalModal(true)}
+            />
           )}
         </div>
 
@@ -194,88 +228,187 @@ const Budget = () => {
             background: '#fff',
             borderRadius: 16,
             padding: 16,
-            boxShadow: 'var(--sh-sm)',
-            minHeight: 240,
+            boxShadow: 'var(--shadow-md)',
+            minHeight: 260,
+            border: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <PiggyBank size={18} color="#f59e0b" />
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Category budgets</h3>
-          </div>
-          {loading ? (
-            <Skeleton height={140} />
-          ) : items.length === 0 ? (
-            <EmptyState title="No category limits" description="Add a limit to start tracking." />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <AnimatePresence>
-                {items.map(item => {
-                  const spent = item.spentAmount || 0
-                  const pctCat = (spent / (item.monthlyLimit || 1)) * 100
-                  return (
-                    <motion.div
-                      key={item.id}
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: 12,
-                        padding: 12,
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
-                        <span>{item.categoryName || categories.find(c => c.id === item.categoryId)?.name || item.categoryId}</span>
-                        <span style={{ color: '#64748b' }}>
-                          {formatCurrency(spent)} / {formatCurrency(item.monthlyLimit)}
-                        </span>
-                      </div>
-                      <ProgressBar percent={pctCat} animate />
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                        <span style={{ color: pctCat >= 100 ? '#b91c1c' : '#64748b', fontSize: 12 }}>
-                          {pctCat >= 100 ? 'Limit exceeded' : 'In progress'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item.id)}
-                          style={{
-                            border: '1px solid #ffe4e6',
-                            background: '#fff1f2',
-                            color: '#ef4444',
-                            borderRadius: 8,
-                            padding: '4px 8px',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            fontWeight: 700,
-                            fontSize: 12,
-                          }}
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </AnimatePresence>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <PiggyBank size={18} color="#f59e0b" />
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Budget health</h3>
             </div>
-          )}
+            <button
+              onClick={() => setCategoryModal(true)}
+              type="button"
+              style={{
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Add category limit
+            </button>
+          </div>
+          <div style={{ color: 'var(--text-2)', fontSize: 13, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <span>• Review your category caps</span>
+            <span>• Keep below 90% to avoid alerts</span>
+            <span>• Update anytime</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['Review weekly', 'Automate savings', 'Track big purchases'].map(tip => (
+              <span
+                key={tip}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'var(--blue-soft)',
+                  color: 'var(--blue)',
+                  fontWeight: 700,
+                  fontSize: 12,
+                }}
+              >
+                <Sparkles size={14} style={{ marginRight: 6 }} />
+                {tip}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Set category limit">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 16,
+          padding: 16,
+          boxShadow: 'var(--shadow-md)',
+          border: '1px solid var(--border)',
+          minHeight: 260,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Category limits</h3>
+          <button
+            onClick={() => setCategoryModal(true)}
+            type="button"
+            style={{
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: '1px solid var(--border)',
+              background: '#fff',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Manage limits
+          </button>
+        </div>
+        {loading ? (
+          <Skeleton height={200} />
+        ) : categories.length === 0 ? (
+          <EmptyState
+            title="No category limits"
+            description="Create limits to keep spending in check."
+            actionLabel="Add limit"
+            onAction={() => setCategoryModal(true)}
+          />
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 12 }}>
+            {categories.map(cat => {
+              const percent = cat.limit ? (cat.spent / cat.limit) * 100 : 0
+              const palette = getBudgetColor(percent)
+              const warn = percent >= 90
+              return (
+                <div
+                  key={cat.categoryId || cat.category}
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    border: warn ? `2px solid ${palette.bar}` : '1px solid var(--border)',
+                    boxShadow: warn ? '0 0 0 6px rgba(244,63,94,0.08)' : 'var(--shadow-sm)',
+                    background: '#fff',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 800 }}>{cat.category}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      {formatCurrency(cat.spent)} / {formatCurrency(cat.limit)}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <ProgressBar percent={percent} color={palette.bar} label="Progress" />
+                  </div>
+                  {warn && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: palette.bg,
+                        color: palette.text,
+                        padding: '6px 10px',
+                        borderRadius: 10,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <ShieldCheck size={14} />
+                      Nearing limit
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <Modal open={goalModal} onClose={() => setGoalModal(false)} title="Set monthly budget">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly budget</label>
+          <input
+            type="number"
+            value={goalInput || incomeGoal || ''}
+            onChange={e => setGoalInput(e.target.value)}
+            placeholder="0.00"
+            style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+          />
+          <button
+            onClick={handleSaveGoal}
+            type="button"
+            style={{
+              width: '100%',
+              height: 48,
+              borderRadius: 14,
+              border: 'none',
+              background: 'linear-gradient(135deg,#f59e0b,#f43f5e)',
+              color: '#fff',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 12px 30px rgba(244,63,94,0.35)',
+            }}
+          >
+            Save goal
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={categoryModal} onClose={() => setCategoryModal(false)} title="Add category limit">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Category</label>
             <select
-              value={selectedCategoryId}
-              onChange={e => setSelectedCategoryId(e.target.value)}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             >
-              <option value="">Select category</option>
-              {categories.map(cat => (
+              {categoryOptions.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
@@ -283,30 +416,31 @@ const Budget = () => {
             </select>
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Limit amount</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit</label>
             <input
               type="number"
-              value={limit}
-              placeholder="0"
-              onChange={e => setLimit(e.target.value)}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              value={categoryLimit}
+              onChange={e => setCategoryLimit(e.target.value)}
+              placeholder="0.00"
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             />
           </div>
           <button
             onClick={handleSaveCategory}
             type="button"
             style={{
-              marginTop: 4,
-              padding: '12px',
-              borderRadius: 12,
-              background: '#2563eb',
-              color: '#fff',
+              width: '100%',
+              height: 48,
+              borderRadius: 14,
               border: 'none',
+              background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
+              color: '#fff',
               fontWeight: 800,
               cursor: 'pointer',
+              boxShadow: '0 12px 30px rgba(37,99,235,0.35)',
             }}
           >
-            Save limit
+            Save category limit
           </button>
         </div>
       </Modal>

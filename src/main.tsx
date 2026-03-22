@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { FinanceProvider } from './context/FinanceContext'
 
 const root = document.getElementById('root')
 if (!root) throw new Error('No root element found')
@@ -9,7 +10,9 @@ if (!root) throw new Error('No root element found')
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <FinanceProvider>
+        <App />
+      </FinanceProvider>
     </ErrorBoundary>
   </React.StrictMode>,
 )

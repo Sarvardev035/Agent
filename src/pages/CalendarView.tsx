@@ -1,125 +1,88 @@
 import { useEffect, useMemo, useState } from 'react'
-import Calendar from 'react-calendar'
-import { AnimatePresence } from 'framer-motion'
-import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import { AnimatePresence } from 'framer-motion'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
-import { Expense } from '../services/expenses.service'
-import { Income } from '../services/income.service'
-import { useFinanceStore } from '../store/finance.store'
+import { expensesApi } from '../api/expensesApi'
+import { incomeApi } from '../api/incomeApi'
+import { useFinance } from '../context/FinanceContext'
+import { smartDate } from '../utils/helpers'
 import { safeArray } from '../lib/helpers'
-import api from '../lib/api'
 
-import 'react-calendar/dist/Calendar.css'
-
-type CalendarTx = (Expense & { kind: 'expense' }) | (Income & { kind: 'income' })
+type CalendarTx = {
+  id: string
+  type: 'expense' | 'income'
+  date: string
+  category: string
+  amount: number
+  description?: string
+  accountId?: string
+  currency?: string
+}
 
 const CalendarView = () => {
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [income, setIncome] = useState<Income[]>([])
+  const { accounts, refreshAccounts } = useFinance()
+  const [transactions, setTransactions] = useState<CalendarTx[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
-  const { accounts, refreshAccounts } = useFinanceStore()
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [expRes, incRes] = await Promise.allSettled([expensesApi.getAll(), incomeApi.getAll()])
+      const expenses =
+        expRes.status === 'fulfilled'
+          ? safeArray<any>(expRes.value.data).map((e: any) => ({
+              id: e.id,
+              type: 'expense' as const,
+              date: e.expenseDate || e.date,
+              category: e.categoryId || e.category || 'OTHER',
+              amount: e.amount,
+              description: e.description,
+              accountId: e.accountId,
+              currency: e.currency || 'UZS',
+            }))
+          : []
+      const income =
+        incRes.status === 'fulfilled'
+          ? safeArray<any>(incRes.value.data).map((i: any) => ({
+              id: i.id,
+              type: 'income' as const,
+              date: i.incomeDate || i.date,
+              category: i.categoryId || i.category || 'OTHER',
+              amount: i.amount,
+              description: i.description,
+              accountId: i.accountId,
+              currency: i.currency || 'UZS',
+            }))
+          : []
+      setTransactions([...expenses, ...income].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+      await refreshAccounts()
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false
-
-    const load = async () => {
-      setLoading(true)
-      setExpenses([])
-      setIncome([])
-      try {
-        const [expRes, incRes] = await Promise.allSettled([
-          api.get('/api/expenses'),
-          api.get('/api/incomes'),
-        ])
-        if (!cancelled) {
-          setExpenses(
-            expRes.status === 'fulfilled' ? safeArray<Expense>(expRes.value.data) : []
-          )
-          setIncome(
-            incRes.status === 'fulfilled' ? safeArray<Income>(incRes.value.data) : []
-          )
-          refreshAccounts()
-        }
-      } catch (err) {
-        if (!cancelled) {
-          const msg = err instanceof Error ? err.message : 'Failed to load calendar'
-          console.error('❌ calendar load failed:', msg)
-          toast.error(msg)
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-    load()
-
-    return () => {
-      cancelled = true
-    }
+    loadData()
   }, [])
 
-  const transactionsByDate = useMemo(() => {
+  const grouped = useMemo(() => {
     const map: Record<string, CalendarTx[]> = {}
-    expenses.forEach(e => {
-      const key = e.expenseDate
+    transactions.forEach(tx => {
+      const key = smartDate(tx.date) || format(new Date(tx.date), 'PPP')
       if (!map[key]) map[key] = []
-      map[key].push({ ...e, kind: 'expense' })
-    })
-    income.forEach(i => {
-      const key = i.incomeDate
-      if (!map[key]) map[key] = []
-      map[key].push({ ...i, kind: 'income' })
+      map[key].push(tx)
     })
     return map
-  }, [expenses, income])
-
-  const selectedKey = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''
-  const selectedTransactions = transactionsByDate[selectedKey] ?? []
+  }, [transactions])
 
   return (
-    <div className="page-enter" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: 16,
-          padding: 16,
-          boxShadow: 'var(--sh-sm)',
-        }}
-      >
-        <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 800 }}>Calendar</h3>
-        {loading ? (
-          <Skeleton height={320} />
-        ) : (
-          <Calendar
-            value={selectedDate}
-            onChange={date => setSelectedDate(date as Date)}
-            tileContent={({ date }) => {
-              const key = format(date, 'yyyy-MM-dd')
-              const has = transactionsByDate[key]
-              return has ? (
-                <div style={{ display: 'flex', gap: 2, marginTop: 2 }}>
-                  {has.slice(0, 3).map((item, idx) => (
-                    <span
-                      key={idx}
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: item.kind === 'expense' ? '#ef4444' : '#10b981',
-                        display: 'inline-block',
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : null
-            }}
-          />
-        )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+      <div>
+        <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>CALENDAR</p>
+        <h1 style={{ margin: '4px 0', fontSize: 22, fontWeight: 800 }}>Timeline of transactions</h1>
+        <p style={{ margin: 0, color: 'var(--text-2)' }}>Browse transactions grouped by day.</p>
       </div>
 
       <div
@@ -127,38 +90,43 @@ const CalendarView = () => {
           background: '#fff',
           borderRadius: 16,
           padding: 16,
-          boxShadow: 'var(--sh-sm)',
-          minHeight: 320,
+          boxShadow: 'var(--shadow-md)',
+          border: '1px solid var(--border)',
+          minHeight: 240,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Transactions</h3>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>{selectedDate ? format(selectedDate, 'PPP') : ''}</p>
-          </div>
-        </div>
         {loading ? (
-          <Skeleton height={52} count={4} />
-        ) : selectedTransactions.length === 0 ? (
-          <EmptyState title="No transactions" description="Choose another day or add one." />
+          <Skeleton height={62} count={5} />
+        ) : transactions.length === 0 ? (
+          <EmptyState title="No transactions yet" description="Add income or expenses to see them here." />
         ) : (
-          <AnimatePresence>
-            {selectedTransactions.map((item, idx) => {
-              const account = accounts.find(a => a.id === item.accountId)
-              return (
-                <TransactionItem
-                  key={idx}
-                  type={item.kind}
-                  amount={item.amount}
-                  category={item.categoryName || item.categoryId}
-                  date={item.kind === 'expense' ? item.expenseDate : item.incomeDate}
-                  description={item.description}
-                  currency={account?.currency ?? 'UZS'}
-                  accountLabel={account?.name}
-                />
-              )
-            })}
-          </AnimatePresence>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {Object.entries(grouped).map(([dateLabel, items]) => (
+              <div key={dateLabel} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 800 }}>{dateLabel}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{items.length} items</div>
+                </div>
+                <AnimatePresence>
+                  {items.map(item => {
+                    const account = accounts.find(a => a.id === item.accountId)
+                    return (
+                      <TransactionItem
+                        key={item.id}
+                        type={item.type}
+                        amount={item.amount}
+                        category={item.category}
+                        date={item.date}
+                        description={item.description}
+                        currency={account?.currency || 'UZS'}
+                        accountLabel={account?.name}
+                      />
+                    )
+                  })}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

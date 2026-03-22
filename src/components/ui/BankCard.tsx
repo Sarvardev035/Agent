@@ -1,5 +1,5 @@
 import { CreditCard, Wallet, WalletCards } from 'lucide-react'
-import { formatCurrency } from '../../lib/currency'
+import { formatCurrency } from '../../utils/helpers'
 
 interface BankCardProps {
   name: string

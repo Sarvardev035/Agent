@@ -98,8 +98,8 @@
 - ✅ `src/lib/currency.ts` — Real-time exchange:
   - ExchangeRate-API integration
   - 1-hour caching to prevent rate limit
-  - Fallback hardcoded rates for 4 currencies
-  - Support for USD, EUR, RUB, UZS
+  - Fallback hardcoded rates for 3 currencies
+  - Support for USD, EUR, UZS
   - Timeout protection (5s)
   - localStorage cache management
 

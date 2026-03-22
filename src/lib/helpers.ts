@@ -23,9 +23,18 @@ export const toArray = <T,>(data: unknown): T[] => {
 
 export const safeArray = <T,>(data: unknown): T[] => {
   if (!data) return []
-  const inner = (data as Record<string, unknown>).data ?? data
+  const root = data as Record<string, unknown>
+  const inner =
+    root.success && root.data !== undefined
+      ? root.data
+      : root.data !== undefined
+        ? root.data
+        : root.result !== undefined
+          ? root.result
+          : data
   if (Array.isArray(inner)) return inner as T[]
   const d = inner as Record<string, unknown>
+  if (Array.isArray(d?.data)) return d.data as T[]
   if (Array.isArray(d?.content)) return d.content as T[]
   if (Array.isArray(d?.items)) return d.items as T[]
   if (Array.isArray(d?.results)) return d.results as T[]
@@ -35,7 +44,15 @@ export const safeArray = <T,>(data: unknown): T[] => {
 
 export const safeObject = <T,>(data: unknown): T | null => {
   if (!data) return null
-  const inner = (data as Record<string, unknown>).data ?? data
+  const root = data as Record<string, unknown>
+  const inner =
+    root.success && root.data !== undefined
+      ? root.data
+      : root.data !== undefined
+        ? root.data
+        : root.result !== undefined
+          ? root.result
+          : data
   return inner as T
 }
 
@@ -89,7 +106,6 @@ export const getBudgetColor = (pct: number) =>
 // Map backend account types to frontend types
 export const mapAccountType = (type: string): 'BANK_CARD' | 'CASH' => {
   const typeMap: Record<string, 'BANK_CARD' | 'CASH'> = {
-    'CARD': 'BANK_CARD',
     'BANK_CARD': 'BANK_CARD',
     'BANK': 'BANK_CARD',
     'CASH': 'CASH',

@@ -28,18 +28,18 @@ const ConfirmDialog = ({
           height: 60,
           margin: '0 auto 12px',
           borderRadius: '50%',
-          background: '#fff1f2',
+          background: 'var(--red-soft)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#ef4444',
+          color: 'var(--red)',
           boxShadow: '0 12px 24px rgba(239,68,68,0.2)',
         }}
       >
         <AlertTriangle size={22} />
       </div>
 
-      <p style={{ color: '#475569', fontSize: 14, margin: '0 0 12px' }}>{message}</p>
+      <p style={{ color: 'var(--text-2)', fontSize: 14, margin: '0 0 12px' }}>{message}</p>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
         <button
@@ -48,11 +48,11 @@ const ConfirmDialog = ({
             flex: 1,
             padding: '10px 14px',
             borderRadius: 12,
-            border: '1px solid #e2e8f0',
-            background: '#ffffff',
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
             cursor: 'pointer',
             fontWeight: 700,
-            color: '#0f172a',
+            color: 'var(--text-1)',
           }}
           type="button"
         >
@@ -65,10 +65,10 @@ const ConfirmDialog = ({
             padding: '10px 14px',
             borderRadius: 12,
             border: 'none',
-            background: '#ef4444',
+            background: 'linear-gradient(135deg,#f43f5e,#ef4444)',
             color: '#ffffff',
             cursor: 'pointer',
-            fontWeight: 700,
+            fontWeight: 800,
             boxShadow: '0 8px 24px rgba(239,68,68,0.25)',
             display: 'inline-flex',
             alignItems: 'center',

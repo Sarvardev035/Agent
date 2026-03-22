@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { modalVariants } from '../../lib/animations'
+import { modalVariants } from '../../utils/animations'
 
 interface ModalProps {
   open: boolean
@@ -62,8 +62,8 @@ const Modal = ({ open, onClose, title, subtitle, footer, children }: ModalProps)
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.5)',
-              backdropFilter: 'blur(8px)',
+              background: 'rgba(15,23,42,0.45)',
+              backdropFilter: 'blur(10px)',
               zIndex: 90,
             }}
           />
@@ -78,7 +78,7 @@ const Modal = ({ open, onClose, title, subtitle, footer, children }: ModalProps)
               display: 'flex',
               alignItems: isMobile ? 'flex-end' : 'center',
               justifyContent: 'center',
-              padding: '24px 16px',
+              padding: isMobile ? '12px 12px 20px' : '24px 16px',
               zIndex: 100,
             }}
           >
@@ -89,13 +89,14 @@ const Modal = ({ open, onClose, title, subtitle, footer, children }: ModalProps)
               aria-describedby={subtitle ? `${labelledBy}-subtitle` : undefined}
               style={{
                 width: '100%',
-                maxWidth: isMobile ? undefined : 560,
-                background: '#ffffff',
-                borderRadius: isMobile ? '20px 20px 0 0' : 20,
-                boxShadow: 'var(--sh-lg)',
+                maxWidth: isMobile ? undefined : 620,
+                background: 'var(--surface)',
+                borderRadius: isMobile ? '20px 20px 0 0' : 'var(--radius-xl)',
+                boxShadow: 'var(--shadow-lg)',
                 padding: 20,
                 margin: isMobile ? '0 auto' : undefined,
                 transformOrigin: 'center',
+                border: '1px solid var(--border)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
@@ -108,7 +109,7 @@ const Modal = ({ open, onClose, title, subtitle, footer, children }: ModalProps)
                   {subtitle && (
                     <p
                       id={`${labelledBy}-subtitle`}
-                      style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13, lineHeight: 1.4 }}
+                      style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.4 }}
                     >
                       {subtitle}
                     </p>
@@ -120,10 +121,11 @@ const Modal = ({ open, onClose, title, subtitle, footer, children }: ModalProps)
                     border: 'none',
                     background: 'transparent',
                     cursor: 'pointer',
-                    color: '#94a3b8',
+                    color: 'var(--text-3)',
                     padding: 6,
                   }}
                   aria-label="Close"
+                  type="button"
                 >
                   <X size={20} />
                 </button>

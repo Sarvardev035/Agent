@@ -1,98 +1,197 @@
-import { NavLink } from 'react-router-dom'
-import { MoreHorizontal } from 'lucide-react'
-import type { ComponentType } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  LayoutDashboard,
+  TrendingDown,
+  TrendingUp,
+  ArrowLeftRight,
+  Menu,
+  HandCoins,
+  PieChart,
+  BarChart3,
+  Calendar,
+  LogOut,
+} from 'lucide-react'
+import { useAuthStore } from '../../store/auth.store'
 
-type Tab = { label: string; path: string; icon: ComponentType<{ size?: number }> }
+const BottomNav = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [showMore, setShowMore] = useState(false)
+  const authStore = useAuthStore()
 
-interface Props {
-  tabs: Tab[]
-  onMoreOpen: () => void
-}
+  const tabs = [
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Home' },
+    { path: '/expenses', icon: TrendingDown, label: 'Expenses' },
+    { path: '/income', icon: TrendingUp, label: 'Income' },
+    { path: '/transfers', icon: ArrowLeftRight, label: 'Transfer' },
+    { action: () => setShowMore(true), icon: Menu, label: 'More' },
+  ]
 
-const BottomNav = ({ tabs, onMoreOpen }: Props) => {
+  const moreItems = [
+    { path: '/debts', label: 'Debts', icon: HandCoins },
+    { path: '/budget', label: 'Budget', icon: PieChart },
+    { path: '/statistics', label: 'Statistics', icon: BarChart3 },
+    { path: '/calendar', label: 'Calendar', icon: Calendar },
+  ]
+
+  const logout = () => {
+    authStore.logout()
+    navigate('/login')
+  }
+
   return (
-    <nav
-      className="safe-bottom"
-      style={{
-        position: 'fixed',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: '#ffffff',
-        borderTop: '1px solid var(--border)',
-        padding: '10px 12px 8px',
-        display: 'grid',
-        gridTemplateColumns: `repeat(${tabs.length + 1}, minmax(0,1fr))`,
-        gap: 8,
-        zIndex: 50,
-      }}
-    >
-      {tabs.map(tab => (
-        <NavLink
-          key={tab.path}
-          to={tab.path}
-          style={{ textDecoration: 'none' }}
-        >
-          {({ isActive }) => (
-            <div
+    <>
+      <nav
+        className="safe-bottom"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: '#ffffff',
+          borderTop: '1px solid #e2e8f0',
+          height: 64,
+          display: 'flex',
+          zIndex: 50,
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
+        {tabs.map(tab => {
+          const active = tab.path === location.pathname
+          return (
+            <button
+              key={tab.label}
+              onClick={() => (tab.action ? tab.action() : tab.path && navigate(tab.path))}
               style={{
+                flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 4,
-                padding: '8px 4px',
-                borderRadius: 12,
-                textDecoration: 'none',
-                color: isActive ? '#2563eb' : '#475569',
-                background: isActive ? '#eff6ff' : 'transparent',
-                fontSize: 12,
-                fontWeight: 600,
+                justifyContent: 'center',
+                gap: 2,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: active ? '#3b82f6' : '#94a3b8',
                 position: 'relative',
+                fontSize: 10,
+                fontWeight: active ? 700 : 500,
               }}
+              type="button"
             >
-              <tab.icon size={18} />
+              <tab.icon size={20} />
               <span>{tab.label}</span>
-              {isActive && (
+              {active && (
                 <span
                   style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    background: '#2563eb',
                     position: 'absolute',
-                    top: 6,
-                    right: 14,
-                    boxShadow: '0 0 0 6px rgba(37,99,235,0.12)',
+                    bottom: 4,
+                    width: 4,
+                    height: 4,
+                    borderRadius: '50%',
+                    background: '#3b82f6',
                   }}
                 />
               )}
-            </div>
-          )}
-        </NavLink>
-      ))}
+            </button>
+          )
+        })}
+      </nav>
 
-      <button
-        onClick={onMoreOpen}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 6,
-          padding: '8px 4px',
-          borderRadius: 12,
-          border: '1px dashed var(--border)',
-          background: '#f8fafc',
-          color: '#0f172a',
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: 'pointer',
-        }}
-        type="button"
-      >
-        <MoreHorizontal size={18} />
-        <span>More</span>
-      </button>
-    </nav>
+      <AnimatePresence>
+        {showMore && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60 }}
+              onClick={() => setShowMore(false)}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: '#ffffff',
+                borderRadius: '20px 20px 0 0',
+                padding: 24,
+                zIndex: 70,
+              }}
+            >
+              <div
+                style={{
+                  width: 32,
+                  height: 4,
+                  background: '#e2e8f0',
+                  borderRadius: 2,
+                  margin: '0 auto 20px',
+                }}
+              />
+              <div style={{ display: 'grid', gap: 10 }}>
+                {moreItems.map(item => (
+                  <button
+                    key={item.path}
+                    onClick={() => {
+                      navigate(item.path)
+                      setShowMore(false)
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '12px 14px',
+                      borderRadius: 12,
+                      border: '1px solid #e2e8f0',
+                      background: '#f8fafc',
+                      color: '#0f172a',
+                      fontWeight: 600,
+                      fontSize: 14,
+                      cursor: 'pointer',
+                    }}
+                    type="button"
+                  >
+                    <item.icon size={18} />
+                    {item.label}
+                    <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>›</span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    setShowMore(false)
+                    logout()
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '12px 14px',
+                    borderRadius: 12,
+                    border: 'none',
+                    background: 'rgba(244,63,94,0.1)',
+                    color: '#e11d48',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                  type="button"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 

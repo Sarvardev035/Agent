@@ -5,7 +5,6 @@ const FALLBACK_RATES: Record<string, number> = {
   USD: 1,
   UZS: 12700,
   EUR: 0.93,
-  RUB: 92.5,
 }
 
 let ratesCache: Record<string, number> | null = null

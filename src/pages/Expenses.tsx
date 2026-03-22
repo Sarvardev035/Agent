@@ -1,20 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format, subMonths } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Info, Lightbulb, PieChart, Plus, ShieldAlert } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { Plus, Trash2 } from 'lucide-react'
-import Skeleton from '../components/ui/Skeleton'
+import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
-import Modal from '../components/ui/Modal'
-import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { smartDate, safeArray } from '../lib/helpers'
-import { Expense, expensesService } from '../services/expenses.service'
-import { ExpenseSchema } from '../lib/security'
-import { formatCurrency } from '../lib/currency'
-import { useFinanceStore } from '../store/finance.store'
+import Skeleton from '../components/ui/Skeleton'
+import { expensesApi } from '../api/expensesApi'
+import { useFinance } from '../context/FinanceContext'
+import { formatCurrency, smartDate } from '../utils/helpers'
+import { categoriesService } from '../services/categories.service'
+import { safeArray } from '../lib/helpers'
 import { CURRENCIES } from '../lib/constants'
-import { useCategories } from '../hooks/useCategories'
 
 type ExpenseFormState = {
   amount: string
@@ -22,8 +20,10 @@ type ExpenseFormState = {
   description: string
   categoryId: string
   accountId: string
-  currency: string
+  currency: (typeof CURRENCIES)[number]
 }
+
+type CategoryOption = { id: string; name: string }
 
 const monthOptions = Array.from({ length: 6 }).map((_, idx) => {
   const d = subMonths(new Date(), idx)
@@ -31,16 +31,14 @@ const monthOptions = Array.from({ length: 6 }).map((_, idx) => {
 })
 
 const Expenses = () => {
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [accounts, setAccounts] = useState<any[]>([])
+  const { accounts, refreshAccounts } = useFinance()
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([])
+  const [expenses, setExpenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
-  const [editing, setEditing] = useState<Expense | null>(null)
-  const [form, setForm] = useState<ExpenseFormState>({
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL')
+  const [month, setMonth] = useState<string>(format(new Date(), 'yyyy-MM'))
+  const [formData, setFormData] = useState<ExpenseFormState>({
     amount: '',
     expenseDate: format(new Date(), 'yyyy-MM-dd'),
     description: '',
@@ -48,226 +46,255 @@ const Expenses = () => {
     accountId: '',
     currency: 'UZS',
   })
-  const { categories } = useCategories('EXPENSE')
-  const { accounts: storeAccounts, refreshAccounts } = useFinanceStore()
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setExpenses([])
+  const loadCategories = async () => {
     try {
-      const [expRes] = await Promise.allSettled([expensesService.getAll()])
-      await refreshAccounts()
-      if (expRes.status === 'fulfilled') {
-        const allExpenses = safeArray<Expense>(expRes.value.data)
-        setExpenses(allExpenses.filter(e => e.expenseDate && e.expenseDate.startsWith(month)))
-      }
-      setAccounts(storeAccounts)
-      if (expRes.status === 'rejected') {
-        setError((expRes.reason as Error).message)
-      }
-    } catch (err: any) {
-      setError(err.message)
+      const res = await categoriesService.getByType('EXPENSE')
+      setCategoryOptions(
+        safeArray<any>(res.data).map(cat => ({
+          id: cat.id ?? cat.categoryId ?? cat.name,
+          name: cat.name ?? cat.category ?? 'Other',
+        }))
+      )
+    } catch {
+      setCategoryOptions([])
+    }
+  }
+
+  const loadExpenses = async () => {
+    try {
+      setLoading(true)
+      const { data } = await expensesApi.getAll()
+      const list = safeArray<any>(data).map(item => ({
+        ...item,
+        date: item.expenseDate || item.date,
+        categoryId: item.categoryId || item.category,
+        currency: item.currency || 'UZS',
+      }))
+      setExpenses(list)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load expenses')
     } finally {
       setLoading(false)
     }
-  }, [month, storeAccounts, refreshAccounts])
+  }
 
   useEffect(() => {
-    let cancelled = false
+    loadExpenses()
+    loadCategories()
+    refreshAccounts()
+  }, [refreshAccounts])
 
-    const load = async () => {
-      if (!cancelled) {
-        await loadData()
+  const filteredExpenses = useMemo(() => {
+    const monthMatch = (date: string) => date?.startsWith(month)
+    return (expenses || [])
+      .filter(item => (categoryFilter === 'ALL' ? true : item.categoryId === categoryFilter))
+      .filter(item => (month ? monthMatch(item.date) : true))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [expenses, categoryFilter, month])
+
+  const grouped = useMemo(() => {
+    const map: Record<string, any[]> = {}
+    filteredExpenses.forEach(item => {
+      const key = smartDate(item.date)
+      if (!map[key]) map[key] = []
+      map[key].push(item)
+    })
+    return map
+  }, [filteredExpenses])
+
+  const handleChange = (key: keyof ExpenseFormState, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleSubmit = () => {
+    setTimeout(async () => {
+      if (!formData.amount || !formData.expenseDate || !formData.accountId || !formData.categoryId) {
+        toast.error('Please fill amount, date, category, account, and currency')
+        return
       }
-    }
-
-    load()
-
-    return () => {
-      cancelled = true
-    }
-  }, [loadData])
-
-  const filtered = useMemo(() => {
-    return expenses.filter(item => {
-      const matchesCategory = selectedCategory ? item.categoryId === selectedCategory : true
-      const matchesMonth = month ? item.expenseDate.startsWith(month) : true
-      return matchesCategory && matchesMonth
-    })
-  }, [expenses, selectedCategory, month])
-
-  const summary = useMemo(() => {
-    const total = filtered.reduce((s, i) => s + i.amount, 0)
-    const avg = filtered.length ? total / filtered.length : 0
-    return { total, avg }
-  }, [filtered])
-
-  const openNew = () => {
-    setEditing(null)
-    setForm({
-      amount: '',
-      expenseDate: format(new Date(), 'yyyy-MM-dd'),
-      description: '',
-      categoryId: '',
-      accountId: '',
-      currency: 'UZS',
-    })
-    setShowModal(true)
+      try {
+        await expensesApi.create({
+          amount: Number(formData.amount),
+          expenseDate: formData.expenseDate,
+          description: formData.description,
+          categoryId: formData.categoryId,
+          accountId: formData.accountId,
+          currency: formData.currency,
+        })
+        toast.success('Expense added')
+        setShowModal(false)
+        setFormData({
+          amount: '',
+          expenseDate: format(new Date(), 'yyyy-MM-dd'),
+          description: '',
+          categoryId: '',
+          accountId: '',
+          currency: 'UZS',
+        })
+        await Promise.allSettled([loadExpenses(), refreshAccounts()])
+      } catch (err) {
+        console.error(err)
+        toast.error('Failed to add expense')
+      }
+    }, 0)
   }
 
-  const openEdit = (item: Expense) => {
-    setEditing(item)
-    setForm({
-      amount: String(item.amount),
-      expenseDate: item.expenseDate,
-      description: item.description || '',
-      categoryId: item.categoryId,
-      accountId: item.accountId,
-      currency: item.currency || 'UZS',
-    })
-    setShowModal(true)
-  }
-
-  const handleAdd = async (formData: ExpenseFormState) => {
-    const parsed = ExpenseSchema.safeParse({
-      ...formData,
-      amount: Number(formData.amount),
-    })
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message)
-      return
-    }
-    try {
-      await expensesService.create({
-        amount: Number(formData.amount),
-        currency: formData.currency || 'UZS',
-        description: formData.description || '',
-        expenseDate: formData.expenseDate,
-        categoryId: formData.categoryId,
-        accountId: formData.accountId,
-      })
-      toast.success('Expense added!')
-      setShowModal(false)
-      await loadData()
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to add expense')
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    try {
-      await expensesService.delete(id)
-      toast.success('Expense deleted')
-      setExpenses(prev => prev.filter(i => i.id !== id))
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete')
-    }
-  }
+  const dailyTotals = (items: any[]) => items.reduce((sum, item) => sum + (item.amount || 0), 0)
 
   return (
-    <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <p style={{ color: '#94a3b8', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>EXPENSES</p>
-          <h1 style={{ margin: '4px 0', fontSize: 22, fontWeight: 800 }}>Spending overview</h1>
-          <p style={{ margin: 0, color: '#64748b' }}>Track where your money goes.</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
+      <div
+        style={{
+          background: 'linear-gradient(120deg,#0f172a,#1e3a8a)',
+          color: '#fff',
+          borderRadius: 16,
+          padding: 18,
+          boxShadow: 'var(--shadow-lg)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            background: 'rgba(255,255,255,0.12)',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          <Info size={20} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: 0, letterSpacing: '0.08em', textTransform: 'uppercase', fontSize: 11, opacity: 0.8 }}>
+            Demo data
+          </p>
+          <h2 style={{ margin: '4px 0 2px', fontSize: 18, fontWeight: 800 }}>Expenses overview</h2>
+          <p style={{ margin: 0, opacity: 0.8, fontSize: 13 }}>Add your expenses to replace the sample insights.</p>
         </div>
         <button
-          onClick={openNew}
+          onClick={() => setShowModal(true)}
           type="button"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
-            border: 'none',
-            background: '#ef4444',
-            color: '#fff',
-            padding: '10px 12px',
+            background: '#fff',
+            color: '#0f172a',
+            padding: '10px 14px',
             borderRadius: 12,
+            border: 'none',
             fontWeight: 800,
-            boxShadow: '0 12px 30px rgba(239,68,68,0.3)',
+            boxShadow: '0 12px 30px rgba(255,255,255,0.18)',
             cursor: 'pointer',
           }}
         >
-          <Plus size={16} /> Add expense
+          <Plus size={18} /> Add Expense
         </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {monthOptions.map(opt => (
-          <button
-            key={opt.value}
-            onClick={() => setMonth(opt.value)}
-            type="button"
-            style={{
-              padding: '8px 12px',
-              borderRadius: 10,
-              border: month === opt.value ? '1px solid #ef4444' : '1px solid #e2e8f0',
-              background: month === opt.value ? '#fff1f2' : '#fff',
-              color: month === opt.value ? '#ef4444' : '#0f172a',
-              fontWeight: 700,
-            }}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setSelectedCategory(null)}
-          type="button"
-          style={{
-            padding: '8px 10px',
-            borderRadius: 10,
-            border: selectedCategory === null ? '1px solid #2563eb' : '1px solid #e2e8f0',
-            background: selectedCategory === null ? '#eff6ff' : '#fff',
-            fontWeight: 700,
-          }}
-        >
-          All
-        </button>
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.id)}
-            type="button"
-            style={{
-              padding: '8px 10px',
-              borderRadius: 10,
-              border: selectedCategory === cat.id ? '1px solid #2563eb' : '1px solid #e2e8f0',
-              background: selectedCategory === cat.id ? '#eff6ff' : '#fff',
-              fontWeight: 700,
-            }}
-          >
-            {cat.name}
-          </button>
-        ))}
       </div>
 
       <div
         style={{
-          background: '#fff',
-          borderRadius: 16,
-          padding: 16,
-          boxShadow: 'var(--sh-sm)',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))',
+          gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
           gap: 12,
         }}
       >
-        <div>
-          <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>Total</p>
-          {loading ? <Skeleton height={24} /> : <div className="tabular" style={{ fontSize: 22, fontWeight: 800 }}>{formatCurrency(summary.total)}</div>}
+        {[
+          { icon: <PieChart size={18} />, title: 'Category breakdown', desc: 'See where spending concentrates.' },
+          { icon: <Lightbulb size={18} />, title: 'Monthly trends', desc: 'Spot spikes before they hurt.' },
+          { icon: <ShieldAlert size={18} />, title: 'Budget alerts', desc: 'Get notified when nearing limits.' },
+        ].map(card => (
+          <div
+            key={card.title}
+            style={{
+              background: '#fff',
+              borderRadius: 14,
+              padding: 14,
+              border: '1px solid var(--border)',
+              display: 'flex',
+              gap: 10,
+              alignItems: 'flex-start',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                background: 'var(--blue-soft)',
+                display: 'grid',
+                placeItems: 'center',
+                color: 'var(--blue)',
+              }}
+            >
+              {card.icon}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>{card.title}</div>
+              <div style={{ color: 'var(--text-2)', fontSize: 13 }}>{card.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          padding: 12,
+          background: '#fff',
+          borderRadius: 14,
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+          {monthOptions.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setMonth(opt.value)}
+              type="button"
+              style={{
+                padding: '10px 12px',
+                borderRadius: 12,
+                border: month === opt.value ? '1px solid var(--blue)' : '1px solid var(--border)',
+                background: month === opt.value ? 'var(--blue-soft)' : '#fff',
+                color: month === opt.value ? 'var(--blue)' : 'var(--text-1)',
+                fontWeight: 700,
+                minWidth: 120,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-        <div>
-          <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>Average</p>
-          {loading ? <Skeleton height={24} /> : <div className="tabular" style={{ fontSize: 22, fontWeight: 800 }}>{formatCurrency(summary.avg)}</div>}
-        </div>
-        <div>
-          <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>Transactions</p>
-          {loading ? <Skeleton height={24} /> : <div style={{ fontSize: 22, fontWeight: 800 }}>{filtered.length}</div>}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+          {['ALL', ...categoryOptions.map(cat => cat.id || cat.name)].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              type="button"
+              style={{
+                padding: '8px 12px',
+                borderRadius: 999,
+                border: categoryFilter === cat ? '1px solid var(--blue)' : '1px solid var(--border)',
+                background: categoryFilter === cat ? 'var(--blue-soft)' : '#fff',
+                fontWeight: 700,
+                color: categoryFilter === cat ? 'var(--blue)' : 'var(--text-1)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {cat === 'ALL' ? 'All' : cat}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -276,171 +303,155 @@ const Expenses = () => {
           background: '#fff',
           borderRadius: 16,
           padding: 16,
-          boxShadow: 'var(--sh-sm)',
-          minHeight: 240,
+          boxShadow: 'var(--shadow-md)',
+          border: '1px solid var(--border)',
+          minHeight: 260,
         }}
       >
         {loading ? (
-          <Skeleton height={64} count={4} />
-        ) : filtered.length === 0 ? (
-          <EmptyState title="No expenses" description="Add your first expense." actionLabel="Add" onAction={openNew} />
+          <Skeleton height={66} count={4} />
+        ) : filteredExpenses.length === 0 ? (
+          <EmptyState
+            title="No expenses yet"
+            description="Track your daily spending to unlock insights."
+            actionLabel="Add expense"
+            onAction={() => setShowModal(true)}
+          />
         ) : (
-          <AnimatePresence>
-            {filtered.map(item => (
-              <motion.div
-                key={item.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-              >
-                <TransactionItem
-                  type="expense"
-                  amount={item.amount}
-                  category={item.categoryId}
-                  date={item.expenseDate}
-                  description={item.description}
-                  currency={accounts.find(a => a.id === item.accountId)?.currency ?? 'UZS'}
-                  accountLabel={accounts.find(a => a.id === item.accountId)?.name}
-                />
-                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 8 }}>
-                  <button
-                    onClick={() => openEdit(item)}
-                    type="button"
-                    style={{
-                      border: '1px solid #e2e8f0',
-                      background: '#f8fafc',
-                      color: '#0f172a',
-                      borderRadius: 10,
-                      padding: '6px 10px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      fontWeight: 700,
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setConfirmId(item.id)}
-                    type="button"
-                    style={{
-                      border: '1px solid #ffe4e6',
-                      background: '#fff1f2',
-                      color: '#ef4444',
-                      borderRadius: 10,
-                      padding: '6px 10px',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      fontWeight: 700,
-                    }}
-                  >
-                    <Trash2 size={16} /> Delete
-                  </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {Object.entries(grouped).map(([dateLabel, items]) => (
+              <div key={dateLabel} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontWeight: 800, color: 'var(--text-1)' }}>{dateLabel}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--red)' }}>{formatCurrency(dailyTotals(items))}</div>
                 </div>
-              </motion.div>
+                <AnimatePresence>
+                  {items.map((item: any) => {
+                    const account = accounts.find(acc => acc.id === item.accountId)
+                    return (
+                      <TransactionItem
+                        key={item.id}
+                        type="expense"
+                        amount={item.amount}
+                        category={item.category || item.categoryId || 'OTHER'}
+                        date={item.date}
+                        description={item.description}
+                        currency={account?.currency || 'UZS'}
+                        accountLabel={account?.name}
+                      />
+                    )
+                  })}
+                </AnimatePresence>
+              </div>
             ))}
-          </AnimatePresence>
+          </div>
         )}
       </div>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? 'Edit expense' : 'Add expense'}>
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title="Add expense"
+        subtitle="Save a new expense entry with ISO date."
+      >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label style={{ fontWeight: 700, fontSize: 13 }}>Amount</label>
+              <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Amount</label>
               <input
                 type="number"
-                value={form.amount}
+                value={formData.amount}
+                onChange={e => handleChange('amount', e.target.value)}
                 placeholder="0.00"
                 min="0"
                 step="any"
-                onChange={e => setForm({ ...form, amount: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
               />
             </div>
             <div>
-              <label style={{ fontWeight: 700, fontSize: 13 }}>Date</label>
+              <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Date</label>
               <input
                 type="date"
-                value={form.expenseDate}
-                onChange={e => setForm({ ...form, expenseDate: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+                value={formData.expenseDate}
+                onChange={e => handleChange('expenseDate', e.target.value)}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
               />
             </div>
           </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
-            <select
-              value={form.categoryId}
-              onChange={e => setForm({ ...form, categoryId: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              required
-            >
-              <option value="">Select category</option>
-              {categories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Category</label>
+              <select
+                value={formData.categoryId}
+                onChange={e => handleChange('categoryId', e.target.value)}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+              >
+                <option value="">Select category</option>
+                {categoryOptions.map(cat => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Currency</label>
+              <select
+                value={formData.currency}
+                onChange={e => handleChange('currency', e.target.value)}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+              >
+                {CURRENCIES.map(cur => (
+                  <option key={cur} value={cur}>
+                    {cur}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Account</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Account</label>
             <select
-              value={form.accountId}
-              onChange={e => setForm({ ...form, accountId: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              required
+              value={formData.accountId}
+              onChange={e => handleChange('accountId', e.target.value)}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             >
               <option value="">Select account</option>
-              {accounts.map((acc: any) => (
-                <option key={acc.id} value={acc.id}>{acc.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
-            <input
-              value={form.description}
-              onChange={e => setForm({ ...form, description: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              placeholder="Optional"
-            />
-          </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Currency</label>
-            <select
-              value={form.currency}
-              onChange={e => setForm({ ...form, currency: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            >
-              {CURRENCIES.map(cur => (
-                <option key={cur} value={cur}>
-                  {cur}
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({acc.currency})
                 </option>
               ))}
             </select>
           </div>
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Description</label>
+            <input
+              value={formData.description}
+              onChange={e => handleChange('description', e.target.value)}
+              placeholder="Optional"
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+            />
+          </div>
           <button
-            onClick={() => handleAdd(form)}
+            onClick={handleSubmit}
             type="button"
-            className="btn-primary"
-            style={{ width: '100%', height: 48, fontSize: 15 }}
+            style={{
+              width: '100%',
+              height: 48,
+              borderRadius: 14,
+              border: 'none',
+              background: 'linear-gradient(135deg,#f43f5e,#ef4444)',
+              color: '#fff',
+              fontWeight: 800,
+              boxShadow: '0 12px 30px rgba(244,63,94,0.35)',
+              cursor: 'pointer',
+            }}
           >
-            {editing ? 'Update expense' : 'Save expense'}
+            Save expense
           </button>
         </div>
       </Modal>
-
-      <ConfirmDialog
-        open={confirmId !== null}
-        onCancel={() => setConfirmId(null)}
-        onConfirm={() => confirmId && handleDelete(confirmId)}
-        message="Delete this expense?"
-        confirmLabel="Delete"
-      />
     </div>
   )
 }

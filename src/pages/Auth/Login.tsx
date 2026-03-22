@@ -42,13 +42,14 @@ export default function Login() {
         password: result.data.password,
       })
 
-      const tokenData = data.data || data
-      const accessToken = tokenData.accessToken
+      const tokenData = data?.data ?? data
+      const accessToken = tokenData?.accessToken ?? tokenData?.data?.accessToken
+      const refreshToken = tokenData?.refreshToken ?? tokenData?.data?.refreshToken
 
       if (!accessToken) throw new Error('No token received')
 
       localStorage.setItem('finly_access_token', accessToken)
-      localStorage.setItem('finly_refresh_token', tokenData.refreshToken || '')
+      localStorage.setItem('finly_refresh_token', refreshToken || '')
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {

@@ -129,7 +129,7 @@ src/
 - Real-time rates from **ExchangeRate-API**
 - Automatic caching (1 hour) to reduce API calls
 - Fallback hardcoded rates if API fails
-- Support for: USD, EUR, RUB, UZS
+- Support for: USD, EUR, UZS
 
 ### How It Works
 
@@ -170,38 +170,36 @@ Accounts:
 
 Expenses:
   GET  /api/expenses      # ?startDate=2024-01-01&endDate=2024-12-31
-  POST /api/expenses      # { amount, date, category, accountId, description? }
+  POST /api/expenses      # { amount, expenseDate, categoryId, currency, accountId, description? }
   PUT  /api/expenses/:id
   DELETE /api/expenses/:id
 
 Income:
-  GET  /api/income
-  POST /api/income
-  PUT  /api/income/:id
-  DELETE /api/income/:id
+  GET  /api/incomes
+  POST /api/incomes       # { amount, incomeDate, categoryId, currency, accountId, description? }
+  PUT  /api/incomes/:id
+  DELETE /api/incomes/:id
 
 Transfers:
   GET  /api/transfers
-  POST /api/transfers     # { fromAccountId, toAccountId, amount, date, note? }
+  POST /api/transfers     # { fromAccountId, toAccountId, amount, transferDate, exchangeRate, description? }
 
 Debts:
   GET  /api/debts
-  POST /api/debts         # { personName, amount, currency, dueDate, type }
-  PUT  /api/debts/:id
-  PUT  /api/debts/:id    # { status: 'CLOSED' }
+  POST /api/debts         # { personName, amount, currency, dueDate, type, accountId? }
+  POST /api/debts/:id/repay # { paymentAmount, accountId? }
   DELETE /api/debts/:id
 
 Budget:
-  GET  /api/budget
-  POST /api/budget
-  GET  /api/budget/categories
-  POST /api/budget/categories
+  GET  /api/budgets
+  POST /api/budgets          # { monthlyLimit, year, month }
+  POST /api/budgets/categories # { monthlyLimit, categoryId, type: 'MONTHLY', year, month }
 
-Statistics:
-  GET  /api/statistics/expenses?period=month
-  GET  /api/statistics/income?period=month
-  GET  /api/statistics/category-breakdown
-  GET  /api/statistics/income-vs-expense
+Analytics:
+  GET  /api/analytics/summary
+  GET  /api/analytics/monthly-expenses
+  GET  /api/analytics/expenses-by-category
+  GET  /api/analytics/income-vs-expense
 ```
 
 ## 🎨 Customization

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { fetchExchangeRates, convert as convertAmount } from '../lib/currency'
 
-type SupportedCurrency = 'USD' | 'EUR' | 'RUB' | 'UZS'
+type SupportedCurrency = 'USD' | 'EUR' | 'UZS'
 
 interface CurrencyState {
   rates: Record<string, number>

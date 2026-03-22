@@ -35,12 +35,13 @@ export default function App() {
           position="top-right"
           toastOptions={{
             style: {
-              borderRadius: 12,
-              background: '#0f172a',
+              borderRadius: 14,
+              background: '#0b1224',
               color: '#f8fafc',
               fontFamily: 'Plus Jakarta Sans, sans-serif',
               fontSize: 14,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              boxShadow: '0 14px 40px rgba(15,23,42,0.4)',
+              border: '1px solid rgba(148,163,184,0.2)',
             },
             success: { iconTheme: { primary: '#10b981', secondary: '#ffffff' }, duration: 3000 },
             error:   { iconTheme: { primary: '#ef4444', secondary: '#ffffff' }, duration: 4000 },

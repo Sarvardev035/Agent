@@ -72,7 +72,7 @@ export const IncomeSchema = z.object({
 export const AccountSchema = z.object({
   name: z.string().min(1).max(100).transform(v => sanitize(v.trim())),
   type: z.enum(['BANK_CARD', 'CASH']),
-  currency: z.enum(['UZS', 'USD', 'EUR', 'RUB']),
+  currency: z.enum(['UZS', 'USD', 'EUR']),
   initialBalance: z.number().min(0),
   cardNumber: z.string().nullable().optional(),
   cardType: z.string().nullable().optional(),
@@ -99,7 +99,7 @@ export const DebtSchema = z.object({
     .max(100)
     .transform(v => sanitize(v.trim())),
   amount: z.number().positive(),
-  currency: z.enum(['UZS', 'USD', 'EUR', 'RUB']),
+  currency: z.enum(['UZS', 'USD', 'EUR']),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   type: z.enum(['DEBT', 'RECEIVABLE']),
   description: z

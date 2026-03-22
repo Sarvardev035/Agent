@@ -6,7 +6,7 @@ export const budgetService = {
 
   create: (d: {
     categoryId: string
-    type: 'EXPENSE'
+    type: 'MONTHLY'
     monthlyLimit: number
     year: number
     month: number

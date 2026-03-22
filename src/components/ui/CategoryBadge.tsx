@@ -1,19 +1,13 @@
-import { CATEGORY_META } from '../../lib/helpers'
 import clsx from 'clsx'
+import { getCategoryMeta } from '../../utils/helpers'
 
 interface CategoryBadgeProps {
-  category: keyof typeof CATEGORY_META | string
+  category: string
   children?: React.ReactNode
 }
 
 const CategoryBadge = ({ category, children }: CategoryBadgeProps) => {
-  const meta = CATEGORY_META[category] ?? {
-    color: '#475569',
-    bg: '#f8fafc',
-    label: category,
-    emoji: '',
-    barColor: '#94a3b8',
-  }
+  const meta = getCategoryMeta(category)
 
   return (
     <span
@@ -22,7 +16,7 @@ const CategoryBadge = ({ category, children }: CategoryBadgeProps) => {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        padding: '3px 10px',
+        padding: '4px 10px',
         borderRadius: 20,
         fontSize: 11,
         fontWeight: 700,
@@ -37,4 +31,3 @@ const CategoryBadge = ({ category, children }: CategoryBadgeProps) => {
 }
 
 export default CategoryBadge
-

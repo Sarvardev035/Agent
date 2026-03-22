@@ -1,4 +1,4 @@
-import { getBudgetColor } from '../../lib/helpers'
+import { getBudgetColor } from '../../utils/helpers'
 
 interface ProgressBarProps {
   percent: number
@@ -25,11 +25,11 @@ const ProgressBar = ({
   if (isLoading) {
     return (
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
           {label && <span>{label}</span>}
           {showPercent && <span>—</span>}
         </div>
-        <div style={{ width: '100%', height, borderRadius: 999, background: '#e2e8f0' }} />
+        <div style={{ width: '100%', height, borderRadius: 999, background: 'var(--border)' }} />
       </div>
     )
   }
@@ -37,7 +37,7 @@ const ProgressBar = ({
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 6 }}>
       {(label || showPercent) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)' }}>
           {label && <span>{label}</span>}
           {showPercent && (
             <span style={{ fontWeight: 700, color: palette.text }}>{Math.round(percent)}%</span>
@@ -50,7 +50,7 @@ const ProgressBar = ({
           width: '100%',
           height,
           borderRadius: 999,
-          background: '#e2e8f0',
+          background: 'var(--border)',
           overflow: 'hidden',
           position: 'relative',
         }}
@@ -59,7 +59,7 @@ const ProgressBar = ({
           className={animate ? 'progress-animate' : undefined}
           style={{
             height: '100%',
-            width: `${Math.min(percent, 100)}%`,
+            width: `${Math.min(percent, 120)}%`,
             background: barColor,
             borderRadius: 999,
             transition: 'width 0.3s ease',
@@ -75,8 +75,8 @@ const ProgressBar = ({
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: '#ef4444',
-              boxShadow: '0 0 0 6px rgba(239,68,68,0.15)',
+              background: 'var(--red)',
+              boxShadow: '0 0 0 6px rgba(244,63,94,0.18)',
             }}
           />
         )}

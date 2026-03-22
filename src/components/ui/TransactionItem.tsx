@@ -1,14 +1,13 @@
 import { motion } from 'framer-motion'
-import { CATEGORY_META, smartDate } from '../../lib/helpers'
 import CategoryBadge from './CategoryBadge'
-import { formatCurrency } from '../../lib/currency'
+import { formatCurrency, getCategoryMeta, smartDate } from '../../utils/helpers'
 
 type TransactionType = 'income' | 'expense'
 
 interface TransactionItemProps {
   type: TransactionType
   amount: number
-  category: keyof typeof CATEGORY_META | string
+  category: string
   date: string
   description?: string
   currency?: string
@@ -24,14 +23,7 @@ const TransactionItem = ({
   currency = 'UZS',
   accountLabel,
 }: TransactionItemProps) => {
-  const meta = CATEGORY_META[category] ?? {
-    emoji: '💼',
-    bg: '#f8fafc',
-    color: '#475569',
-    label: category,
-    barColor: '#94a3b8',
-  }
-
+  const meta = getCategoryMeta(category)
   const isExpense = type === 'expense'
 
   return (
@@ -45,18 +37,21 @@ const TransactionItem = ({
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        padding: '10px 12px',
-        borderRadius: 12,
+        padding: '12px 14px',
+        borderRadius: 14,
         cursor: 'pointer',
         transition: 'background 0.15s ease',
+        background: '#fff',
+        boxShadow: 'var(--shadow-sm)',
+        border: '1px solid var(--border)',
       }}
       whileHover={{ backgroundColor: '#f8fafc' }}
     >
       <div
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
+          width: 40,
+          height: 40,
+          borderRadius: 12,
           background: meta.bg,
           color: meta.color,
           display: 'flex',
@@ -71,39 +66,66 @@ const TransactionItem = ({
       </div>
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14, lineHeight: 1.2, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-1)', fontSize: 14, lineHeight: 1.2, minWidth: 0 }}>
             {description || meta.label}
           </div>
           {accountLabel && (
             <span
               style={{
-                background: '#e2e8f0',
-                color: '#0f172a',
+                background: 'var(--blue-soft)',
+                color: 'var(--navy)',
                 borderRadius: 999,
                 padding: '2px 8px',
                 fontSize: 11,
                 fontWeight: 700,
+                whiteSpace: 'nowrap',
               }}
             >
               {accountLabel}
             </span>
           )}
         </div>
-        <div style={{ fontSize: 12, color: '#94a3b8', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--text-3)',
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
           <span>{smartDate(date)}</span>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e2e8f0', display: 'inline-block' }} />
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--border)',
+              display: 'inline-block',
+            }}
+          />
           <CategoryBadge category={category} />
         </div>
       </div>
 
-      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+      <div
+        style={{
+          textAlign: 'right',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          alignItems: 'flex-end',
+          minWidth: 120,
+        }}
+      >
         <div
           className="tabular"
           style={{
-            fontWeight: 700,
-            color: isExpense ? '#ef4444' : '#10b981',
-            fontSize: 14,
+            fontWeight: 800,
+            color: isExpense ? 'var(--red)' : 'var(--green)',
+            fontSize: 15,
           }}
         >
           {isExpense ? '-' : '+'}
