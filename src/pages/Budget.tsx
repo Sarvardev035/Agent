@@ -145,6 +145,8 @@ const Budget = () => {
     return Math.min((actualIncome / incomeGoal) * 100, 150)
   }, [actualIncome, incomeGoal])
 
+  const currencySymbol = 'UZS'
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -195,10 +197,10 @@ const Budget = () => {
               <ProgressRing percent={goalProgress} label="Budget vs spent" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>
-                  Budget {formatCurrency(incomeGoal)}
+                  Budget {currencySymbol} {formatCurrency(incomeGoal).replace('UZS ', '')}
                 </div>
                 <div style={{ color: 'var(--text-2)' }}>
-                  Spent {formatCurrency(actualIncome)}
+                  Spent {currencySymbol} {formatCurrency(actualIncome).replace('UZS ', '')}
                 </div>
                 <div
                   style={{
@@ -209,7 +211,7 @@ const Budget = () => {
                     fontWeight: 800,
                   }}
                 >
-                  Remaining {formatCurrency(Math.max(incomeGoal - actualIncome, 0))}
+                  Remaining {currencySymbol} {formatCurrency(Math.max(incomeGoal - actualIncome, 0)).replace('UZS ', '')}
                 </div>
               </div>
             </>
@@ -338,7 +340,7 @@ const Budget = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontWeight: 800 }}>{cat.category}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                      {formatCurrency(cat.spent)} / {formatCurrency(cat.limit)}
+                      {currencySymbol} {formatCurrency(cat.spent).replace('UZS ', '')} / {currencySymbol} {formatCurrency(cat.limit).replace('UZS ', '')}
                     </div>
                   </div>
                   <div style={{ marginTop: 8 }}>
@@ -371,7 +373,7 @@ const Budget = () => {
 
       <Modal open={goalModal} onClose={() => setGoalModal(false)} title="Set monthly budget">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly budget</label>
+          <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly budget ({currencySymbol})</label>
           <input
             type="number"
             value={goalInput || incomeGoal || ''}
@@ -416,7 +418,7 @@ const Budget = () => {
             </select>
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit ({currencySymbol})</label>
             <input
               type="number"
               value={categoryLimit}

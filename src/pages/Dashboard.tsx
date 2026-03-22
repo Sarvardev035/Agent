@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useAuthStore } from '../store/auth.store'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 import { formatCurrency, getCategoryMeta } from '../utils/helpers'
 import TransactionItem from '../components/ui/TransactionItem'
@@ -20,6 +21,7 @@ import EmptyState from '../components/ui/EmptyState'
 import ProgressBar from '../components/ui/ProgressBar'
 
 const Dashboard = () => {
+  const { user } = useAuthStore()
   const { stats, loading } = useDashboardStats()
   const [chartReady, setChartReady] = useState(false)
 
@@ -71,7 +73,7 @@ const Dashboard = () => {
         <div>
           <p className="text-sm text-slate-500 font-medium">{format(new Date(), 'EEEE, MMMM do')}</p>
           <h1 style={{ fontFamily: 'Space Grotesk', fontSize: 26, fontWeight: 700 }}>
-            Good {timeOfDay}, Finly user 👋
+            Good {timeOfDay}, {user?.name || 'Finly user'} 👋
           </h1>
         </div>
         <button className="relative p-2 rounded-xl bg-white border border-slate-200">
@@ -191,8 +193,8 @@ const Dashboard = () => {
       </div>
 
       {/* Two column grid */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div>
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h3 style={{ fontWeight: 700, fontSize: 16 }}>Recent Activity</h3>
             <button style={{ color: '#3b82f6', fontWeight: 700, border: 'none', background: 'none', cursor: 'pointer' }}>
@@ -268,7 +270,7 @@ const Dashboard = () => {
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-4 gap-3 mt-5 md:grid-cols-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
         {[
           { label: 'Expense', icon: <TrendingDown size={18} />, color: '#fef2f2' },
           { label: 'Income', icon: <TrendingUp size={18} />, color: '#ecfdf3' },
