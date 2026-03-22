@@ -74,9 +74,6 @@ export const AccountSchema = z.object({
   type: z.enum(['BANK_CARD', 'CASH']),
   currency: z.enum(['UZS', 'USD', 'EUR']),
   initialBalance: z.number().min(0),
-  cardNumber: z.string().nullable().optional(),
-  cardType: z.string().nullable().optional(),
-  expiryDate: z.string().nullable().optional(),
 })
 
 export const TransferSchema = z
