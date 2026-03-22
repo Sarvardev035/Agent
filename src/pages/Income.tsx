@@ -8,30 +8,21 @@ import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { CATEGORY_META, toArray, safeArray } from '../lib/helpers'
-import { Income } from '../services/income.service'
+import { safeArray } from '../lib/helpers'
+import { Income, incomesService } from '../services/income.service'
 import { IncomeSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
 import { useFinanceStore } from '../store/finance.store'
-import api from '../lib/api'
-import { INCOME_CATEGORIES } from '../lib/constants'
+import { CURRENCIES } from '../lib/constants'
+import { useCategories } from '../hooks/useCategories'
 
 type IncomeForm = {
   amount: string
-  date: string
+  incomeDate: string
   description: string
-  category: Income['category']
-  accountId: number
-}
-
-const keywordMap: Record<string, string> = {
-  salary: 'SALARY',
-  bonus: 'SALARY',
-  freelance: 'FREELANCE',
-  contract: 'BUSINESS',
-  rent: 'BUSINESS',
-  gift: 'GIFT',
-  investment: 'INVESTMENT',
+  categoryId: string
+  accountId: string
+  currency: string
 }
 
 const monthOptions = Array.from({ length: 6 }).map((_, idx) => {
@@ -41,55 +32,48 @@ const monthOptions = Array.from({ length: 6 }).map((_, idx) => {
 
 const IncomePage = () => {
   const [incomes, setIncomes] = useState<Income[]>([])
-  const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [month, setMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  )
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
-  const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [editing, setEditing] = useState<Income | null>(null)
   const [form, setForm] = useState<IncomeForm>({
     amount: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
+    incomeDate: format(new Date(), 'yyyy-MM-dd'),
     description: '',
-    category: 'SALARY',
-    accountId: 0,
+    categoryId: '',
+    accountId: '',
+    currency: 'UZS',
   })
+
+  const { categories } = useCategories('INCOME')
+  const { accounts, refreshAccounts } = useFinanceStore()
 
   const loadData = async () => {
     setLoading(true)
-    setError(null)
     try {
-      const [incRes, accRes] = await Promise.allSettled([
-        api.get('/api/income'),
-        api.get('/api/accounts'),
-      ])
-      const allIncomes = safeArray<Income>(incRes.status === 'fulfilled' ? incRes.value.data : [])
-      setIncomes(
-        allIncomes.filter(i => i.date && i.date.startsWith(month))
-      )
-      setAccounts(
-        safeArray(accRes.status === 'fulfilled' ? accRes.value.data : [])
-      )
-      if (incRes.status === 'rejected') {
-        setError((incRes.reason as Error).message)
-      }
-    } catch (err: any) {
-      setError(err.message)
+      const res = await incomesService.getAll()
+      const all = safeArray<Income>(res.data)
+      setIncomes(all.filter(i => i.incomeDate?.startsWith(month)))
+      await refreshAccounts()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load income'
+      toast.error(msg)
+      setIncomes([])
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { loadData() }, [month])
+  useEffect(() => {
+    loadData()
+  }, [month])
 
   const filtered = useMemo(() => {
     return incomes.filter(item => {
-      const matchesCategory = selectedCategory ? item.category === selectedCategory : true
-      const matchesMonth = month ? item.date.startsWith(month) : true
+      const matchesCategory = selectedCategory ? item.categoryId === selectedCategory : true
+      const matchesMonth = month ? item.incomeDate.startsWith(month) : true
       return matchesCategory && matchesMonth
     })
   }, [incomes, selectedCategory, month])
@@ -102,44 +86,78 @@ const IncomePage = () => {
 
   const openNew = () => {
     setEditing(null)
-    setForm({ amount: '', date: format(new Date(), 'yyyy-MM-dd'), description: '', category: 'SALARY', accountId: 0 })
+    setForm({
+      amount: '',
+      incomeDate: format(new Date(), 'yyyy-MM-dd'),
+      description: '',
+      categoryId: '',
+      accountId: '',
+      currency: 'UZS',
+    })
     setShowModal(true)
   }
 
   const openEdit = (item: Income) => {
     setEditing(item)
     setForm({
-      ...item,
       amount: String(item.amount),
+      incomeDate: item.incomeDate,
       description: item.description || '',
+      categoryId: item.categoryId,
+      accountId: item.accountId,
+      currency: item.currency || 'UZS',
     })
     setShowModal(true)
   }
 
-  const handleAdd = async (formData: any) => {
+  const handleSave = async () => {
+    const parsed = IncomeSchema.safeParse({
+      amount: Number(form.amount),
+      incomeDate: form.incomeDate,
+      description: form.description || undefined,
+      categoryId: form.categoryId,
+      accountId: form.accountId,
+    })
+
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message)
+      return
+    }
+
+    const payload = {
+      amount: Number(form.amount),
+      currency: form.currency || 'UZS',
+      description: form.description || '',
+      incomeDate: form.incomeDate,
+      categoryId: form.categoryId,
+      accountId: form.accountId,
+    }
+
     try {
-      await api.post('/api/income', {
-        amount:      Number(formData.amount) || 0,
-        date:        formData.date,
-        description: formData.description || '',
-        category:    formData.category,
-        accountId:   Number(formData.accountId),
-      })
-      toast.success('Income added!')
+      if (editing) {
+        await incomesService.update(editing.id, payload)
+        toast.success('Income updated')
+      } else {
+        await incomesService.create(payload)
+        toast.success('Income added')
+      }
       setShowModal(false)
+      setEditing(null)
       await loadData()
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to add income')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to save income'
+      toast.error(msg)
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
-      await api.delete(`/api/income/${id}`)
+      await incomesService.delete(id)
       toast.success('Income deleted')
       setIncomes(prev => prev.filter(i => i.id !== id))
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete'
+      toast.error(msg)
     }
   }
 
@@ -206,25 +224,22 @@ const IncomePage = () => {
         >
           All
         </button>
-        {Object.entries(CATEGORY_META)
-          .filter(([key]) => ['SALARY', 'FREELANCE', 'BUSINESS', 'INVESTMENT', 'GIFT', 'OTHER'].includes(key))
-          .map(([key, meta]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedCategory(key)}
-              type="button"
-              style={{
-                padding: '8px 10px',
-                borderRadius: 10,
-                border: selectedCategory === key ? `1px solid ${meta.color}` : '1px solid #e2e8f0',
-                background: selectedCategory === key ? meta.bg : '#fff',
-                color: meta.color,
-                fontWeight: 700,
-              }}
-            >
-              {meta.emoji} {meta.label}
-            </button>
-          ))}
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id)}
+            type="button"
+            style={{
+              padding: '8px 10px',
+              borderRadius: 10,
+              border: selectedCategory === cat.id ? '1px solid #2563eb' : '1px solid #e2e8f0',
+              background: selectedCategory === cat.id ? '#eff6ff' : '#fff',
+              fontWeight: 700,
+            }}
+          >
+            {cat.name}
+          </button>
+        ))}
       </div>
 
       <div
@@ -260,9 +275,6 @@ const IncomePage = () => {
           boxShadow: 'var(--sh-sm)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Transactions</h3>
-        </div>
         {loading ? (
           <Skeleton height={52} count={5} />
         ) : filtered.length === 0 ? (
@@ -275,8 +287,8 @@ const IncomePage = () => {
                   <TransactionItem
                     type="income"
                     amount={item.amount}
-                    category={item.category}
-                    date={item.date}
+                    category={item.categoryName || item.categoryId}
+                    date={item.incomeDate}
                     description={item.description}
                     currency={accounts.find(a => a.id === item.accountId)?.currency}
                     accountLabel={accounts.find(a => a.id === item.accountId)?.name}
@@ -337,32 +349,25 @@ const IncomePage = () => {
               <label style={{ fontWeight: 700, fontSize: 13 }}>Date</label>
               <input
                 type="date"
-                value={form.date}
-                onChange={e => setForm({ ...form, date: e.target.value })}
+                value={form.incomeDate}
+                onChange={e => setForm({ ...form, incomeDate: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
-          </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
-            <input
-              value={form.description ?? ''}
-              onChange={e => setForm({ ...form, description: e.target.value })}
-              placeholder="e.g. Salary"
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
               <select
-                value={form.category}
-                onChange={e => setForm({ ...form, category: e.target.value })}
+                value={form.categoryId}
+                onChange={e => setForm({ ...form, categoryId: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+                required
               >
-                {INCOME_CATEGORIES.map(cat => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.emoji} {cat.label}
+                <option value="">Select category</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
                   </option>
                 ))}
               </select>
@@ -371,10 +376,11 @@ const IncomePage = () => {
               <label style={{ fontWeight: 700, fontSize: 13 }}>Account</label>
               <select
                 value={form.accountId}
-                onChange={e => setForm({ ...form, accountId: Number(e.target.value) })}
+                onChange={e => setForm({ ...form, accountId: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+                required
               >
-                <option value={0}>Select</option>
+                <option value="">Select</option>
                 {accounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
                     {acc.name}
@@ -383,8 +389,33 @@ const IncomePage = () => {
               </select>
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Currency</label>
+              <select
+                value={form.currency}
+                onChange={e => setForm({ ...form, currency: e.target.value })}
+                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              >
+                {CURRENCIES.map(cur => (
+                  <option key={cur} value={cur}>
+                    {cur}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
+              <input
+                value={form.description}
+                onChange={e => setForm({ ...form, description: e.target.value })}
+                placeholder="e.g. Salary"
+                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              />
+            </div>
+          </div>
           <button
-            onClick={() => handleAdd(form)}
+            onClick={handleSave}
             type="button"
             style={{
               marginTop: 4,

@@ -2,23 +2,23 @@ import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { ArrowLeftRight, Plus } from 'lucide-react'
+import { ArrowLeftRight, Plus, Trash2 } from 'lucide-react'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
-import { Transfer } from '../services/transfers.service'
+import { Transfer, transfersService } from '../services/transfers.service'
 import { TransferSchema } from '../lib/security'
 import { useFinanceStore } from '../store/finance.store'
 import { formatCurrency, useExchangeRates } from '../lib/currency'
-import { smartDate, toArray, safeArray } from '../lib/helpers'
-import api from '../lib/api'
+import { smartDate, safeArray } from '../lib/helpers'
 
 interface TransferForm {
-  fromAccountId: number
-  toAccountId: number
+  fromAccountId: string
+  toAccountId: string
   amount: string
-  date: string
-  note?: string
+  transferDate: string
+  description: string
+  exchangeRate: string
 }
 
 const Transfers = () => {
@@ -27,10 +27,11 @@ const Transfers = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState<TransferForm>({
     amount: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    note: '',
-    fromAccountId: 0,
-    toAccountId: 0,
+    transferDate: format(new Date(), 'yyyy-MM-dd'),
+    description: '',
+    exchangeRate: '1',
+    fromAccountId: '',
+    toAccountId: '',
   })
   const { accounts, refreshAccounts } = useFinanceStore()
   const { convert } = useExchangeRates()
@@ -38,20 +39,13 @@ const Transfers = () => {
   const load = async () => {
     setLoading(true)
     try {
-      const [transRes, accRes] = await Promise.allSettled([
-        api.get('/api/transfers'),
-        api.get('/api/accounts'),
-      ])
-      setItems(
-        safeArray(transRes.status === 'fulfilled' ? transRes.value.data : [])
-      )
-      if (accRes.status === 'fulfilled') {
-        // Store accounts locally or update via callback
-      }
+      const res = await transfersService.getAll()
+      setItems(safeArray<Transfer>(res.data))
+      await refreshAccounts()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load transfers'
-      console.error('❌ transfers load failed:', msg)
       toast.error(msg)
+      setItems([])
     } finally {
       setLoading(false)
     }
@@ -59,23 +53,49 @@ const Transfers = () => {
 
   useEffect(() => {
     load()
-    refreshAccounts()
   }, [])
 
   const handleSubmit = async () => {
-    const parsed = TransferSchema.safeParse({ ...form, amount: Number(form.amount) })
+    const parsed = TransferSchema.safeParse({
+      fromAccountId: form.fromAccountId,
+      toAccountId: form.toAccountId,
+      amount: Number(form.amount),
+      transferDate: form.transferDate,
+      description: form.description || undefined,
+      exchangeRate: Number(form.exchangeRate) || 1,
+    })
+
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
       return
     }
+
     try {
-      await api.post('/api/transfers', parsed.data)
+      await transfersService.create({
+        fromAccountId: form.fromAccountId,
+        toAccountId: form.toAccountId,
+        amount: Number(form.amount),
+        description: form.description || '',
+        transferDate: form.transferDate,
+        exchangeRate: Number(form.exchangeRate) || 1.0,
+      })
       toast.success('Transfer added')
       setModalOpen(false)
-      load()
-      refreshAccounts()
+      await load()
+      await refreshAccounts()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save transfer'
+      toast.error(msg)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await transfersService.delete(id)
+      toast.success('Transfer deleted')
+      setItems(prev => prev.filter(i => i.id !== id))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete transfer'
       toast.error(msg)
     }
   }
@@ -171,12 +191,12 @@ const Transfers = () => {
                     </span>
                     <div>
                       <div style={{ fontWeight: 800 }}>
-                        {from?.name ?? 'Unknown'} → {to?.name ?? 'Unknown'}
+                        {from?.name ?? 'Unknown'} {'->'} {to?.name ?? 'Unknown'}
                       </div>
-                      <div style={{ color: '#94a3b8', fontSize: 12 }}>{smartDate(item.date)}</div>
+                      <div style={{ color: '#94a3b8', fontSize: 12 }}>{smartDate(item.transferDate)}</div>
                     </div>
                   </div>
-                  {item.note && <div style={{ marginTop: 6, color: '#475569' }}>{item.note}</div>}
+                  {item.description && <div style={{ marginTop: 6, color: '#475569' }}>{item.description}</div>}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 800, color: '#0f172a' }}>
@@ -184,9 +204,28 @@ const Transfers = () => {
                   </div>
                   {preview != null && to && (
                     <div style={{ color: '#94a3b8', fontSize: 12 }}>
-                      ≈ {formatCurrency(preview, to.currency)}
+                      ~= {formatCurrency(preview, to.currency)}
                     </div>
                   )}
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    type="button"
+                    style={{
+                      marginTop: 6,
+                      border: '1px solid #ffe4e6',
+                      background: '#fff1f2',
+                      color: '#ef4444',
+                      borderRadius: 10,
+                      padding: '6px 10px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
                 </div>
               </motion.div>
             ))}
@@ -201,10 +240,10 @@ const Transfers = () => {
               <label style={{ fontWeight: 700, fontSize: 13 }}>From account</label>
               <select
                 value={form.fromAccountId}
-                onChange={e => setForm({ ...form, fromAccountId: Number(e.target.value) })}
+                onChange={e => setForm({ ...form, fromAccountId: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               >
-                <option value={0}>Select</option>
+                <option value="">Select</option>
                 {accounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
                     {acc.name}
@@ -216,10 +255,10 @@ const Transfers = () => {
               <label style={{ fontWeight: 700, fontSize: 13 }}>To account</label>
               <select
                 value={form.toAccountId}
-                onChange={e => setForm({ ...form, toAccountId: Number(e.target.value) })}
+                onChange={e => setForm({ ...form, toAccountId: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               >
-                <option value={0}>Select</option>
+                <option value="">Select</option>
                 {accounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
                     {acc.name}
@@ -245,20 +284,34 @@ const Transfers = () => {
               <label style={{ fontWeight: 700, fontSize: 13 }}>Date</label>
               <input
                 type="date"
-                value={form.date}
-                onChange={e => setForm({ ...form, date: e.target.value })}
+                value={form.transferDate}
+                onChange={e => setForm({ ...form, transferDate: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
           </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Note</label>
-            <input
-              value={form.note ?? ''}
-              onChange={e => setForm({ ...form, note: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Exchange rate</label>
+              <input
+                type="number"
+                value={form.exchangeRate}
+                min="0"
+                step="any"
+                onChange={e => setForm({ ...form, exchangeRate: e.target.value })}
+                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              />
+            </div>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
+              <input
+                value={form.description}
+                onChange={e => setForm({ ...form, description: e.target.value })}
+                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              />
+            </div>
           </div>
+
           {Number(form.amount) > 0 && form.fromAccountId && form.toAccountId && (() => {
             const from = accounts.find(a => a.id === form.fromAccountId)
             const to = accounts.find(a => a.id === form.toAccountId)
@@ -266,10 +319,11 @@ const Transfers = () => {
             const preview = convert(Number(form.amount) || 0, from.currency, to.currency)
             return (
               <div style={{ background: '#f8fafc', borderRadius: 10, padding: 10, color: '#0f172a' }}>
-                {formatCurrency(Number(form.amount) || 0, from.currency)} ≈ {formatCurrency(preview, to.currency)}
+                {formatCurrency(Number(form.amount) || 0, from.currency)} ~= {formatCurrency(preview, to.currency)}
               </div>
             )
           })()}
+
           <button
             onClick={handleSubmit}
             type="button"

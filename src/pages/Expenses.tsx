@@ -2,38 +2,27 @@ import { useEffect, useMemo, useState } from 'react'
 import { format, subMonths } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import TransactionItem from '../components/ui/TransactionItem'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { CATEGORY_META, smartDate, toArray, safeArray } from '../lib/helpers'
-import { Expense } from '../services/expenses.service'
+import { smartDate, safeArray } from '../lib/helpers'
+import { Expense, expensesService } from '../services/expenses.service'
 import { ExpenseSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
 import { useFinanceStore } from '../store/finance.store'
-import api from '../lib/api'
-import { ACCOUNT_TYPES, CURRENCIES, EXPENSE_CATEGORIES } from '../lib/constants'
-
-const keywordMap: Record<string, string> = {
-  coffee: 'FOOD',
-  lunch: 'FOOD',
-  dinner: 'FOOD',
-  taxi: 'TRANSPORT',
-  fuel: 'TRANSPORT',
-  gas: 'UTILITIES',
-  doctor: 'HEALTH',
-  clinic: 'HEALTH',
-  movie: 'ENTERTAINMENT',
-}
+import { CURRENCIES } from '../lib/constants'
+import { useCategories } from '../hooks/useCategories'
 
 type ExpenseFormState = {
   amount: string
-  date: string
+  expenseDate: string
   description: string
-  category: Expense['category']
-  accountId: number
+  categoryId: string
+  accountId: string
+  currency: string
 }
 
 const monthOptions = Array.from({ length: 6 }).map((_, idx) => {
@@ -46,36 +35,33 @@ const Expenses = () => {
   const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [month, setMonth] = useState(
-    new Date().toISOString().slice(0, 7)
-  )
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
-  const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const [editing, setEditing] = useState<Expense | null>(null)
   const [form, setForm] = useState<ExpenseFormState>({
     amount: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
+    expenseDate: format(new Date(), 'yyyy-MM-dd'),
     description: '',
-    category: 'FOOD',
-    accountId: 0,
+    categoryId: '',
+    accountId: '',
+    currency: 'UZS',
   })
+  const { categories } = useCategories('EXPENSE')
+  const { accounts: storeAccounts, refreshAccounts } = useFinanceStore()
 
   const loadData = async () => {
     setLoading(true)
     setError(null)
     try {
-      const [expRes, accRes] = await Promise.allSettled([
-        api.get('/api/expenses'),
-        api.get('/api/accounts'),
-      ])
-      const allExpenses = safeArray<Expense>(expRes.status === 'fulfilled' ? expRes.value.data : [])
-      setExpenses(
-        allExpenses.filter(e => e.date && e.date.startsWith(month))
-      )
-      setAccounts(
-        safeArray(accRes.status === 'fulfilled' ? accRes.value.data : [])
-      )
+      const [expRes] = await Promise.allSettled([expensesService.getAll()])
+      await refreshAccounts()
+      if (expRes.status === 'fulfilled') {
+        const allExpenses = safeArray<Expense>(expRes.value.data)
+        setExpenses(allExpenses.filter(e => e.expenseDate && e.expenseDate.startsWith(month)))
+      }
+      setAccounts(storeAccounts)
       if (expRes.status === 'rejected') {
         setError((expRes.reason as Error).message)
       }
@@ -86,14 +72,14 @@ const Expenses = () => {
     }
   }
 
-  useEffect(() => { loadData() }, [month])
+  useEffect(() => {
+    loadData()
+  }, [month, storeAccounts])
 
   const filtered = useMemo(() => {
     return expenses.filter(item => {
-      const matchesCategory = selectedCategory ? item.category === selectedCategory : true
-      const matchesMonth = month
-        ? item.date.startsWith(month)
-        : true
+      const matchesCategory = selectedCategory ? item.categoryId === selectedCategory : true
+      const matchesMonth = month ? item.expenseDate.startsWith(month) : true
       return matchesCategory && matchesMonth
     })
   }, [expenses, selectedCategory, month])
@@ -106,28 +92,47 @@ const Expenses = () => {
 
   const openNew = () => {
     setEditing(null)
-    setForm({ amount: '', date: format(new Date(), 'yyyy-MM-dd'), description: '', category: 'FOOD', accountId: 0 })
+    setForm({
+      amount: '',
+      expenseDate: format(new Date(), 'yyyy-MM-dd'),
+      description: '',
+      categoryId: '',
+      accountId: '',
+      currency: 'UZS',
+    })
     setShowModal(true)
   }
 
   const openEdit = (item: Expense) => {
     setEditing(item)
     setForm({
-      ...item,
       amount: String(item.amount),
+      expenseDate: item.expenseDate,
       description: item.description || '',
+      categoryId: item.categoryId,
+      accountId: item.accountId,
+      currency: item.currency || 'UZS',
     })
     setShowModal(true)
   }
 
-  const handleAdd = async (formData: any) => {
+  const handleAdd = async (formData: ExpenseFormState) => {
+    const parsed = ExpenseSchema.safeParse({
+      ...formData,
+      amount: Number(formData.amount),
+    })
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message)
+      return
+    }
     try {
-      await api.post('/api/expenses', {
-        amount:      Number(formData.amount) || 0,
-        date:        formData.date,
+      await expensesService.create({
+        amount: Number(formData.amount),
+        currency: formData.currency || 'UZS',
         description: formData.description || '',
-        category:    formData.category,
-        accountId:   Number(formData.accountId),
+        expenseDate: formData.expenseDate,
+        categoryId: formData.categoryId,
+        accountId: formData.accountId,
       })
       toast.success('Expense added!')
       setShowModal(false)
@@ -137,9 +142,9 @@ const Expenses = () => {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
-      await api.delete(`/api/expenses/${id}`)
+      await expensesService.delete(id)
       toast.success('Expense deleted')
       setExpenses(prev => prev.filter(i => i.id !== id))
     } catch (err: any) {
@@ -210,25 +215,22 @@ const Expenses = () => {
         >
           All
         </button>
-        {Object.entries(CATEGORY_META)
-          .filter(([key]) => ['FOOD', 'TRANSPORT', 'HEALTH', 'ENTERTAINMENT', 'UTILITIES', 'OTHER'].includes(key))
-          .map(([key, meta]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedCategory(key)}
-              type="button"
-              style={{
-                padding: '8px 10px',
-                borderRadius: 10,
-                border: selectedCategory === key ? `1px solid ${meta.color}` : '1px solid #e2e8f0',
-                background: selectedCategory === key ? meta.bg : '#fff',
-                color: meta.color,
-                fontWeight: 700,
-              }}
-            >
-              {meta.emoji} {meta.label}
-            </button>
-          ))}
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id)}
+            type="button"
+            style={{
+              padding: '8px 10px',
+              borderRadius: 10,
+              border: selectedCategory === cat.id ? '1px solid #2563eb' : '1px solid #e2e8f0',
+              background: selectedCategory === cat.id ? '#eff6ff' : '#fff',
+              fontWeight: 700,
+            }}
+          >
+            {cat.name}
+          </button>
+        ))}
       </div>
 
       <div
@@ -262,31 +264,33 @@ const Expenses = () => {
           borderRadius: 16,
           padding: 16,
           boxShadow: 'var(--sh-sm)',
+          minHeight: 240,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Transactions</h3>
-        </div>
         {loading ? (
-          <Skeleton height={52} count={5} />
+          <Skeleton height={64} count={4} />
         ) : filtered.length === 0 ? (
-          <EmptyState title="No expenses" description="Try another month or add one." actionLabel="Add expense" onAction={openNew} />
+          <EmptyState title="No expenses" description="Add your first expense." actionLabel="Add" onAction={openNew} />
         ) : (
           <AnimatePresence>
             {filtered.map(item => (
-              <motion.div key={item.id} layout style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <TransactionItem
-                    type="expense"
-                    amount={item.amount}
-                    category={item.category}
-                    date={item.date}
-                    description={item.description}
-                    currency={accounts.find(a => a.id === item.accountId)?.currency}
-                    accountLabel={accounts.find(a => a.id === item.accountId)?.name}
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
+              <motion.div
+                key={item.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+              >
+                <TransactionItem
+                  type="expense"
+                  amount={item.amount}
+                  category={item.categoryId}
+                  date={item.expenseDate}
+                  description={item.description}
+                  currency={accounts.find(a => a.id === item.accountId)?.currency ?? 'UZS'}
+                  accountLabel={accounts.find(a => a.id === item.accountId)?.name}
+                />
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 8 }}>
                   <button
                     onClick={() => openEdit(item)}
                     type="button"
@@ -295,11 +299,15 @@ const Expenses = () => {
                       background: '#f8fafc',
                       color: '#0f172a',
                       borderRadius: 10,
-                      padding: 8,
+                      padding: '6px 10px',
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 700,
                     }}
                   >
-                    <Pencil size={16} />
+                    Edit
                   </button>
                   <button
                     onClick={() => setConfirmId(item.id)}
@@ -309,11 +317,15 @@ const Expenses = () => {
                       background: '#fff1f2',
                       color: '#ef4444',
                       borderRadius: 10,
-                      padding: 8,
+                      padding: '6px 10px',
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 700,
                     }}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={16} /> Delete
                   </button>
                 </div>
               </motion.div>
@@ -323,7 +335,7 @@ const Expenses = () => {
       </div>
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? 'Edit expense' : 'Add expense'}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Amount</label>
@@ -341,65 +353,68 @@ const Expenses = () => {
               <label style={{ fontWeight: 700, fontSize: 13 }}>Date</label>
               <input
                 type="date"
-                value={form.date}
-                onChange={e => setForm({ ...form, date: e.target.value })}
+                value={form.expenseDate}
+                onChange={e => setForm({ ...form, expenseDate: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
           </div>
           <div>
+            <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
+            <select
+              value={form.categoryId}
+              onChange={e => setForm({ ...form, categoryId: e.target.value })}
+              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              required
+            >
+              <option value="">Select category</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13 }}>Account</label>
+            <select
+              value={form.accountId}
+              onChange={e => setForm({ ...form, accountId: e.target.value })}
+              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              required
+            >
+              <option value="">Select account</option>
+              {accounts.map((acc: any) => (
+                <option key={acc.id} value={acc.id}>{acc.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
             <input
-              value={form.description ?? ''}
+              value={form.description}
               onChange={e => setForm({ ...form, description: e.target.value })}
-              placeholder="e.g. Coffee"
               style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              placeholder="Optional"
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
-              <select
-                value={form.category}
-                onChange={e => setForm({ ...form, category: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                {EXPENSE_CATEGORIES.map(cat => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.emoji} {cat.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontWeight: 700, fontSize: 13 }}>Account</label>
-              <select
-                value={form.accountId}
-                onChange={e => setForm({ ...form, accountId: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                <option value={0}>Select</option>
-                {accounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13 }}>Currency</label>
+            <select
+              value={form.currency}
+              onChange={e => setForm({ ...form, currency: e.target.value })}
+              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+            >
+              {CURRENCIES.map(cur => (
+                <option key={cur} value={cur}>
+                  {cur}
+                </option>
+              ))}
+            </select>
           </div>
           <button
             onClick={() => handleAdd(form)}
             type="button"
-            style={{
-              marginTop: 4,
-              padding: '12px',
-              borderRadius: 12,
-              background: '#ef4444',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
+            className="btn-primary"
+            style={{ width: '100%', height: 48, fontSize: 15 }}
           >
             {editing ? 'Update expense' : 'Save expense'}
           </button>

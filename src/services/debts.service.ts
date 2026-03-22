@@ -1,20 +1,33 @@
 import api from '../lib/api'
 
 export interface Debt {
-  id: number
+  id: string
   personName: string
-  amount: number
+  type: 'DEBT' | 'RECEIVABLE'
   currency: string
-  dueDate: string
-  type: 'LENT' | 'BORROWED'
-  status: 'OPEN' | 'CLOSED'
+  accountId?: string
+  amount: number
   description?: string
+  dueDate: string
+  status?: 'OPEN' | 'CLOSED'
 }
 
 export const debtsService = {
-  getAll:  () => api.get<Debt[]>('/api/debts'),
-  create:  (data: unknown) => api.post<Debt>('/api/debts', data),
-  update:  (id: number, d: unknown) => api.put<Debt>(`/api/debts/${id}`, d),
-  delete:  (id: number)    => api.delete(`/api/debts/${id}`),
-  close:   (id: number)    => api.put(`/api/debts/${id}`, { status: 'CLOSED' }),
+  getAll: (params?: { type?: 'DEBT' | 'RECEIVABLE'; status?: 'OPEN' | 'CLOSED' }) =>
+    api.get('/api/debts', { params }),
+
+  create: (d: {
+    personName: string
+    type: 'DEBT' | 'RECEIVABLE'
+    currency: string
+    accountId?: string
+    amount: number
+    description: string
+    dueDate: string
+  }) => api.post('/api/debts', d),
+
+  repay: (id: string, d: { paymentAmount: number; accountId?: string }) =>
+    api.post(`/api/debts/${id}/repay`, d),
+
+  delete: (id: string) => api.delete(`/api/debts/${id}`),
 }

@@ -1,235 +1,235 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { format, subDays } from 'date-fns'
-import {
-  ArrowRight,
-  AlertTriangle,
-  Flame,
-  Plus,
-  TrendingDown,
-  TrendingUp,
-  ArrowLeftRight,
-} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { format } from 'date-fns'
+import { Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { AnimatePresence, motion } from 'framer-motion'
 import StatCard from '../components/ui/StatCard'
 import Skeleton from '../components/ui/Skeleton'
 import BankCard from '../components/ui/BankCard'
 import TransactionItem from '../components/ui/TransactionItem'
-import ProgressBar from '../components/ui/ProgressBar'
-import ProgressRing from '../components/ui/ProgressRing'
-import CurrencyWidget from '../components/widgets/CurrencyWidget'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
-import { CATEGORY_META, getTimeOfDay, isThisMonth, toArray, safeArray, mapAccountType } from '../lib/helpers'
-import { formatCurrency, useExchangeRates } from '../lib/currency'
-import api from '../lib/api'
-import { Expense } from '../services/expenses.service'
-import { Income } from '../services/income.service'
-import { Debt } from '../services/debts.service'
-import { Account } from '../services/accounts.service'
-import { generateNotifications, dismissNotification, BudgetCategory } from '../lib/notifications'
-import { ExpenseSchema, IncomeSchema, TransferSchema } from '../lib/security'
+import { formatCurrency } from '../lib/currency'
+import { mapAccountType, safeArray, safeObject } from '../lib/helpers'
 import { useFinanceStore } from '../store/finance.store'
 import { useAuthStore } from '../store/auth.store'
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { accountsService, Account } from '../services/accounts.service'
+import { expensesService, Expense } from '../services/expenses.service'
+import { incomesService, Income } from '../services/income.service'
+import { transfersService } from '../services/transfers.service'
+import { debtsService, Debt } from '../services/debts.service'
+import { analyticsService } from '../services/analytics.service'
+import { notificationsService } from '../services/notifications.service'
+import { useCategories } from '../hooks/useCategories'
+import { CURRENCIES } from '../lib/constants'
 
-interface BudgetOverview {
-  goal?: number
-  spent?: number
-  categories?: BudgetCategory[]
+interface Summary {
+  totalBalance: number
+  totalIncome: number
+  totalExpense: number
+  savings: number
 }
 
-type ExpenseForm = Omit<Expense, 'id'>
-type IncomeForm = Omit<Income, 'id'>
-interface TransferForm {
-  fromAccountId: number
-  toAccountId: number
+interface ExpenseCategoryPoint {
+  category: string
   amount: number
-  date: string
-  note?: string
 }
 
-const defaultExpense: ExpenseForm = {
-  amount: 0,
-  date: format(new Date(), 'yyyy-MM-dd'),
-  description: '',
-  category: 'FOOD',
-  accountId: 0,
+interface IncVsExpPoint {
+  period: string
+  income: number
+  expense: number
 }
 
-const defaultIncome: IncomeForm = {
-  amount: 0,
-  date: format(new Date(), 'yyyy-MM-dd'),
-  description: '',
-  category: 'SALARY',
-  accountId: 0,
+type ExpenseForm = {
+  amount: string
+  expenseDate: string
+  description: string
+  categoryId: string
+  accountId: string
+  currency: string
 }
 
-const defaultTransfer: TransferForm = {
-  amount: 0,
-  date: format(new Date(), 'yyyy-MM-dd'),
-  note: '',
-  fromAccountId: 0,
-  toAccountId: 0,
+type IncomeForm = {
+  amount: string
+  incomeDate: string
+  description: string
+  categoryId: string
+  accountId: string
+  currency: string
 }
 
-const ChartSkeleton = () => (
-  <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-      <Skeleton width={160} height={16} />
-      <Skeleton width={80} height={16} />
-    </div>
-    <Skeleton height={160} />
-  </div>
-)
+type TransferForm = {
+  fromAccountId: string
+  toAccountId: string
+  amount: string
+  transferDate: string
+  description: string
+  exchangeRate: string
+}
 
 const Dashboard = () => {
+  const [summary, setSummary] = useState<Summary>({
+    totalBalance: 0,
+    totalIncome: 0,
+    totalExpense: 0,
+    savings: 0,
+  })
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [income, setIncome] = useState<Income[]>([])
-  const [debts, setDebts] = useState<Debt[]>([])
-  const [budget, setBudget] = useState<BudgetOverview>({})
-  const [warnings, setWarnings] = useState<string[]>([])
+  const [openDebts, setOpenDebts] = useState<Debt[]>([])
+  const [expByCategory, setExpByCategory] = useState<ExpenseCategoryPoint[]>([])
+  const [incVsExp, setIncVsExp] = useState<IncVsExpPoint[]>([])
+  const [recentExpenses, setRecentExpenses] = useState<Expense[]>([])
+  const [recentIncomes, setRecentIncomes] = useState<Income[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [chartReady, setChartReady] = useState(false)
+
   const [expenseModal, setExpenseModal] = useState(false)
   const [incomeModal, setIncomeModal] = useState(false)
   const [transferModal, setTransferModal] = useState(false)
-  const [expenseForm, setExpenseForm] = useState<ExpenseForm>(defaultExpense)
-  const [incomeForm, setIncomeForm] = useState<IncomeForm>(defaultIncome)
-  const [transferForm, setTransferForm] = useState<TransferForm>(defaultTransfer)
-  const [noteTick, setNoteTick] = useState(0)
+
+  const [expenseForm, setExpenseForm] = useState<ExpenseForm>({
+    amount: '',
+    expenseDate: format(new Date(), 'yyyy-MM-dd'),
+    description: '',
+    categoryId: '',
+    accountId: '',
+    currency: 'UZS',
+  })
+
+  const [incomeForm, setIncomeForm] = useState<IncomeForm>({
+    amount: '',
+    incomeDate: format(new Date(), 'yyyy-MM-dd'),
+    description: '',
+    categoryId: '',
+    accountId: '',
+    currency: 'UZS',
+  })
+
+  const [transferForm, setTransferForm] = useState<TransferForm>({
+    fromAccountId: '',
+    toAccountId: '',
+    amount: '',
+    transferDate: format(new Date(), 'yyyy-MM-dd'),
+    description: '',
+    exchangeRate: '1',
+  })
+
+  const { categories: expenseCategories } = useCategories('EXPENSE')
+  const { categories: incomeCategories } = useCategories('INCOME')
   const refreshAccounts = useFinanceStore(s => s.refreshAccounts)
-  const { accounts: storeAccounts } = useFinanceStore()
   const user = useAuthStore(s => s.user)
-  const { convert } = useExchangeRates()
 
-  useEffect(() => {
-    setChartReady(true)
-  }, [])
-
-  const loadData = useCallback(async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true)
     try {
-      const [accRes, expRes, incRes, debtRes] = await Promise.allSettled([
-        api.get('/api/accounts'),
-        api.get('/api/expenses'),
-        api.get('/api/income'),
-        api.get('/api/debts'),
+      const [summaryRes, accountsRes, debtsRes, expByCatRes, incVsExpRes, expRes, incRes] = await Promise.allSettled([
+        analyticsService.summary(),
+        accountsService.getAll(),
+        debtsService.getAll({ status: 'OPEN' }),
+        analyticsService.expensesByCategory(),
+        analyticsService.incomeVsExpense(),
+        expensesService.getAll(),
+        incomesService.getAll(),
       ])
 
-      const accounts = safeArray<Account>(
-        accRes.status === 'fulfilled' ? accRes.value.data : []
-      )
-      const expenses = safeArray<Expense>(
-        expRes.status === 'fulfilled' ? expRes.value.data : []
-      )
-      const incomes = safeArray<Income>(
-        incRes.status === 'fulfilled' ? incRes.value.data : []
-      )
-      const debts = safeArray<Debt>(
-        debtRes.status === 'fulfilled' ? debtRes.value.data : []
-      )
+      if (summaryRes.status === 'fulfilled') {
+        const s = safeObject<Summary>(summaryRes.value.data)
+        if (s) setSummary(s)
+      }
 
-      const totalBalance = accounts.reduce((s, a) => s + (a.balance ?? 0), 0)
-      const monthlyIncome = incomes
-        .filter(i => isThisMonth(i.date))
-        .reduce((s, i) => s + (i.amount ?? 0), 0)
-      const monthlyExpenses = expenses
-        .filter(e => isThisMonth(e.date))
-        .reduce((s, e) => s + (e.amount ?? 0), 0)
+      setAccounts(safeArray<Account>(accountsRes.status === 'fulfilled' ? accountsRes.value.data : []))
+      setOpenDebts(safeArray<Debt>(debtsRes.status === 'fulfilled' ? debtsRes.value.data : []))
+      setExpByCategory(safeArray<ExpenseCategoryPoint>(expByCatRes.status === 'fulfilled' ? expByCatRes.value.data : []))
+      setIncVsExp(safeArray<IncVsExpPoint>(incVsExpRes.status === 'fulfilled' ? incVsExpRes.value.data : []))
 
-      const recentTxns = [
-        ...expenses.map(e => ({ ...e, txnType: 'expense' as const })),
-        ...incomes.map(i => ({ ...i, txnType: 'income' as const })),
-      ]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 10)
-    } catch (err) {
-      console.error('Dashboard load error:', err)
+      const allExpenses = safeArray<Expense>(expRes.status === 'fulfilled' ? expRes.value.data : [])
+      const allIncomes = safeArray<Income>(incRes.status === 'fulfilled' ? incRes.value.data : [])
+
+      setRecentExpenses(
+        allExpenses
+          .slice()
+          .sort((a, b) => new Date(b.expenseDate).getTime() - new Date(a.expenseDate).getTime())
+          .slice(0, 5)
+      )
+      setRecentIncomes(
+        allIncomes
+          .slice()
+          .sort((a, b) => new Date(b.incomeDate).getTime() - new Date(a.incomeDate).getTime())
+          .slice(0, 5)
+      )
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadDashboard()
+  }, [loadDashboard])
+
+  useEffect(() => {
+    notificationsService.getAll()
+      .then(res => setNotifications(safeArray(res.data)))
+      .catch(() => setNotifications([]))
+  }, [])
+
+  const markRead = async (id: string) => {
+    try {
+      await notificationsService.markRead(id)
+      setNotifications(prev => prev.filter(n => n.id !== id))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to mark notification'
+      toast.error(msg)
+    }
+  }
+
+  const activities = useMemo(() => {
+    const merged = [
+      ...recentExpenses.map(e => ({
+        id: `exp_${e.id}`,
+        type: 'expense' as const,
+        amount: e.amount,
+        category: e.categoryName || e.categoryId,
+        date: e.expenseDate,
+        description: e.description,
+        accountId: e.accountId,
+      })),
+      ...recentIncomes.map(i => ({
+        id: `inc_${i.id}`,
+        type: 'income' as const,
+        amount: i.amount,
+        category: i.categoryName || i.categoryId,
+        date: i.incomeDate,
+        description: i.description,
+        accountId: i.accountId,
+      })),
+    ]
+
+    return merged
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 8)
+  }, [recentExpenses, recentIncomes])
 
   const greeting = useMemo(() => {
-    const tod = getTimeOfDay()
+    const h = new Date().getHours()
+    const tod = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
     const name = user?.name ? `, ${user.name.split(' ')[0]}` : ''
     return `Good ${tod}${name}`
   }, [user?.name])
 
-  const totalBalance = accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0)
-  const expensesThisMonth = expenses
-    .filter(e => isThisMonth(e.date))
-    .reduce((s, e) => s + (e.amount ?? 0), 0)
-  const incomeThisMonth = income
-    .filter(i => isThisMonth(i.date))
-    .reduce((s, i) => s + (i.amount ?? 0), 0)
-  const totalBalanceFormatted = formatCurrency(totalBalance)
-  const expensesThisMonthFormatted = formatCurrency(expensesThisMonth)
-  const incomeThisMonthFormatted = formatCurrency(incomeThisMonth)
-  const openDebts = debts.filter(d => d.status === 'OPEN').length
-
-  const activities = useMemo(
-    () =>
-      [...expenses.map(e => ({
-        id: `exp_${e.id}`,
-        type: 'expense' as const,
-        amount: e.amount,
-        category: e.category,
-        date: e.date,
-        description: e.description,
-        currency: accounts.find(a => a.id === e.accountId)?.currency,
-        accountLabel: accounts.find(a => a.id === e.accountId)?.name,
-      })),
-      ...income.map(i => ({
-        id: `inc_${i.id}`,
-        type: 'income' as const,
-        amount: i.amount,
-        category: i.category,
-        date: i.date,
-        description: i.description,
-        currency: accounts.find(a => a.id === i.accountId)?.currency,
-        accountLabel: accounts.find(a => a.id === i.accountId)?.name,
-      }))]
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 6),
-    [accounts, expenses, income]
-  )
-
-  const notificationList = useMemo(
-    () => generateNotifications(expenses, budget.categories ?? [], debts),
-    [expenses, budget.categories, debts, noteTick]
-  )
-
-  const recentSpendTrend = useMemo(() => {
-    const days = Array.from({ length: 7 }).map((_, idx) => {
-      const date = subDays(new Date(), 6 - idx)
-      const dayKey = format(date, 'yyyy-MM-dd')
-      const total = expenses
-        .filter(e => e.date === dayKey)
-        .reduce((s, e) => s + (e.amount ?? 0), 0)
-      return { date: format(date, 'MMM d'), total }
-    })
-    return days
-  }, [expenses])
-
   const handleExpenseSubmit = async () => {
-    const parsed = ExpenseSchema.safeParse({ ...expenseForm, amount: Number(expenseForm.amount) })
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message)
-      return
-    }
     try {
-      await api.post('/api/expenses', parsed.data)
+      await expensesService.create({
+        amount: Number(expenseForm.amount),
+        currency: expenseForm.currency || 'UZS',
+        description: expenseForm.description || '',
+        expenseDate: expenseForm.expenseDate,
+        categoryId: expenseForm.categoryId,
+        accountId: expenseForm.accountId,
+      })
       toast.success('Expense added')
       setExpenseModal(false)
-      loadData()
-      refreshAccounts()
+      await loadDashboard()
+      await refreshAccounts()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to add expense'
       toast.error(msg)
@@ -237,17 +237,19 @@ const Dashboard = () => {
   }
 
   const handleIncomeSubmit = async () => {
-    const parsed = IncomeSchema.safeParse({ ...incomeForm, amount: Number(incomeForm.amount) })
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message)
-      return
-    }
     try {
-      await api.post('/api/income', parsed.data)
+      await incomesService.create({
+        amount: Number(incomeForm.amount),
+        currency: incomeForm.currency || 'UZS',
+        description: incomeForm.description || '',
+        incomeDate: incomeForm.incomeDate,
+        categoryId: incomeForm.categoryId,
+        accountId: incomeForm.accountId,
+      })
       toast.success('Income added')
       setIncomeModal(false)
-      loadData()
-      refreshAccounts()
+      await loadDashboard()
+      await refreshAccounts()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to add income'
       toast.error(msg)
@@ -255,33 +257,24 @@ const Dashboard = () => {
   }
 
   const handleTransferSubmit = async () => {
-    const parsed = TransferSchema.safeParse({
-      ...transferForm,
-      amount: Number(transferForm.amount),
-    })
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message)
-      return
-    }
     try {
-      await api.post('/api/transfers', parsed.data)
+      await transfersService.create({
+        fromAccountId: transferForm.fromAccountId,
+        toAccountId: transferForm.toAccountId,
+        amount: Number(transferForm.amount),
+        description: transferForm.description || '',
+        transferDate: transferForm.transferDate,
+        exchangeRate: Number(transferForm.exchangeRate) || 1.0,
+      })
       toast.success('Transfer completed')
       setTransferModal(false)
-      loadData()
-      refreshAccounts()
+      await loadDashboard()
+      await refreshAccounts()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to transfer'
       toast.error(msg)
     }
   }
-
-  const expenseQuickActions = [
-    { label: 'Expense', icon: <TrendingDown size={16} />, onClick: () => setExpenseModal(true) },
-    { label: 'Income', icon: <TrendingUp size={16} />, onClick: () => setIncomeModal(true) },
-    { label: 'Transfer', icon: <ArrowLeftRight size={16} />, onClick: () => setTransferModal(true) },
-  ]
-
-  const budgetPct = budget.goal ? Math.min((budget.spent ?? 0) / budget.goal * 100, 150) : 0
 
   return (
     <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -293,50 +286,24 @@ const Dashboard = () => {
           <h1 style={{ margin: '6px 0 0', fontSize: 24, fontWeight: 800 }}>{greeting}</h1>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>Track your finances in real time.</p>
         </div>
-        <button
-          onClick={() => setExpenseModal(true)}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            background: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 12,
-            padding: '10px 14px',
-            boxShadow: '0 12px 30px rgba(37,99,235,0.2)',
-            cursor: 'pointer',
-            fontWeight: 700,
-          }}
-          type="button"
-        >
-          <Plus size={16} />
-          Quick add
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setExpenseModal(true)} type="button" className="btn-primary" style={{ height: 40 }}>
+            <Plus size={14} /> Expense
+          </button>
+          <button onClick={() => setIncomeModal(true)} type="button" className="btn-primary" style={{ height: 40 }}>
+            <Plus size={14} /> Income
+          </button>
+          <button onClick={() => setTransferModal(true)} type="button" className="btn-primary" style={{ height: 40 }}>
+            <Plus size={14} /> Transfer
+          </button>
+        </div>
       </div>
 
-      {!!warnings.length && (
-        <div
-          style={{
-            background: '#fff7ed',
-            border: '1px solid #fed7aa',
-            borderRadius: 12,
-            padding: '12px 14px',
-            display: 'flex',
-            gap: 10,
-            alignItems: 'center',
-          }}
-        >
-          <AlertTriangle color="#f59e0b" size={18} />
-          <span style={{ color: '#92400e', fontSize: 14 }}>{warnings.join(' • ')}</span>
-        </div>
-      )}
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
-        <StatCard label="Total balance" value={totalBalanceFormatted} color="#2563eb" isLoading={loading} />
-        <StatCard label="Expenses (mo)" value={expensesThisMonthFormatted} color="#ef4444" changeType="down" isLoading={loading} />
-        <StatCard label="Income (mo)" value={incomeThisMonthFormatted} color="#10b981" changeType="up" isLoading={loading} />
-        <StatCard label="Open debts" value={openDebts} suffix=" open" color="#f59e0b" isLoading={loading} />
+        <StatCard label="Total balance" value={formatCurrency(summary.totalBalance || 0)} color="#2563eb" isLoading={loading} />
+        <StatCard label="Income this month" value={formatCurrency(summary.totalIncome || 0)} color="#10b981" isLoading={loading} />
+        <StatCard label="Expenses this month" value={formatCurrency(summary.totalExpense || 0)} color="#ef4444" isLoading={loading} />
+        <StatCard label="Net savings" value={formatCurrency(summary.savings || 0)} color="#f59e0b" isLoading={loading} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: 16 }}>
@@ -362,316 +329,110 @@ const Dashboard = () => {
                 ))}
           </div>
         </div>
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: 16,
-            boxShadow: 'var(--sh-sm)',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))',
-            gap: 10,
-          }}
-        >
-          {expenseQuickActions.map(action => (
-            <button
-              key={action.label}
-              onClick={action.onClick}
-              type="button"
-              style={{
-                padding: '12px 10px',
-                borderRadius: 12,
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              {action.icon}
-              {action.label}
-              <ArrowRight size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />
-            </button>
-          ))}
+        <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Quick stats</h3>
+          <p style={{ color: '#64748b' }}>Open debts: {openDebts.length}</p>
+          <p style={{ color: '#64748b' }}>Expense categories: {expByCategory.length}</p>
+          <p style={{ color: '#64748b' }}>Income vs expense points: {incVsExp.length}</p>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1.2fr)', gap: 16 }}>
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: 16,
-            boxShadow: 'var(--sh-sm)',
-            minHeight: 260,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Recent activity</h3>
-            <span style={{ color: '#94a3b8', fontSize: 13 }}>Last updates</span>
-          </div>
+        <div style={{ background: '#ffffff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)', minHeight: 260 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 800 }}>Recent activity</h3>
           {loading ? (
             <Skeleton count={4} height={52} />
           ) : activities.length === 0 ? (
             <EmptyState title="No activity" description="Add an expense or income to get started." />
           ) : (
-            <AnimatePresence>
-              {activities.map(item => (
-                <TransactionItem key={item.id} {...item} />
-              ))}
-            </AnimatePresence>
+            activities.map(item => (
+              <TransactionItem
+                key={item.id}
+                type={item.type}
+                amount={item.amount}
+                category={item.category}
+                date={item.date}
+                description={item.description}
+                currency={accounts.find(a => a.id === item.accountId)?.currency}
+                accountLabel={accounts.find(a => a.id === item.accountId)?.name}
+              />
+            ))
           )}
         </div>
 
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: 16,
-            boxShadow: 'var(--sh-sm)',
-            minHeight: 260,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Budget health</h3>
-              <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>Overview of this month</p>
-            </div>
-            <span style={{ color: '#0f172a', fontWeight: 800 }}>{formatCurrency(budget.spent ?? 0)}</span>
-          </div>
-          {loading ? (
-            <Skeleton height={140} />
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 16, alignItems: 'center' }}>
-              <ProgressRing percent={budgetPct} label="Overall" />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(budget.categories ?? []).length === 0 ? (
-                  <EmptyState title="No budgets set" description="Set category limits to stay on track." />
-                ) : (
-                  (budget.categories ?? []).slice(0, 4).map(cat => (
-                    <div key={cat.category}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                        <span>{CATEGORY_META[cat.category]?.label ?? cat.category}</span>
-                        <span style={{ color: '#64748b' }}>
-                          {formatCurrency(cat.spent, 'UZS')} / {formatCurrency(cat.limit, 'UZS')}
-                        </span>
-                      </div>
-                      <ProgressBar percent={(cat.spent / (cat.limit || 1)) * 100} animate />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: 16 }}>
-        <div>
-          {loading || !chartReady ? (
-            <ChartSkeleton />
-          ) : (
-            <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)', minHeight: 240 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>7-day expense trend</h3>
-                  <p style={{ margin: 0, color: '#94a3b8', fontSize: 13 }}>Recent daily spending</p>
-                </div>
-              </div>
-              <div style={{ width: '100%', minHeight: 200 }}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={recentSpendTrend} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="expenseGradient" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="date" tickLine={false} axisLine={false} dy={6} />
-                    <YAxis tickLine={false} axisLine={false} tickFormatter={v => `${Math.round(v / 1000)}k`} width={50} />
-                    <Tooltip formatter={(value) => formatCurrency(Number(value ?? 0))} />
-                    <Area
-                      type="monotone"
-                      dataKey="total"
-                      stroke="#ef4444"
-                      strokeWidth={2}
-                      fill="url(#expenseGradient)"
-                      dot={{ r: 3 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: 16,
-            boxShadow: 'var(--sh-sm)',
-            minHeight: 240,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Notifications</h3>
-            <Flame size={18} color="#f97316" />
-          </div>
+        <div style={{ background: '#ffffff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)', minHeight: 260 }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 800 }}>Notifications</h3>
           {loading ? (
             <Skeleton count={3} height={56} />
-          ) : notificationList.length === 0 ? (
-            <EmptyState title="All clear" description="No urgent alerts right now." />
+          ) : notifications.length === 0 ? (
+            <EmptyState title="All clear" description="No unread notifications." />
           ) : (
-            <AnimatePresence>
-              {notificationList.map(note => (
-                <motion.div
-                  key={note.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  style={{
-                    display: 'flex',
-                    gap: 10,
-                    padding: '10px 12px',
-                    borderRadius: 12,
-                    background: note.type === 'danger' ? '#fff1f2' : '#f8fafc',
-                    color: '#0f172a',
-                    marginBottom: 8,
-                    alignItems: 'center',
-                  }}
+            notifications.map(note => (
+              <div key={note.id} style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 12, background: '#f8fafc', marginBottom: 8, alignItems: 'center' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{note.title || note.message || 'Notification'}</div>
+                  {note.message && <div style={{ color: '#64748b', fontSize: 13 }}>{note.message}</div>}
+                </div>
+                <button
+                  onClick={() => markRead(note.id)}
+                  type="button"
+                  style={{ border: '1px solid #dbeafe', background: '#eff6ff', color: '#2563eb', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontWeight: 700 }}
                 >
-                  <span style={{ fontSize: 18 }}>{note.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>{note.message}</div>
-                    {note.actionLabel && (
-                      <button
-                        onClick={() => {
-                          dismissNotification(note.id)
-                          setNoteTick(t => t + 1)
-                        }}
-                        type="button"
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#2563eb',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          padding: 0,
-                        }}
-                      >
-                        {note.actionLabel}
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      dismissNotification(note.id)
-                      setNoteTick(t => t + 1)
-                    }}
-                    type="button"
-                    style={{
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ×
-                  </button>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                  Mark read
+                </button>
+              </div>
+            ))
           )}
         </div>
       </div>
-
-      <CurrencyWidget />
 
       <Modal open={expenseModal} onClose={() => setExpenseModal(false)} title="Add expense">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Amount</label>
-              <input
-                type="number"
-                value={expenseForm.amount}
-                onChange={e => setExpenseForm({ ...expenseForm, amount: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              />
+              <input type="number" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
             </div>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Date</label>
-              <input
-                type="date"
-                value={expenseForm.date}
-                onChange={e => setExpenseForm({ ...expenseForm, date: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              />
+              <input type="date" value={expenseForm.expenseDate} onChange={e => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
             </div>
-          </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
-            <input
-              value={expenseForm.description ?? ''}
-              onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })}
-              placeholder="Lunch, ride, etc"
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
-              <select
-                value={expenseForm.category}
-                onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                {['FOOD', 'TRANSPORT', 'HEALTH', 'ENTERTAINMENT', 'UTILITIES', 'OTHER'].map(cat => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_META[cat]?.label ?? cat}
-                  </option>
+              <select value={expenseForm.categoryId} onChange={e => setExpenseForm({ ...expenseForm, categoryId: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                <option value="">Select category</option>
+                {expenseCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             </div>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Account</label>
-              <select
-                value={expenseForm.accountId}
-                onChange={e => setExpenseForm({ ...expenseForm, accountId: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                <option value={0}>Select account</option>
-                {storeAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
+              <select value={expenseForm.accountId} onChange={e => setExpenseForm({ ...expenseForm, accountId: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                <option value="">Select account</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
                 ))}
               </select>
             </div>
           </div>
-          <button
-            onClick={handleExpenseSubmit}
-            type="button"
-            style={{
-              marginTop: 4,
-              padding: '12px',
-              borderRadius: 12,
-              background: '#ef4444',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Save expense
-          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Currency</label>
+              <select value={expenseForm.currency} onChange={e => setExpenseForm({ ...expenseForm, currency: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                {CURRENCIES.map(cur => (
+                  <option key={cur} value={cur}>{cur}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
+              <input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
+            </div>
+          </div>
+          <button onClick={handleExpenseSubmit} type="button" className="btn-primary" style={{ width: '100%', height: 44 }}>Save expense</button>
         </div>
       </Modal>
 
@@ -680,112 +441,69 @@ const Dashboard = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Amount</label>
-              <input
-                type="number"
-                value={incomeForm.amount}
-                onChange={e => setIncomeForm({ ...incomeForm, amount: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              />
+              <input type="number" value={incomeForm.amount} onChange={e => setIncomeForm({ ...incomeForm, amount: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
             </div>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Date</label>
-              <input
-                type="date"
-                value={incomeForm.date}
-                onChange={e => setIncomeForm({ ...incomeForm, date: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              />
+              <input type="date" value={incomeForm.incomeDate} onChange={e => setIncomeForm({ ...incomeForm, incomeDate: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
             </div>
-          </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
-            <input
-              value={incomeForm.description ?? ''}
-              onChange={e => setIncomeForm({ ...incomeForm, description: e.target.value })}
-              placeholder="Salary, gift, etc"
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
-              <select
-                value={incomeForm.category}
-                onChange={e => setIncomeForm({ ...incomeForm, category: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                {['SALARY', 'FREELANCE', 'BUSINESS', 'INVESTMENT', 'GIFT', 'OTHER'].map(cat => (
-                  <option key={cat} value={cat}>
-                    {CATEGORY_META[cat]?.label ?? cat}
-                  </option>
+              <select value={incomeForm.categoryId} onChange={e => setIncomeForm({ ...incomeForm, categoryId: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                <option value="">Select category</option>
+                {incomeCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             </div>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Account</label>
-              <select
-                value={incomeForm.accountId}
-                onChange={e => setIncomeForm({ ...incomeForm, accountId: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                <option value={0}>Select account</option>
-                {storeAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
+              <select value={incomeForm.accountId} onChange={e => setIncomeForm({ ...incomeForm, accountId: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                <option value="">Select account</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
                 ))}
               </select>
             </div>
           </div>
-          <button
-            onClick={handleIncomeSubmit}
-            type="button"
-            style={{
-              marginTop: 4,
-              padding: '12px',
-              borderRadius: 12,
-              background: '#10b981',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Save income
-          </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Currency</label>
+              <select value={incomeForm.currency} onChange={e => setIncomeForm({ ...incomeForm, currency: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                {CURRENCIES.map(cur => (
+                  <option key={cur} value={cur}>{cur}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
+              <input value={incomeForm.description} onChange={e => setIncomeForm({ ...incomeForm, description: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
+            </div>
+          </div>
+          <button onClick={handleIncomeSubmit} type="button" className="btn-primary" style={{ width: '100%', height: 44 }}>Save income</button>
         </div>
       </Modal>
 
-      <Modal open={transferModal} onClose={() => setTransferModal(false)} title="New transfer">
+      <Modal open={transferModal} onClose={() => setTransferModal(false)} title="Add transfer">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>From account</label>
-              <select
-                value={transferForm.fromAccountId}
-                onChange={e => setTransferForm({ ...transferForm, fromAccountId: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                <option value={0}>Select</option>
-                {storeAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
+              <select value={transferForm.fromAccountId} onChange={e => setTransferForm({ ...transferForm, fromAccountId: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                <option value="">Select</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
                 ))}
               </select>
             </div>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>To account</label>
-              <select
-                value={transferForm.toAccountId}
-                onChange={e => setTransferForm({ ...transferForm, toAccountId: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                <option value={0}>Select</option>
-                {storeAccounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
+              <select value={transferForm.toAccountId} onChange={e => setTransferForm({ ...transferForm, toAccountId: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}>
+                <option value="">Select</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
                 ))}
               </select>
             </div>
@@ -793,62 +511,24 @@ const Dashboard = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Amount</label>
-              <input
-                type="number"
-                value={transferForm.amount}
-                onChange={e => setTransferForm({ ...transferForm, amount: Number(e.target.value) })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              />
+              <input type="number" value={transferForm.amount} onChange={e => setTransferForm({ ...transferForm, amount: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
             </div>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Date</label>
-              <input
-                type="date"
-                value={transferForm.date}
-                onChange={e => setTransferForm({ ...transferForm, date: e.target.value })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              />
+              <input type="date" value={transferForm.transferDate} onChange={e => setTransferForm({ ...transferForm, transferDate: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
             </div>
           </div>
-          <div>
-            <label style={{ fontWeight: 700, fontSize: 13 }}>Note</label>
-            <input
-              value={transferForm.note ?? ''}
-              onChange={e => setTransferForm({ ...transferForm, note: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-            />
-          </div>
-          {transferForm.amount > 0 && transferForm.fromAccountId && transferForm.toAccountId && (
-            <div style={{ background: '#f8fafc', borderRadius: 10, padding: 10, color: '#0f172a' }}>
-              {(() => {
-                const from = storeAccounts.find(a => a.id === transferForm.fromAccountId)
-                const to = storeAccounts.find(a => a.id === transferForm.toAccountId)
-                if (!from || !to) return null
-                const converted = convert(transferForm.amount, from.currency, to.currency)
-                return (
-                  <span>
-                    {formatCurrency(transferForm.amount, from.currency)} ≈ {formatCurrency(converted, to.currency)}
-                  </span>
-                )
-              })()}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Exchange rate</label>
+              <input type="number" value={transferForm.exchangeRate} onChange={e => setTransferForm({ ...transferForm, exchangeRate: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
             </div>
-          )}
-          <button
-            onClick={handleTransferSubmit}
-            type="button"
-            style={{
-              marginTop: 4,
-              padding: '12px',
-              borderRadius: 12,
-              background: '#2563eb',
-              color: '#fff',
-              border: 'none',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Confirm transfer
-          </button>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
+              <input value={transferForm.description} onChange={e => setTransferForm({ ...transferForm, description: e.target.value })} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }} />
+            </div>
+          </div>
+          <button onClick={handleTransferSubmit} type="button" className="btn-primary" style={{ width: '100%', height: 44 }}>Save transfer</button>
         </div>
       </Modal>
     </div>

@@ -2,55 +2,67 @@ import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { CheckCircle2, HandCoins, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import Modal from '../components/ui/Modal'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
-import { Debt } from '../services/debts.service'
+import { Debt, debtsService } from '../services/debts.service'
 import { DebtSchema } from '../lib/security'
 import { formatCurrency } from '../lib/currency'
-import { smartDate, toArray, safeArray } from '../lib/helpers'
-import api from '../lib/api'
-import { CURRENCIES, DEBT_TYPES } from '../lib/constants'
+import { smartDate } from '../lib/helpers'
+import { CURRENCIES } from '../lib/constants'
+import { useFinanceStore } from '../store/finance.store'
 
 interface DebtForm {
   personName: string
   amount: string
   currency: string
   dueDate: string
-  type: 'LENT' | 'BORROWED'
-  description?: string
+  type: 'DEBT' | 'RECEIVABLE'
+  description: string
+  accountId: string
 }
+
+interface RepayForm {
+  paymentAmount: string
+  accountId: string
+}
+
+const TABS: Array<{ value: 'DEBT' | 'RECEIVABLE'; label: string; color: string }> = [
+  { value: 'DEBT', label: 'I Owe', color: '#ef4444' },
+  { value: 'RECEIVABLE', label: 'Owed to Me', color: '#10b981' },
+]
 
 const Debts = () => {
   const [items, setItems] = useState<Debt[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'LENT' | 'BORROWED'>('LENT')
+  const [tab, setTab] = useState<'DEBT' | 'RECEIVABLE'>('DEBT')
   const [modalOpen, setModalOpen] = useState(false)
-  const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [showRepayModal, setShowRepayModal] = useState<string | null>(null)
   const [form, setForm] = useState<DebtForm>({
     personName: '',
     amount: '',
     currency: 'UZS',
     dueDate: format(new Date(), 'yyyy-MM-dd'),
-    type: 'LENT',
+    type: 'DEBT',
     description: '',
+    accountId: '',
   })
+  const [repayForm, setRepayForm] = useState<RepayForm>({ paymentAmount: '', accountId: '' })
+  const { accounts, refreshAccounts } = useFinanceStore()
 
   const load = async () => {
     setLoading(true)
     try {
-      const [debtsRes] = await Promise.allSettled([
-        api.get('/api/debts'),
-      ])
-      setItems(
-        safeArray(debtsRes.status === 'fulfilled' ? debtsRes.value.data : [])
-      )
+      const res = await debtsService.getAll()
+      setItems(Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []))
+      await refreshAccounts()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load debts'
-      console.error('❌ debts load failed:', msg)
       toast.error(msg)
+      setItems([])
     } finally {
       setLoading(false)
     }
@@ -63,29 +75,52 @@ const Debts = () => {
   const filtered = useMemo(() => items.filter(i => i.type === tab), [items, tab])
 
   const handleSubmit = async () => {
-    const parsed = DebtSchema.safeParse({ ...form, amount: Number(form.amount) || 0 })
+    const parsed = DebtSchema.safeParse({
+      personName: form.personName,
+      amount: Number(form.amount) || 0,
+      currency: form.currency,
+      dueDate: form.dueDate,
+      type: form.type,
+      description: form.description || undefined,
+    })
+
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
       return
     }
+
     try {
-      await api.post('/api/debts', parsed.data)
+      await debtsService.create({
+        personName: form.personName.trim(),
+        type: form.type,
+        currency: form.currency || 'UZS',
+        accountId: form.accountId || undefined,
+        amount: Number(form.amount),
+        description: form.description || '',
+        dueDate: form.dueDate,
+      })
       toast.success('Debt added')
       setModalOpen(false)
-      load()
+      await load()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save debt'
       toast.error(msg)
     }
   }
 
-  const handleClose = async (id: number) => {
+  const handleRepay = async () => {
+    if (!showRepayModal) return
     try {
-      await api.patch(`/api/debts/${id}`, { status: 'CLOSED' })
-      toast.success('Marked as closed')
-      load()
+      await debtsService.repay(showRepayModal, {
+        paymentAmount: Number(repayForm.paymentAmount),
+        accountId: repayForm.accountId || undefined,
+      })
+      toast.success('Repayment recorded')
+      setShowRepayModal(null)
+      setRepayForm({ paymentAmount: '', accountId: '' })
+      await load()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to update debt'
+      const msg = err instanceof Error ? err.message : 'Failed to repay debt'
       toast.error(msg)
     }
   }
@@ -93,10 +128,10 @@ const Debts = () => {
   const handleDelete = async () => {
     if (!confirmId) return
     try {
-      await api.delete(`/api/debts/${confirmId}`)
+      await debtsService.delete(confirmId)
       toast.success('Debt deleted')
       setConfirmId(null)
-      load()
+      await load()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to delete debt'
       toast.error(msg)
@@ -109,7 +144,7 @@ const Debts = () => {
         <div>
           <p style={{ color: '#94a3b8', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>DEBTS</p>
           <h1 style={{ margin: '4px 0', fontSize: 22, fontWeight: 800 }}>Manage debts</h1>
-          <p style={{ margin: 0, color: '#64748b' }}>Stay on top of lent and borrowed money.</p>
+          <p style={{ margin: 0, color: '#64748b' }}>Track what you owe and what is owed to you.</p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
@@ -132,22 +167,27 @@ const Debts = () => {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 8 }}>
-        {(['LENT', 'BORROWED'] as const).map(key => (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {TABS.map(tabItem => (
           <button
-            key={key}
-            onClick={() => setTab(key)}
+            key={tabItem.value}
             type="button"
+            onClick={() => {
+              setTab(tabItem.value)
+              setForm(p => ({ ...p, type: tabItem.value }))
+            }}
             style={{
-              padding: '10px 14px',
-              borderRadius: 12,
-              border: tab === key ? '1px solid #2563eb' : '1px solid #e2e8f0',
-              background: tab === key ? '#eff6ff' : '#fff',
-              fontWeight: 800,
-              color: tab === key ? '#1d4ed8' : '#0f172a',
+              padding: '10px',
+              borderRadius: 10,
+              border: `2px solid ${tab === tabItem.value ? tabItem.color : '#e2e8f0'}`,
+              background: tab === tabItem.value ? `${tabItem.color}15` : 'transparent',
+              color: tab === tabItem.value ? tabItem.color : '#64748b',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
             }}
           >
-            {key === 'LENT' ? 'Lent out' : 'Borrowed'}
+            {tabItem.value === 'DEBT' ? '💸' : '💰'} {tabItem.label}
           </button>
         ))}
       </div>
@@ -190,39 +230,19 @@ const Debts = () => {
                   alignItems: 'center',
                 }}
               >
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <span
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      background: '#f8fafc',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#2563eb',
-                    }}
-                  >
-                    <HandCoins size={18} />
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ fontWeight: 800 }}>{item.personName}</div>
-                    {item.description && (
-                      <div style={{ color: '#475569' }}>{item.description}</div>
-                    )}
-                    <div style={{ color: '#94a3b8', fontSize: 12 }}>
-                      Due {smartDate(item.dueDate)}
-                    </div>
-                  </div>
+                <div>
+                  <div style={{ fontWeight: 800 }}>{item.personName}</div>
+                  {item.description && <div style={{ color: '#475569' }}>{item.description}</div>}
+                  <div style={{ color: '#94a3b8', fontSize: 12 }}>Due {smartDate(item.dueDate)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: 800, color: '#0f172a' }}>
                     {formatCurrency(item.amount, item.currency)}
                   </div>
                   <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 6 }}>
-                    {item.status === 'OPEN' ? (
+                    {item.status === 'OPEN' && (
                       <button
-                        onClick={() => handleClose(item.id)}
+                        onClick={() => setShowRepayModal(item.id)}
                         type="button"
                         style={{
                           border: '1px solid #dcfce7',
@@ -237,10 +257,8 @@ const Debts = () => {
                           fontWeight: 700,
                         }}
                       >
-                        <CheckCircle2 size={16} /> Mark closed
+                        💵 Repay
                       </button>
-                    ) : (
-                      <span style={{ color: '#16a34a', fontWeight: 800 }}>Closed</span>
                     )}
                     <button
                       onClick={() => setConfirmId(item.id)}
@@ -292,6 +310,7 @@ const Debts = () => {
               />
             </div>
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Currency</label>
@@ -317,30 +336,55 @@ const Debts = () => {
               />
             </div>
           </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={{ fontWeight: 700, fontSize: 13 }}>Type</label>
-              <select
-                value={form.type}
-                onChange={e => setForm({ ...form, type: e.target.value as DebtForm['type'] })}
-                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
-              >
-                {DEBT_TYPES.map(t => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div>
               <label style={{ fontWeight: 700, fontSize: 13 }}>Description</label>
               <input
-                value={form.description ?? ''}
+                value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
                 style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
               />
             </div>
+            <div>
+              <label style={{ fontWeight: 700, fontSize: 13 }}>Account (optional)</label>
+              <select
+                value={form.accountId}
+                onChange={e => setForm({ ...form, accountId: e.target.value })}
+                style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              >
+                <option value="">Not selected</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {TABS.map(tabItem => (
+              <button
+                key={tabItem.value}
+                type="button"
+                onClick={() => setForm(p => ({ ...p, type: tabItem.value }))}
+                style={{
+                  padding: '10px',
+                  borderRadius: 10,
+                  border: `2px solid ${form.type === tabItem.value ? tabItem.color : '#e2e8f0'}`,
+                  background: form.type === tabItem.value ? `${tabItem.color}15` : 'transparent',
+                  color: form.type === tabItem.value ? tabItem.color : '#64748b',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {tabItem.value === 'DEBT' ? '💸' : '💰'} {tabItem.label}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={handleSubmit}
             type="button"
@@ -356,6 +400,53 @@ const Debts = () => {
             }}
           >
             Save debt
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={showRepayModal !== null} onClose={() => setShowRepayModal(null)} title="Repay debt">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13 }}>Payment amount</label>
+            <input
+              type="number"
+              value={repayForm.paymentAmount}
+              onChange={e => setRepayForm({ ...repayForm, paymentAmount: e.target.value })}
+              min="0"
+              step="any"
+              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+            />
+          </div>
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13 }}>Account (optional)</label>
+            <select
+              value={repayForm.accountId}
+              onChange={e => setRepayForm({ ...repayForm, accountId: e.target.value })}
+              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+            >
+              <option value="">Not selected</option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleRepay}
+            type="button"
+            style={{
+              marginTop: 4,
+              padding: '12px',
+              borderRadius: 12,
+              background: '#16a34a',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Confirm repayment
           </button>
         </div>
       </Modal>

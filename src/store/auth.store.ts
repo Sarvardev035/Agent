@@ -4,7 +4,7 @@ import { TokenStorage } from '../lib/security'
 import { authService } from '../services/auth.service'
 
 interface User {
-  id: number
+  id: string
   name: string
   email: string
 }
@@ -59,44 +59,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.log('📦 [Auth] Payload:', { email, password: '***' })
 
       const response = await authService.login({ email, password })
-
-      // 2. Validate response status
-      console.log('✅ [Auth] Response status:', response.status)
-
-      if (response.status !== 200 && response.status !== 201) {
-        throw new Error(`Unexpected status code: ${response.status}`)
-      }
-
-      const { data } = response
-      console.log('📥 [Auth] Response data:', data)
-
-      // 3. Extract token from multiple possible backend shapes
-      const root = asRecord(data)
-      const nested =
-        asRecord(root.data).token ||
-        asRecord(root.data).accessToken ||
-        asRecord(root.data).access_token ||
-        asRecord(root.data).jwt ||
-        asRecord(root.result).token ||
-        asRecord(root.result).accessToken ||
-        asRecord(root.result).access_token ||
-        asRecord(root.result).jwt
-
-      const token = extractToken(data) ?? (typeof nested === 'string' ? nested : null)
-
-      if (!token) {
-        console.error('❌ [Auth] No token found in response:', data)
-        throw new Error('No token in response')
-      }
-
-      const userFromRoot = asRecord(data).user
-      const userFromData = asRecord(asRecord(data).data).user
-      const resolvedUser = (userFromRoot ?? userFromData) as User | undefined
-
-      TokenStorage.set(token)
+      const payload = asRecord(response.data)
+      const inner = asRecord(payload.data)
+      const accessToken = (inner.accessToken || payload.accessToken) as string | undefined
+      const refreshToken = (inner.refreshToken || payload.refreshToken) as string | undefined
+      if (!accessToken) throw new Error('No token in response')
+      TokenStorage.set(accessToken)
+      if (refreshToken) localStorage.setItem('finly_refresh_token', refreshToken)
+      const userFromResponse = (inner.user || payload.user) as User | undefined
       set({
         isAuthenticated: true,
-        user: resolvedUser || { id: 0, name: email.split('@')[0], email },
+        user: userFromResponse || { id: '', name: email.split('@')[0], email },
         isLoading: false,
       })
     } catch (err: unknown) {

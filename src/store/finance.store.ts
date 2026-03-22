@@ -3,7 +3,7 @@ import api from '../lib/api'
 import { safeArray } from '../lib/helpers'
 
 export interface Account {
-  id: number
+  id: string
   name: string
   type: 'BANK_CARD' | 'CASH'
   currency: string

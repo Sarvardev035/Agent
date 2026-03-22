@@ -4,25 +4,15 @@ import { z } from 'zod'
 // ── Token Security ──────────────────────────────────────────────
 
 export const TokenStorage = {
-  KEY: 'finly_token',
+  KEY: 'finly_access_token',
   set: (token: string): void => {
     localStorage.setItem(TokenStorage.KEY, token)
   },
-  get: (): string | null => {
-    const t = localStorage.getItem(TokenStorage.KEY)
-    if (!t) return null
-    try {
-      const { exp } = JSON.parse(atob(t.split('.')[1]))
-      if (exp && Date.now() > exp * 1000) {
-        localStorage.removeItem(TokenStorage.KEY)
-        return null
-      }
-    } catch {
-      return null
-    }
-    return t
+  get: (): string | null => localStorage.getItem(TokenStorage.KEY),
+  clear: () => {
+    localStorage.removeItem('finly_access_token')
+    localStorage.removeItem('finly_refresh_token')
   },
-  clear: () => localStorage.removeItem(TokenStorage.KEY),
   isValid: () => !!TokenStorage.get(),
 }
 
@@ -57,60 +47,46 @@ export const RegisterSchema = z.object({
 
 export const ExpenseSchema = z.object({
   amount: z.number().positive().max(999_999_999),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   description: z
     .string()
     .max(500)
     .optional()
     .transform(v => (v ? sanitize(v) : v)),
-  category: z.enum([
-    'FOOD',
-    'TRANSPORT',
-    'HEALTH',
-    'ENTERTAINMENT',
-    'UTILITIES',
-    'OTHER',
-  ]),
-  accountId: z.number().positive(),
+  categoryId: z.string().min(1),
+  accountId: z.string().min(1),
 })
 
 export const IncomeSchema = z.object({
   amount: z.number().positive().max(999_999_999),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  incomeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   description: z
     .string()
     .max(500)
     .optional()
     .transform(v => (v ? sanitize(v) : v)),
-  category: z.enum([
-    'SALARY',
-    'FREELANCE',
-    'BUSINESS',
-    'INVESTMENT',
-    'GIFT',
-    'OTHER',
-  ]),
-  accountId: z.number().positive(),
+  categoryId: z.string().min(1),
+  accountId: z.string().min(1),
 })
 
 export const AccountSchema = z.object({
   name: z.string().min(1).max(100).transform(v => sanitize(v.trim())),
   type: z.enum(['BANK_CARD', 'CASH']),
   currency: z.enum(['UZS', 'USD', 'EUR', 'RUB']),
-  balance: z.number().min(0),
+  initialBalance: z.number().min(0),
+  cardNumber: z.string().nullable().optional(),
+  cardType: z.string().nullable().optional(),
+  expiryDate: z.string().nullable().optional(),
 })
 
 export const TransferSchema = z
   .object({
-    fromAccountId: z.number().positive(),
-    toAccountId: z.number().positive(),
+    fromAccountId: z.string().min(1),
+    toAccountId: z.string().min(1),
     amount: z.number().positive(),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    note: z
-      .string()
-      .max(200)
-      .optional()
-      .transform(v => (v ? sanitize(v) : v)),
+    transferDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    description: z.string().max(200).optional().transform(v => (v ? sanitize(v) : v)),
+    exchangeRate: z.number().positive(),
   })
   .refine(d => d.fromAccountId !== d.toAccountId, {
     message: 'Cannot transfer to the same account',
@@ -125,7 +101,7 @@ export const DebtSchema = z.object({
   amount: z.number().positive(),
   currency: z.enum(['UZS', 'USD', 'EUR', 'RUB']),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  type: z.enum(['LENT', 'BORROWED']),
+  type: z.enum(['DEBT', 'RECEIVABLE']),
   description: z
     .string()
     .max(500)

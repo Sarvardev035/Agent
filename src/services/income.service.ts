@@ -1,18 +1,35 @@
 import api from '../lib/api'
 
 export interface Income {
-  id: number
+  id: string
   amount: number
-  date: string
+  currency: string
   description?: string
-  category: string
-  accountId: number
+  incomeDate: string
+  categoryId: string
+  accountId: string
+  categoryName?: string
 }
 
-export const incomeService = {
-  getAll:  (params?: Record<string, unknown>) =>
-             api.get<Income[]>('/api/income', { params }),
-  create:  (data: unknown) => api.post<Income>('/api/income', data),
-  update:  (id: number, d: unknown) => api.put<Income>(`/api/income/${id}`, d),
-  delete:  (id: number)    => api.delete(`/api/income/${id}`),
+export const incomesService = {
+  getAll: (params?: {
+    accountId?: string
+    startDate?: string
+    endDate?: string
+  }) => api.get('/api/incomes', { params }),
+
+  create: (d: {
+    amount: number
+    currency: string
+    description: string
+    incomeDate: string
+    categoryId: string
+    accountId: string
+  }) => api.post('/api/incomes', d),
+
+  update: (id: string, d: unknown) => api.put(`/api/incomes/${id}`, d),
+
+  delete: (id: string) => api.delete(`/api/incomes/${id}`),
 }
+
+export const incomeService = incomesService

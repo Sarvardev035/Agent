@@ -3,21 +3,20 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff, Zap, Loader2, AlertTriangle } from 'lucide-react'
-import { useAuthStore } from '../../store/auth.store'
+import api from '../../lib/api'
 import {
   LoginSchema,
   loginRateLimiter,
 } from '../../lib/security'
 
 export default function Login() {
-  const navigate  = useNavigate()
-  const login     = useAuthStore(s => s.login)
-  const isLoading = useAuthStore(s => s.isLoading)
+  const navigate = useNavigate()
 
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,7 +36,19 @@ export default function Login() {
     }
 
     try {
-      await login(result.data.email, result.data.password)
+      setIsLoading(true)
+      const { data } = await api.post('/api/auth/login', {
+        email: result.data.email,
+        password: result.data.password,
+      })
+
+      const tokenData = data.data || data
+      const accessToken = tokenData.accessToken
+
+      if (!accessToken) throw new Error('No token received')
+
+      localStorage.setItem('finly_access_token', accessToken)
+      localStorage.setItem('finly_refresh_token', tokenData.refreshToken || '')
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
@@ -48,8 +59,10 @@ export default function Login() {
       } else {
         setError(msg)
       }
+    } finally {
+      setIsLoading(false)
     }
-  }, [email, password, login, navigate])
+  }, [email, password, navigate])
 
   return (
     <div style={{

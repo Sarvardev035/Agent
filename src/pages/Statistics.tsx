@@ -1,98 +1,59 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { AlertTriangle } from 'lucide-react'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import { CATEGORY_META, safeArray } from '../lib/helpers'
 import { formatCurrency } from '../lib/currency'
-import api from '../lib/api'
+import { analyticsService } from '../services/analytics.service'
 
 interface TrendPoint { date: string; total: number }
 interface BreakdownPoint { category: string; value: number }
-interface VsPoint { month: string; income: number; expense: number }
+interface VsPoint { period: string; income: number; expense: number }
 
-const sampleTrend: TrendPoint[] = [
-  { date: 'Jan', total: 1200 },
-  { date: 'Feb', total: 1500 },
-  { date: 'Mar', total: 900 },
-]
-const sampleBreakdown: BreakdownPoint[] = [
-  { category: 'FOOD', value: 400 },
-  { category: 'TRANSPORT', value: 200 },
-  { category: 'OTHER', value: 100 },
-]
-const sampleVs: VsPoint[] = [
-  { month: 'Jan', income: 2000, expense: 1200 },
-  { month: 'Feb', income: 2100, expense: 1500 },
-]
+type Period = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
+
+const periods: Period[] = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']
 
 const Statistics = () => {
-  const [expenseTrend, setExpenseTrend] = useState<TrendPoint[] | null>(null)
-  const [incomeTrend, setIncomeTrend] = useState<TrendPoint[] | null>(null)
-  const [breakdown, setBreakdown] = useState<BreakdownPoint[] | null>(null)
-  const [vs, setVs] = useState<VsPoint[] | null>(null)
+  const [period, setPeriod] = useState<Period>('MONTHLY')
+  const [timeseries, setTimeseries] = useState<TrendPoint[]>([])
+  const [categoryData, setCategoryData] = useState<BreakdownPoint[]>([])
+  const [incVsExp, setIncVsExp] = useState<VsPoint[]>([])
   const [loading, setLoading] = useState(true)
-  const [chartReady, setChartReady] = useState(false)
-  const [isSample, setIsSample] = useState(false)
 
-  useEffect(() => {
-    setTimeout(() => setChartReady(true), 150)
-  }, [])
+  const loadStats = async () => {
+    setLoading(true)
+    try {
+      const now = new Date()
+      const endDate = now.toISOString().slice(0, 10)
+      const startDate = new Date(now.setFullYear(now.getFullYear() - 1)).toISOString().slice(0, 10)
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      try {
-        const [expRes, incRes, brkRes, vsRes] = await Promise.allSettled([
-          api.get('/api/statistics/expenses', { params: { period: '3m' } }),
-          api.get('/api/statistics/income', { params: { period: '3m' } }),
-          api.get('/api/statistics/breakdown'),
-          api.get('/api/statistics/vs-income'),
-        ])
-        setExpenseTrend(
-          expRes.status === 'fulfilled' ? safeArray<TrendPoint>(expRes.value.data) : []
-        )
-        setIncomeTrend(
-          incRes.status === 'fulfilled' ? safeArray<TrendPoint>(incRes.value.data) : []
-        )
-        setBreakdown(
-          brkRes.status === 'fulfilled' ? safeArray<BreakdownPoint>(brkRes.value.data) : []
-        )
-        setVs(
-          vsRes.status === 'fulfilled' ? safeArray<VsPoint>(vsRes.value.data) : []
-        )
-        setIsSample(false)
-      } catch (err) {
-        console.error('❌ statistics load failed:', err)
-        setExpenseTrend(sampleTrend)
-        setIncomeTrend(sampleTrend)
-        setBreakdown(sampleBreakdown)
-        setVs(sampleVs)
-        setIsSample(true)
-      } finally {
-        setLoading(false)
-      }
+      const [tsRes, catRes, ivseRes] = await Promise.allSettled([
+        analyticsService.timeseries({ period, startDate, endDate }),
+        analyticsService.expensesByCategory({ from: startDate, to: endDate }),
+        analyticsService.incomeVsExpense({ from: startDate, to: endDate }),
+      ])
+
+      setTimeseries(safeArray(tsRes.status === 'fulfilled' ? tsRes.value.data : []))
+      setCategoryData(safeArray(catRes.status === 'fulfilled' ? catRes.value.data : []))
+      setIncVsExp(safeArray(ivseRes.status === 'fulfilled' ? ivseRes.value.data : []))
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [])
+  }
 
-  const pieData = useMemo(() =>
-    (breakdown ?? []).map(d => ({
-      name: CATEGORY_META[d.category]?.label ?? d.category,
-      value: d.value,
-      color: CATEGORY_META[d.category]?.barColor ?? '#2563eb',
-    })),
-  [breakdown])
+  useEffect(() => {
+    loadStats()
+  }, [period])
 
-  const ChartContainer = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)', minHeight: 260 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>{title}</h3>
-        {isSample && <span style={{ color: '#f59e0b', fontSize: 12 }}>Sample data</span>}
-      </div>
-      {loading || !chartReady ? <Skeleton height={200} /> : children}
-    </div>
+  const pieData = useMemo(
+    () =>
+      categoryData.map(d => ({
+        name: CATEGORY_META[d.category]?.label ?? d.category,
+        value: d.value,
+        color: CATEGORY_META[d.category]?.barColor ?? '#2563eb',
+      })),
+    [categoryData]
   )
 
   return (
@@ -103,70 +64,82 @@ const Statistics = () => {
         <p style={{ margin: 0, color: '#64748b' }}>Visualize your spending and earnings.</p>
       </div>
 
-      {isSample && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fffbeb', border: '1px solid #fef3c7', padding: 10, borderRadius: 12 }}>
-          <AlertTriangle color="#f59e0b" size={18} />
-          <span style={{ color: '#92400e' }}>Live stats unavailable. Showing sample data.</span>
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
-        <ChartContainer title="Expense trend">
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={expenseTrend ?? []}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="date" />
-              <YAxis tickFormatter={v => `${Math.round(v)}`} />
-              <Tooltip formatter={value => formatCurrency(Number(value ?? 0))} />
-              <Line type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartContainer>
-
-        <ChartContainer title="Income trend">
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={incomeTrend ?? []}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="date" />
-              <YAxis tickFormatter={v => `${Math.round(v)}`} />
-              <Tooltip formatter={value => formatCurrency(Number(value ?? 0))} />
-              <Line type="monotone" dataKey="total" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartContainer>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {periods.map(p => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            type="button"
+            style={{
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: period === p ? '1px solid #2563eb' : '1px solid #e2e8f0',
+              background: period === p ? '#eff6ff' : '#fff',
+              color: period === p ? '#1d4ed8' : '#0f172a',
+              fontWeight: 700,
+            }}
+          >
+            {p}
+          </button>
+        ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
-        <ChartContainer title="Category breakdown">
-          {pieData.length === 0 ? (
-            <EmptyState title="No data" description="Set some budgets or record transactions." />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)', minHeight: 260 }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800 }}>Expense trend</h3>
+          {loading ? (
+            <Skeleton height={200} />
           ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={90} label>
-                  {pieData.map(entry => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={timeseries}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" />
+                <YAxis tickFormatter={v => `${Math.round(Number(v) || 0)}`} />
                 <Tooltip formatter={value => formatCurrency(Number(value ?? 0))} />
-              </PieChart>
+                <Line type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
             </ResponsiveContainer>
           )}
-        </ChartContainer>
+        </div>
 
-        <ChartContainer title="Income vs Expense">
+        <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)', minHeight: 260 }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800 }}>Income vs Expense</h3>
+          {loading ? (
+            <Skeleton height={200} />
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={incVsExp}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="period" />
+                <YAxis tickFormatter={v => `${Math.round(Number(v) || 0)}`} />
+                <Tooltip formatter={value => formatCurrency(Number(value ?? 0))} />
+                <Legend />
+                <Bar dataKey="income" fill="#10b981" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="expense" fill="#ef4444" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: 'var(--sh-sm)', minHeight: 260 }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 800 }}>Category breakdown</h3>
+        {loading ? (
+          <Skeleton height={200} />
+        ) : pieData.length === 0 ? (
+          <EmptyState title="No data" description="Add some transactions to see category analytics." />
+        ) : (
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={vs ?? []}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="month" />
-              <YAxis tickFormatter={v => `${Math.round(v)}`} />
+            <PieChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={90} label>
+                {pieData.map(entry => (
+                  <Cell key={entry.name} fill={entry.color} />
+                ))}
+              </Pie>
               <Tooltip formatter={value => formatCurrency(Number(value ?? 0))} />
-              <Legend />
-              <Bar dataKey="income" fill="#10b981" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="expense" fill="#ef4444" radius={[6, 6, 0, 0]} />
-            </BarChart>
+            </PieChart>
           </ResponsiveContainer>
-        </ChartContainer>
+        )}
       </div>
     </div>
   )

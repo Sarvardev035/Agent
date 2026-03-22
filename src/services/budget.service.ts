@@ -1,8 +1,18 @@
 import api from '../lib/api'
 
 export const budgetService = {
-  get:           () => api.get('/api/budget'),
-  set:           (d: unknown) => api.post('/api/budget', d),
-  getCategories: () => api.get('/api/budget/categories'),
-  setCategory:   (d: unknown) => api.post('/api/budget/categories', d),
+  getAll: (params?: { year?: number; month?: number }) =>
+    api.get('/api/budgets', { params }),
+
+  create: (d: {
+    categoryId: string
+    type: 'MONTHLY'
+    monthlyLimit: number
+    year: number
+    month: number
+  }) => api.post('/api/budgets', d),
+
+  delete: (id: string) => api.delete(`/api/budgets/${id}`),
 }
+
+export const budgetsService = budgetService

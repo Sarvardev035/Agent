@@ -26,8 +26,8 @@ export const INCOME_CATEGORIES = [
 
 // Debt types
 export const DEBT_TYPES = [
-  { value: 'LENT', label: 'Owed to me' },
-  { value: 'BORROWED', label: 'I owe' },
+  { value: 'DEBT', label: 'I owe' },
+  { value: 'RECEIVABLE', label: 'Owed to me' },
 ] as const
 
 // Currencies

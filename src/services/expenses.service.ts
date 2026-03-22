@@ -1,18 +1,34 @@
 import api from '../lib/api'
 
 export interface Expense {
-  id: number
+  id: string
   amount: number
-  date: string
+  currency: string
   description?: string
-  category: string
-  accountId: number
+  expenseDate: string
+  categoryId: string
+  accountId: string
+  categoryName?: string
 }
 
 export const expensesService = {
-  getAll:  (params?: Record<string, unknown>) =>
-             api.get<Expense[]>('/api/expenses', { params }),
-  create:  (data: unknown) => api.post<Expense>('/api/expenses', data),
-  update:  (id: number, d: unknown) => api.put<Expense>(`/api/expenses/${id}`, d),
-  delete:  (id: number)    => api.delete(`/api/expenses/${id}`),
+  getAll: (params?: {
+    accountId?: string
+    categoryId?: string
+    startDate?: string
+    endDate?: string
+  }) => api.get('/api/expenses', { params }),
+
+  create: (d: {
+    amount: number
+    currency: string
+    description: string
+    expenseDate: string
+    categoryId: string
+    accountId: string
+  }) => api.post('/api/expenses', d),
+
+  update: (id: string, d: unknown) => api.put(`/api/expenses/${id}`, d),
+
+  delete: (id: string) => api.delete(`/api/expenses/${id}`),
 }

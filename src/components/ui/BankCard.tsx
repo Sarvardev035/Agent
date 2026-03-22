@@ -7,7 +7,7 @@ interface BankCardProps {
   balance: number
   currency: string
   type: 'BANK_CARD' | 'CASH'
-  accountId?: number
+  accountId?: string
   institution?: string
   productType?: string
 }

@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { AxiosError } from 'axios'
 import { Eye, EyeOff, Zap, Loader2, AlertTriangle } from 'lucide-react'
 import { RegisterSchema } from '../../lib/security'
-import { authService } from '../../services/auth.service'
+import api from '../../lib/api'
 import { TokenStorage } from '../../lib/security'
 
 type UnknownRecord = Record<string, unknown>
@@ -66,9 +66,17 @@ export default function Register() {
 
     setLoading(true)
     try {
-      const { data } = await authService.register(result.data)
-      const token = extractToken(data)
-      if (token) TokenStorage.set(token)
+      const { data } = await api.post('/api/auth/register', {
+        fullName: result.data.fullName,
+        email: result.data.email,
+        password: result.data.password,
+      })
+      const root = asRecord(data)
+      const inner = asRecord(root.data)
+      const accessToken = (inner.accessToken || root.accessToken) as string | undefined
+      const refreshToken = (inner.refreshToken || root.refreshToken) as string | undefined
+      if (accessToken) TokenStorage.set(accessToken)
+      if (refreshToken) localStorage.setItem('finly_refresh_token', refreshToken)
       toast.success('Account created! Welcome to Finly.')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
@@ -93,7 +101,7 @@ export default function Register() {
     } finally {
       setLoading(false)
     }
-  }, [name, email, password, navigate])
+  }, [fullName, email, password, navigate])
 
   return (
     <div style={{

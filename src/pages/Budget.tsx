@@ -1,48 +1,56 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { PiggyBank, Plus } from 'lucide-react'
+import { PiggyBank, Plus, Trash2 } from 'lucide-react'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
 import ProgressRing from '../components/ui/ProgressRing'
 import ProgressBar from '../components/ui/ProgressBar'
 import Modal from '../components/ui/Modal'
-import { BudgetCategory } from '../lib/notifications'
 import { formatCurrency } from '../lib/currency'
-import { CATEGORY_META, safeArray } from '../lib/helpers'
-import api from '../lib/api'
+import { safeArray, safeObject } from '../lib/helpers'
+import { budgetsService } from '../services/budget.service'
+import { categoriesService } from '../services/categories.service'
 
-interface BudgetOverview {
-  goal?: number
-  spent?: number
-  categories?: BudgetCategory[]
+interface ApiCategory {
+  id: string
+  name: string
+  type: 'EXPENSE' | 'INCOME'
+}
+
+interface BudgetItem {
+  id: string
+  categoryId: string
+  categoryName?: string
+  monthlyLimit: number
+  spentAmount?: number
+  year: number
+  month: number
 }
 
 const Budget = () => {
-  const [overview, setOverview] = useState<BudgetOverview>({})
-  const [categories, setCategories] = useState<BudgetCategory[]>([])
+  const [items, setItems] = useState<BudgetItem[]>([])
+  const [categories, setCategories] = useState<ApiCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState<string>('FOOD')
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [limit, setLimit] = useState<number>(0)
 
   const load = async () => {
     setLoading(true)
     try {
-      const [overRes, catsRes] = await Promise.allSettled([
-        api.get('/api/budget'),
-        api.get('/api/budget/categories'),
+      const now = new Date()
+      const [budgetsRes, catsRes] = await Promise.all([
+        budgetsService.getAll({ year: now.getFullYear(), month: now.getMonth() + 1 }),
+        categoriesService.getByType('EXPENSE'),
       ])
-      setOverview(
-        overRes.status === 'fulfilled' ? (overRes.value.data as BudgetOverview) : {}
-      )
-      setCategories(
-        safeArray<BudgetCategory>(catsRes.status === 'fulfilled' ? catsRes.value.data : [])
-      )
+      setItems(safeArray<BudgetItem>(budgetsRes.data))
+      setCategories(safeArray<ApiCategory>(catsRes.data))
     } catch (err) {
-      console.error('❌ budget load failed:', err)
       const msg = err instanceof Error ? err.message : 'Failed to load budget'
       toast.error(msg)
+      setItems([])
+      setCategories([])
     } finally {
       setLoading(false)
     }
@@ -52,23 +60,52 @@ const Budget = () => {
     load()
   }, [])
 
+  const overview = useMemo(() => {
+    const goal = items.reduce((sum, item) => sum + (item.monthlyLimit || 0), 0)
+    const spent = items.reduce((sum, item) => sum + (item.spentAmount || 0), 0)
+    return { goal, spent }
+  }, [items])
+
   const pct = useMemo(() => {
-    if (!overview.goal || !overview.spent) return 0
+    if (!overview.goal) return 0
     return Math.min((overview.spent / overview.goal) * 100, 150)
   }, [overview.goal, overview.spent])
 
   const handleSaveCategory = async () => {
+    if (!selectedCategoryId) {
+      toast.error('Select a category')
+      return
+    }
     if (limit <= 0) {
       toast.error('Limit must be positive')
       return
     }
+
     try {
-      await api.post('/api/budget/categories', { category: selectedCategory, limit })
+      const now = new Date()
+      await budgetsService.create({
+        categoryId: selectedCategoryId,
+        type: 'MONTHLY',
+        monthlyLimit: Number(limit),
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+      })
       toast.success('Category limit saved')
       setModalOpen(false)
-      load()
+      await load()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save limit'
+      toast.error(msg)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await budgetsService.delete(id)
+      toast.success('Budget deleted')
+      setItems(prev => prev.filter(i => i.id !== id))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete budget'
       toast.error(msg)
     }
   }
@@ -121,12 +158,12 @@ const Budget = () => {
             <>
               <ProgressRing percent={pct} label="Overall" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 18, fontWeight: 800 }}>Goal {formatCurrency(overview.goal ?? 0)}</div>
-                <div style={{ color: '#94a3b8' }}>Spent {formatCurrency(overview.spent ?? 0)}</div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>Goal {formatCurrency(overview.goal)}</div>
+                <div style={{ color: '#94a3b8' }}>Spent {formatCurrency(overview.spent)}</div>
                 <div style={{ background: '#f8fafc', padding: 12, borderRadius: 12 }}>
                   <div style={{ fontWeight: 800 }}>Remaining</div>
                   <div style={{ color: '#2563eb', fontWeight: 800 }}>
-                    {formatCurrency(Math.max((overview.goal ?? 0) - (overview.spent ?? 0), 0))}
+                    {formatCurrency(Math.max(overview.goal - overview.spent, 0))}
                   </div>
                 </div>
               </div>
@@ -149,17 +186,17 @@ const Budget = () => {
           </div>
           {loading ? (
             <Skeleton height={140} />
-          ) : categories.length === 0 ? (
+          ) : items.length === 0 ? (
             <EmptyState title="No category limits" description="Add a limit to start tracking." />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <AnimatePresence>
-                {categories.map(cat => {
-                  const meta = CATEGORY_META[cat.category] ?? { emoji: '🏷️', label: cat.category, color: '#0f172a', bg: '#f8fafc', barColor: '#94a3b8' }
-                  const pctCat = (cat.spent / (cat.limit || 1)) * 100
+                {items.map(item => {
+                  const spent = item.spentAmount || 0
+                  const pctCat = (spent / (item.monthlyLimit || 1)) * 100
                   return (
                     <motion.div
-                      key={cat.category}
+                      key={item.id}
                       layout
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -168,38 +205,38 @@ const Budget = () => {
                         border: '1px solid #e2e8f0',
                         borderRadius: 12,
                         padding: 12,
-                        display: 'grid',
-                        gridTemplateColumns: 'auto 1fr',
-                        gap: 12,
-                        alignItems: 'center',
                       }}
                     >
-                      <div
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 12,
-                          background: meta.bg,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {meta.emoji}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
+                        <span>{item.categoryName || categories.find(c => c.id === item.categoryId)?.name || item.categoryId}</span>
+                        <span style={{ color: '#64748b' }}>
+                          {formatCurrency(spent)} / {formatCurrency(item.monthlyLimit)}
+                        </span>
                       </div>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800 }}>
-                          <span>{meta.label}</span>
-                          <span style={{ color: '#64748b' }}>
-                            {formatCurrency(cat.spent)} / {formatCurrency(cat.limit)}
-                          </span>
-                        </div>
-                        <ProgressBar percent={pctCat} animate />
-                        {pctCat >= 90 && (
-                          <div style={{ color: pctCat >= 100 ? '#b91c1c' : '#92400e', fontSize: 12, marginTop: 4 }}>
-                            {pctCat >= 100 ? 'Limit exceeded' : 'Close to limit'}
-                          </div>
-                        )}
+                      <ProgressBar percent={pctCat} animate />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                        <span style={{ color: pctCat >= 100 ? '#b91c1c' : '#64748b', fontSize: 12 }}>
+                          {pctCat >= 100 ? 'Limit exceeded' : 'In progress'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.id)}
+                          style={{
+                            border: '1px solid #ffe4e6',
+                            background: '#fff1f2',
+                            color: '#ef4444',
+                            borderRadius: 8,
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontWeight: 700,
+                            fontSize: 12,
+                          }}
+                        >
+                          <Trash2 size={12} /> Delete
+                        </button>
                       </div>
                     </motion.div>
                   )
@@ -215,13 +252,14 @@ const Budget = () => {
           <div>
             <label style={{ fontWeight: 700, fontSize: 13 }}>Category</label>
             <select
-              value={selectedCategory}
-              onChange={e => setSelectedCategory(e.target.value)}
+              value={selectedCategoryId}
+              onChange={e => setSelectedCategoryId(e.target.value)}
               style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
             >
-              {Object.keys(CATEGORY_META).map(cat => (
-                <option key={cat} value={cat}>
-                  {CATEGORY_META[cat].label}
+              <option value="">Select category</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
                 </option>
               ))}
             </select>

@@ -9,7 +9,7 @@ import TransactionItem from '../components/ui/TransactionItem'
 import { Expense } from '../services/expenses.service'
 import { Income } from '../services/income.service'
 import { useFinanceStore } from '../store/finance.store'
-import { toArray, safeArray } from '../lib/helpers'
+import { safeArray } from '../lib/helpers'
 import api from '../lib/api'
 
 import 'react-calendar/dist/Calendar.css'
@@ -29,7 +29,7 @@ const CalendarView = () => {
       try {
         const [expRes, incRes] = await Promise.allSettled([
           api.get('/api/expenses'),
-          api.get('/api/income'),
+          api.get('/api/incomes'),
         ])
         setExpenses(
           expRes.status === 'fulfilled' ? safeArray<Expense>(expRes.value.data) : []
@@ -52,12 +52,12 @@ const CalendarView = () => {
   const transactionsByDate = useMemo(() => {
     const map: Record<string, CalendarTx[]> = {}
     expenses.forEach(e => {
-      const key = e.date
+      const key = e.expenseDate
       if (!map[key]) map[key] = []
       map[key].push({ ...e, kind: 'expense' })
     })
     income.forEach(i => {
-      const key = i.date
+      const key = i.incomeDate
       if (!map[key]) map[key] = []
       map[key].push({ ...i, kind: 'income' })
     })
@@ -136,8 +136,8 @@ const CalendarView = () => {
                   key={idx}
                   type={item.kind}
                   amount={item.amount}
-                  category={item.category}
-                  date={item.date}
+                  category={item.categoryName || item.categoryId}
+                  date={item.kind === 'expense' ? item.expenseDate : item.incomeDate}
                   description={item.description}
                   currency={account?.currency ?? 'UZS'}
                   accountLabel={account?.name}

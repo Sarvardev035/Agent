@@ -23,13 +23,20 @@ export const toArray = <T,>(data: unknown): T[] => {
 
 export const safeArray = <T,>(data: unknown): T[] => {
   if (!data) return []
+  const inner = (data as Record<string, unknown>).data ?? data
+  if (Array.isArray(inner)) return inner as T[]
+  const d = inner as Record<string, unknown>
+  if (Array.isArray(d?.content)) return d.content as T[]
+  if (Array.isArray(d?.items)) return d.items as T[]
+  if (Array.isArray(d?.results)) return d.results as T[]
   if (Array.isArray(data)) return data as T[]
-  const d = data as Record<string, unknown>
-  if (Array.isArray(d.content)) return d.content as T[]
-  if (Array.isArray(d.data)) return d.data as T[]
-  if (Array.isArray(d.items)) return d.items as T[]
-  if (Array.isArray(d.results)) return d.results as T[]
   return []
+}
+
+export const safeObject = <T,>(data: unknown): T | null => {
+  if (!data) return null
+  const inner = (data as Record<string, unknown>).data ?? data
+  return inner as T
 }
 
 export const smartDate = (d: string): string => {

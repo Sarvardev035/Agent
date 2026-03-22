@@ -23,14 +23,19 @@ interface AccountForm {
   name: string
   type: AccountType
   currency: CurrencyCode
-  balance: string
+  initialBalance: string
 }
 
 const Accounts = () => {
   const { accounts, refreshAccounts, isLoadingAccounts } = useFinanceStore()
   const [modalOpen, setModalOpen] = useState(false)
-  const [confirmId, setConfirmId] = useState<number | null>(null)
-  const [form, setForm] = useState<AccountForm>({ name: '', type: 'CASH', currency: 'UZS', balance: '' })
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [form, setForm] = useState<AccountForm>({
+    name: '',
+    type: 'CASH',
+    currency: 'UZS',
+    initialBalance: '',
+  })
   const [displayCurrency, setDisplayCurrency] = useState('USD')
   const { convert, rates, loading: rateLoading, lastUpdated, refresh } = useExchangeRates()
 
@@ -49,13 +54,24 @@ const Accounts = () => {
       toast.error('Name is required')
       return
     }
-    const parsed = AccountSchema.safeParse({ ...form, balance: Number(form.balance) || 0 })
+    const parsed = AccountSchema.safeParse({
+      ...form,
+      initialBalance: Number(form.initialBalance) || 0,
+    })
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
       return
     }
     try {
-      await api.post('/api/accounts', parsed.data)
+      await api.post('/api/accounts', {
+        name: form.name.trim(),
+        type: form.type,
+        currency: form.currency,
+        initialBalance: Number(form.initialBalance) || 0,
+        cardNumber: null,
+        cardType: null,
+        expiryDate: null,
+      })
       toast.success('Account created')
       setModalOpen(false)
       refreshAccounts()
@@ -68,7 +84,7 @@ const Accounts = () => {
   const handleDelete = async () => {
     if (!confirmId) return
     try {
-      await api.delete(`/api/accounts/${confirmId}`)
+       await api.delete(`/api/accounts/${confirmId}`)
       toast.success('Account deleted')
       setConfirmId(null)
       refreshAccounts()
@@ -173,7 +189,7 @@ const Accounts = () => {
                 <div style={{ position: 'relative' }}>
                   <BankCard
                     name={acc.name}
-                    last4={String(acc.id).slice(-4)}
+                     last4={String(acc.id).slice(-4)}
                     balance={acc.balance}
                     currency={acc.currency}
                     type={mapAccountType(acc.type)}
@@ -319,8 +335,8 @@ const Accounts = () => {
                 </label>
                 <input
                   type="number"
-                  value={form.balance}
-                  onChange={e => setForm({ ...form, balance: e.target.value })}
+                  value={form.initialBalance}
+                  onChange={e => setForm({ ...form, initialBalance: e.target.value })}
                   placeholder="0"
                   min="0"
                   step="any"
