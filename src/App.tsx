@@ -18,6 +18,7 @@ import CalendarView from './pages/CalendarView'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
 import { seedDefaultCategories } from './lib/seedCategories'
+import NetworkStatus from './components/ui/NetworkStatus'
 import './index.css'
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
             error:   { iconTheme: { primary: '#ef4444', secondary: '#ffffff' }, duration: 4000 },
           }}
         />
+        <NetworkStatus />
         <Routes>
           {/* Public routes */}
           <Route element={<PublicRoute />}>

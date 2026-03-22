@@ -241,7 +241,7 @@ const Debts = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
         <div
           style={{
-            background: '#fff',
+            background: 'var(--surface-strong)',
             borderRadius: 14,
             padding: 14,
             border: '1px solid var(--border)',
@@ -253,7 +253,7 @@ const Debts = () => {
         </div>
         <div
           style={{
-            background: '#fff',
+            background: 'var(--surface-strong)',
             borderRadius: 14,
             padding: 14,
             border: '1px solid var(--border)',
@@ -282,7 +282,7 @@ const Debts = () => {
               padding: '12px',
               borderRadius: 12,
               border: tab === btn.value ? `2px solid ${btn.color}` : '1px solid var(--border)',
-              background: tab === btn.value ? `${btn.color}10` : '#fff',
+              background: tab === btn.value ? `${btn.color}10` : 'var(--surface)',
               color: tab === btn.value ? btn.color : 'var(--text-2)',
               fontWeight: 800,
               cursor: 'pointer',
@@ -295,7 +295,7 @@ const Debts = () => {
 
       <div
         style={{
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 16,
           padding: 16,
           border: '1px solid var(--border)',
@@ -330,7 +330,7 @@ const Debts = () => {
                     borderRadius: 14,
                     border: '1px solid var(--border)',
                     boxShadow: 'var(--shadow-sm)',
-                    background: '#fff',
+                    background: 'var(--surface)',
                     borderLeft: `6px solid ${item.type === 'DEBT' ? 'var(--red)' : 'var(--green)'}`,
                   }}
                 >

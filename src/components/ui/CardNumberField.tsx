@@ -16,7 +16,7 @@ const CardNumberField = ({ value, error, onChange }: CardNumberFieldProps) => {
     <div style={{ marginBottom: 16 }}>
       <label
         htmlFor="cardNumber"
-        style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}
+        style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}
       >
         Card Number *
       </label>
@@ -37,10 +37,11 @@ const CardNumberField = ({ value, error, onChange }: CardNumberFieldProps) => {
           width: '100%',
           height: 44,
           padding: '0 14px',
-          border: `1.5px solid ${error ? '#ef4444' : '#e2e8f0'}`,
+          border: `1.5px solid ${error ? '#ef4444' : 'var(--border)'}`,
           borderRadius: 10,
           fontSize: 14,
-          background: error ? '#fef2f2' : '#f8fafc',
+          background: error ? '#fef2f2' : 'var(--surface)',
+          color: 'var(--text-1)',
           letterSpacing: '0.08em',
         }}
       />
@@ -49,7 +50,7 @@ const CardNumberField = ({ value, error, onChange }: CardNumberFieldProps) => {
         style={{
           margin: '6px 0 0',
           minHeight: 18,
-          color: error ? '#dc2626' : '#64748b',
+          color: error ? '#dc2626' : 'var(--text-3)',
           fontSize: 12,
         }}
       >

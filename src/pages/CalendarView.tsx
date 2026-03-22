@@ -87,7 +87,7 @@ const CalendarView = () => {
 
       <div
         style={{
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 16,
           padding: 16,
           boxShadow: 'var(--shadow-md)',

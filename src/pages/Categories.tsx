@@ -80,11 +80,11 @@ const Categories = () => {
     <div className="page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <p style={{ color: '#94a3b8', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>
+          <p style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }}>
             CATEGORIES
           </p>
           <h1 style={{ margin: '4px 0', fontSize: 22, fontWeight: 800 }}>Manage categories</h1>
-          <p style={{ margin: 0, color: '#64748b' }}>Organize your spending and income.</p>
+          <p style={{ margin: 0, color: 'var(--text-2)' }}>Organize your spending and income.</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -116,9 +116,9 @@ const Categories = () => {
             style={{
               padding: '8px 12px',
               borderRadius: 10,
-              border: activeType === type ? '1px solid #7c3aed' : '1px solid #e2e8f0',
-              background: activeType === type ? '#f5f3ff' : '#fff',
-              color: activeType === type ? '#7c3aed' : '#0f172a',
+              border: activeType === type ? '1px solid #7c3aed' : '1px solid var(--border)',
+              background: activeType === type ? 'rgba(124,58,237,0.12)' : 'var(--surface)',
+              color: activeType === type ? '#7c3aed' : 'var(--text-1)',
               fontWeight: 700,
             }}
           >
@@ -129,11 +129,12 @@ const Categories = () => {
 
       <div
         style={{
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 16,
           padding: 16,
-          boxShadow: 'var(--sh-sm)',
+          boxShadow: 'var(--shadow-sm)',
           minHeight: 240,
+          border: '1px solid var(--border)',
         }}
       >
         {loading ? (
@@ -156,16 +157,16 @@ const Categories = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   style={{
-                    background: '#f8fafc',
+                    background: 'var(--surface)',
                     borderRadius: 12,
                     padding: 12,
-                    border: '1px solid #e2e8f0',
+                    border: '1px solid var(--border)',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                   }}
                 >
-                  <p style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>{cat.name}</p>
+                  <p style={{ margin: 0, fontWeight: 700, color: 'var(--text-1)' }}>{cat.name}</p>
                   <button
                     onClick={() => setConfirmId(cat.id)}
                     type="button"
@@ -203,7 +204,7 @@ const Categories = () => {
               value={form.name}
               placeholder="e.g., Groceries"
               onChange={e => setForm({ ...form, name: e.target.value })}
-              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10 }}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 10, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
             />
           </div>
           <button

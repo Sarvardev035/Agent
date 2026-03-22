@@ -9,6 +9,7 @@ import {
   loginRateLimiter,
 } from '../../lib/security'
 import { sounds } from '../../lib/sounds'
+import AuthLinkGrid from '../../components/ui/AuthLinkGrid'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -257,6 +258,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={isLoading || !email || !password}
+            className="auth-submit-button"
             style={{
               width: '100%', height: 48,
               background: (isLoading || !email || !password)
@@ -286,6 +288,10 @@ export default function Login() {
               </>
             ) : 'Sign In →'}
           </button>
+
+          <div style={{ marginTop: 18 }}>
+            <AuthLinkGrid />
+          </div>
 
           {/* Terms */}
           <p style={{

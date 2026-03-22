@@ -8,6 +8,7 @@ import { RegisterSchema } from '../../lib/security'
 import api from '../../lib/api'
 import { TokenStorage } from '../../lib/security'
 import { sounds } from '../../lib/sounds'
+import AuthLinkGrid from '../../components/ui/AuthLinkGrid'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -346,6 +347,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading || !fullName || !email || !password}
+            className="auth-submit-button"
             style={{
               width: '100%', height: 48,
               background: (loading || !fullName || !email || !password)
@@ -375,6 +377,10 @@ export default function Register() {
               </>
             ) : 'Create Account →'}
           </button>
+
+          <div style={{ marginTop: 18 }}>
+            <AuthLinkGrid />
+          </div>
         </form>
 
         <div style={{

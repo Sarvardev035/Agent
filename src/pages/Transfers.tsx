@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeftRight, Plus } from 'lucide-react'
+import { ArrowLeftRight, Clock3, Landmark, Plus, ReceiptText, ScanLine, Ticket } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
@@ -27,6 +27,7 @@ const Transfers = () => {
   const [transfers, setTransfers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [receiptTransfer, setReceiptTransfer] = useState<any | null>(null)
   const [rates, setRates] = useState<any>(null)
   const [form, setForm] = useState<TransferForm>({
     amount: '',
@@ -142,6 +143,7 @@ const Transfers = () => {
         <button
           onClick={() => setModalOpen(true)}
           type="button"
+          className="transfer-action-button"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -162,7 +164,7 @@ const Transfers = () => {
 
       <div
         style={{
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 16,
           padding: 16,
           boxShadow: 'var(--shadow-md)',
@@ -191,6 +193,8 @@ const Transfers = () => {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
+                  whileHover={{ y: -2 }}
+                  onClick={() => setReceiptTransfer(item)}
                   style={{
                     border: '1px solid var(--border)',
                     borderRadius: 12,
@@ -201,6 +205,8 @@ const Transfers = () => {
                     gap: 8,
                     alignItems: 'center',
                     boxShadow: 'var(--shadow-sm)',
+                    background: 'var(--surface)',
+                    cursor: 'pointer',
                   }}
                 >
                   <div>
@@ -226,7 +232,10 @@ const Transfers = () => {
                     <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
                       {item.description || 'No description'}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{smartDate(item.date)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Clock3 size={12} />
+                      {smartDate(item.date)}
+                    </div>
                   </div>
                   <div style={{ textAlign: 'right', fontWeight: 800, color: 'var(--blue)' }}>
                     {formatCurrency(item.amount, from?.currency || 'UZS')}
@@ -246,7 +255,7 @@ const Transfers = () => {
               <select
                 value={form.fromAccountId}
                 onChange={e => setForm(prev => ({ ...prev, fromAccountId: e.target.value }))}
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
               >
                 <option value="">Select account</option>
                 {accounts.map(acc => (
@@ -261,7 +270,7 @@ const Transfers = () => {
               <select
                 value={form.toAccountId}
                 onChange={e => setForm(prev => ({ ...prev, toAccountId: e.target.value }))}
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
               >
                 <option value="">Select account</option>
                 {accounts.map(acc => (
@@ -282,7 +291,7 @@ const Transfers = () => {
                 placeholder="0.00"
                 min="0"
                 step="any"
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
               />
             </div>
             <div>
@@ -291,7 +300,7 @@ const Transfers = () => {
                 type="date"
                 value={form.transferDate}
                 onChange={e => setForm(prev => ({ ...prev, transferDate: e.target.value }))}
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
               />
             </div>
           </div>
@@ -304,7 +313,7 @@ const Transfers = () => {
                 min="0"
                 step="any"
                 onChange={e => setForm(prev => ({ ...prev, exchangeRate: e.target.value }))}
-                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+                style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
               />
             </div>
             <div></div>
@@ -336,7 +345,7 @@ const Transfers = () => {
               value={form.description}
               onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Optional"
-              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }}
             />
           </div>
 
@@ -356,6 +365,7 @@ const Transfers = () => {
           <button
             onClick={handleSubmit}
             type="button"
+            className="transfer-action-button"
             style={{
               width: '100%',
               height: 48,
@@ -371,6 +381,116 @@ const Transfers = () => {
             Save transfer
           </button>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(receiptTransfer)}
+        onClose={() => setReceiptTransfer(null)}
+        title="Transfer receipt"
+        subtitle="Tap any transfer in history to open this receipt view."
+      >
+        {receiptTransfer && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <div
+              className="transfer-receipt"
+              style={{
+                borderRadius: 22,
+                padding: 18,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
+                <div>
+                  <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-3)', marginBottom: 4 }}>
+                    Finly cheque
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)' }}>
+                    {formatCurrency(
+                      receiptTransfer.amount,
+                      accounts.find(a => a.id === receiptTransfer.fromAccountId)?.currency || 'UZS'
+                    )}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 16,
+                    background: 'var(--blue-soft)',
+                    color: 'var(--blue)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2)',
+                  }}
+                >
+                  <ReceiptText size={22} />
+                </div>
+              </div>
+
+              <div className="transfer-receipt__grid">
+                <div className="transfer-receipt__row">
+                  <span><Landmark size={14} /> From</span>
+                  <strong>{accounts.find(a => a.id === receiptTransfer.fromAccountId)?.name || 'From account'}</strong>
+                </div>
+                <div className="transfer-receipt__row">
+                  <span><Landmark size={14} /> To</span>
+                  <strong>{accounts.find(a => a.id === receiptTransfer.toAccountId)?.name || 'To account'}</strong>
+                </div>
+                <div className="transfer-receipt__row">
+                  <span><Clock3 size={14} /> Date</span>
+                  <strong>{format(new Date(receiptTransfer.transferDate || receiptTransfer.date), 'PPP')}</strong>
+                </div>
+                <div className="transfer-receipt__row">
+                  <span><Clock3 size={14} /> Time</span>
+                  <strong>
+                    {receiptTransfer.createdAt
+                      ? format(new Date(receiptTransfer.createdAt), 'p')
+                      : 'Recorded by daily transfer log'}
+                  </strong>
+                </div>
+                <div className="transfer-receipt__row">
+                  <span><ScanLine size={14} /> Route</span>
+                  <strong>
+                    {(accounts.find(a => a.id === receiptTransfer.fromAccountId)?.name || 'From')}
+                    {' '}→{' '}
+                    {(accounts.find(a => a.id === receiptTransfer.toAccountId)?.name || 'To')}
+                  </strong>
+                </div>
+                <div className="transfer-receipt__row">
+                  <span><Ticket size={14} /> Transfer ID</span>
+                  <strong>
+                    {`TRX-${String(receiptTransfer.id || Math.random().toString(36).slice(2))
+                      .replace(/-/g, '')
+                      .slice(0, 12)
+                      .toUpperCase()}`}
+                  </strong>
+                </div>
+              </div>
+
+              {receiptTransfer.description && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    paddingTop: 14,
+                    borderTop: '1px dashed rgba(122,140,189,0.28)',
+                  }}
+                >
+                  <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-3)', marginBottom: 6 }}>
+                    Note
+                  </div>
+                  <div style={{ fontSize: 14, color: 'var(--text-1)', lineHeight: 1.5 }}>
+                    {receiptTransfer.description}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

@@ -41,11 +41,11 @@ const TransactionItem = ({
         borderRadius: 14,
         cursor: 'pointer',
         transition: 'background 0.15s ease',
-        background: '#fff',
+        background: 'var(--surface-strong)',
         boxShadow: 'var(--shadow-sm)',
         border: '1px solid var(--border)',
       }}
-      whileHover={{ backgroundColor: '#f8fafc' }}
+      whileHover={{ y: -2 }}
     >
       <div
         style={{

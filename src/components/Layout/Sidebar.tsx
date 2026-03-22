@@ -22,6 +22,7 @@ import { useAuthStore } from '../../store/auth.store'
 import BrandLogo from '../ui/BrandLogo'
 import { sounds } from '../../lib/sounds'
 import { useTheme } from '../../contexts/ThemeContext'
+import { ThemeToggle } from '../ui/ThemeToggle'
 
 type NavItem = {
   label: string
@@ -50,7 +51,7 @@ interface SidebarProps {
 const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const authStore = useAuthStore()
   const user = authStore.user
-  const { isDark, setTheme } = useTheme()
+  const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [muted, setMuted] = useState(() => sounds.getMuted())
   const settingsRef = useRef<HTMLDivElement | null>(null)
@@ -82,13 +83,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
-
-  const handleThemeToggle = () => {
-    startTransition(() => {
-      setTheme(isDark ? 'light' : 'dark')
-      sounds.click()
-    })
-  }
 
   const handleSoundToggle = () => {
     startTransition(() => {
@@ -296,15 +290,7 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                data-button-reset="true"
-                onClick={handleThemeToggle}
-                className={`settings-panel__switch${isDark ? ' is-on' : ''}`}
-                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                <span className="settings-panel__switch-thumb" />
-              </button>
+              <ThemeToggle compact />
             </div>
 
             <div className="settings-panel__row">

@@ -29,23 +29,24 @@ const CurrencyWidget = () => {
   return (
     <div
       style={{
-        background: '#ffffff',
+        background: 'var(--surface-strong)',
         borderRadius: 16,
         padding: 16,
-        boxShadow: 'var(--sh-sm)',
+        boxShadow: 'var(--shadow-sm)',
+        border: '1px solid var(--border)',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Live exchange rates</div>
-          <div style={{ fontWeight: 800, fontSize: 16 }}>Currency Converter</div>
+          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Live exchange rates</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-1)' }}>Currency Converter</div>
         </div>
         <button
           onClick={refresh}
           disabled={loading}
           style={{
-            border: '1px solid #e2e8f0',
-            background: '#f8fafc',
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
             borderRadius: 10,
             padding: '8px 10px',
             cursor: 'pointer',
@@ -77,9 +78,11 @@ const CurrencyWidget = () => {
                 flex: 1,
                 height: 44,
                 borderRadius: 12,
-                border: '1px solid #e2e8f0',
+                border: '1px solid var(--border)',
                 padding: '0 12px',
                 fontSize: 14,
+                background: 'var(--surface)',
+                color: 'var(--text-1)',
               }}
             />
             <select
@@ -89,10 +92,11 @@ const CurrencyWidget = () => {
                 width: 110,
                 height: 44,
                 borderRadius: 12,
-                border: '1px solid #e2e8f0',
+                border: '1px solid var(--border)',
                 padding: '0 10px',
                 fontWeight: 700,
-                background: '#fff',
+                background: 'var(--surface)',
+                color: 'var(--text-1)',
               }}
             >
               {CURRENCIES.map(c => (
@@ -108,25 +112,25 @@ const CurrencyWidget = () => {
               <div
                 key={c.code}
                 style={{
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border)',
                   borderRadius: 12,
                   padding: 12,
-                  background: '#f8fafc',
+                  background: 'var(--surface)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 18 }}>{c.flag}</span>
-                  <span style={{ fontWeight: 800, color: '#0f172a' }}>{c.code}</span>
+                  <span style={{ fontWeight: 800, color: 'var(--text-1)' }}>{c.code}</span>
                 </div>
                 <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15, color: '#2563eb' }}>
                   {formatCurrency(c.value, c.code)}
                 </div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>vs {from}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>vs {from}</div>
               </div>
             ))}
           </div>
 
-           <div style={{ marginTop: 12, fontSize: 12, color: '#94a3b8' }}>
+           <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)' }}>
              Last updated: {minutesAgo != null ? `${minutesAgo} minute(s) ago` : 'Fetching...'}
            </div>
         </>

@@ -287,7 +287,7 @@ const Expenses = () => {
           <div
             key={card.title}
             style={{
-              background: '#fff',
+              background: 'var(--surface-strong)',
               borderRadius: 14,
               padding: 14,
               border: '1px solid var(--border)',
@@ -324,7 +324,7 @@ const Expenses = () => {
           flexDirection: 'column',
           gap: 10,
           padding: 12,
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 14,
           border: '1px solid var(--border)',
           boxShadow: 'var(--shadow-sm)',
@@ -340,7 +340,7 @@ const Expenses = () => {
                 padding: '10px 12px',
                 borderRadius: 12,
                 border: month === opt.value ? '1px solid var(--blue)' : '1px solid var(--border)',
-                background: month === opt.value ? 'var(--blue-soft)' : '#fff',
+                background: month === opt.value ? 'var(--blue-soft)' : 'var(--surface)',
                 color: month === opt.value ? 'var(--blue)' : 'var(--text-1)',
                 fontWeight: 700,
                 minWidth: 120,
@@ -361,7 +361,7 @@ const Expenses = () => {
                 padding: '8px 12px',
                 borderRadius: 999,
                 border: categoryFilter === cat ? '1px solid var(--blue)' : '1px solid var(--border)',
-                background: categoryFilter === cat ? 'var(--blue-soft)' : '#fff',
+                background: categoryFilter === cat ? 'var(--blue-soft)' : 'var(--surface)',
                 fontWeight: 700,
                 color: categoryFilter === cat ? 'var(--blue)' : 'var(--text-1)',
                 whiteSpace: 'nowrap',
@@ -375,7 +375,7 @@ const Expenses = () => {
 
       <div
         style={{
-          background: '#fff',
+          background: 'var(--surface-strong)',
           borderRadius: 16,
           padding: 16,
           boxShadow: 'var(--shadow-md)',

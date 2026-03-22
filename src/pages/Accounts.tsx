@@ -362,7 +362,7 @@ const Accounts = () => {
             style={{
               width: '100%',
               maxWidth: 620,
-              background: '#fff',
+              background: 'var(--surface-strong)',
               borderRadius: isPhone ? '24px 24px 0 0' : 20,
               padding: isPhone ? 18 : 24,
               boxShadow: 'var(--shadow-lg)',
@@ -376,14 +376,14 @@ const Accounts = () => {
               <button
                 onClick={() => setModalOpen(false)}
                 style={{
-                  background: '#f1f5f9',
+                  background: 'var(--surface)',
                   border: 'none',
                   borderRadius: 8,
                   width: 32,
                   height: 32,
                   cursor: 'pointer',
                   fontSize: 16,
-                  color: '#64748b',
+                  color: 'var(--text-3)',
                 }}
               >
                 ✕
@@ -397,7 +397,7 @@ const Accounts = () => {
               }}
             >
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
                   Account Name *
                 </label>
                 <input
@@ -410,10 +410,11 @@ const Accounts = () => {
                     width: '100%',
                     height: 44,
                     padding: '0 14px',
-                    border: '1.5px solid #e2e8f0',
+                    border: '1.5px solid var(--border)',
                     borderRadius: 10,
                     fontSize: 14,
-                    background: '#f8fafc',
+                    background: 'var(--surface)',
+                    color: 'var(--text-1)',
                   }}
                 />
               </div>
@@ -427,7 +428,7 @@ const Accounts = () => {
                 }}
               >
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
                     Type *
                   </label>
                   <select
@@ -437,10 +438,11 @@ const Accounts = () => {
                       width: '100%',
                       height: 44,
                       padding: '0 14px',
-                      border: '1.5px solid #e2e8f0',
+                      border: '1.5px solid var(--border)',
                       borderRadius: 10,
                       fontSize: 14,
-                      background: '#f8fafc',
+                      background: 'var(--surface)',
+                      color: 'var(--text-1)',
                       cursor: 'pointer',
                     }}
                   >
@@ -452,7 +454,7 @@ const Accounts = () => {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
                     Currency *
                   </label>
                   <select
@@ -462,10 +464,11 @@ const Accounts = () => {
                       width: '100%',
                       height: 44,
                       padding: '0 14px',
-                      border: '1.5px solid #e2e8f0',
+                      border: '1.5px solid var(--border)',
                       borderRadius: 10,
                       fontSize: 14,
-                      background: '#f8fafc',
+                      background: 'var(--surface)',
+                      color: 'var(--text-1)',
                       cursor: 'pointer',
                     }}
                   >
@@ -487,7 +490,7 @@ const Accounts = () => {
                   />
 
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
                       Card Type *
                     </label>
                     <select
@@ -497,10 +500,11 @@ const Accounts = () => {
                         width: '100%',
                         height: 44,
                         padding: '0 14px',
-                        border: `1.5px solid ${cardTypeError ? '#ef4444' : '#e2e8f0'}`,
+                        border: `1.5px solid ${cardTypeError ? '#ef4444' : 'var(--border)'}`,
                         borderRadius: 10,
                         fontSize: 14,
-                        background: cardTypeError ? '#fef2f2' : '#f8fafc',
+                        background: cardTypeError ? '#fef2f2' : 'var(--surface)',
+                        color: 'var(--text-1)',
                         cursor: 'pointer',
                       }}
                     >
@@ -511,7 +515,7 @@ const Accounts = () => {
                         </option>
                       ))}
                     </select>
-                    <p style={{ margin: '6px 0 0', minHeight: 18, color: cardTypeError ? '#dc2626' : '#64748b', fontSize: 12 }}>
+                    <p style={{ margin: '6px 0 0', minHeight: 18, color: cardTypeError ? '#dc2626' : 'var(--text-3)', fontSize: 12 }}>
                       {cardTypeError ?? 'Supported by the backend: Uzcard, Humo, Visa, and Mastercard.'}
                     </p>
                   </div>
@@ -519,7 +523,7 @@ const Accounts = () => {
               )}
 
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
                   Initial Balance
                 </label>
                 <input
@@ -533,10 +537,11 @@ const Accounts = () => {
                     width: '100%',
                     height: 44,
                     padding: '0 14px',
-                    border: '1.5px solid #e2e8f0',
+                    border: '1.5px solid var(--border)',
                     borderRadius: 10,
                     fontSize: 14,
-                    background: '#f8fafc',
+                    background: 'var(--surface)',
+                    color: 'var(--text-1)',
                   }}
                 />
               </div>
@@ -582,10 +587,11 @@ const Accounts = () => {
           }}
         >
           <div style={{
-            background: 'white',
+            background: 'var(--surface-strong)',
             borderRadius: 20, padding: 28,
             maxWidth: 420, width: '100%',
             boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
+            border: '1px solid var(--border)',
           }}>
             <div style={{
               width: 52, height: 52,
@@ -599,20 +605,20 @@ const Accounts = () => {
             </div>
             <h3 style={{
               textAlign: 'center', fontSize: 18,
-              fontWeight: 700, color: '#0f172a',
+              fontWeight: 700, color: 'var(--text-1)',
               marginBottom: 8,
             }}>
               {deleteError.title}
             </h3>
             <div style={{
-              background: '#f8fafc',
+              background: 'var(--surface)',
               borderRadius: 12, padding: '14px 16px',
               marginBottom: 20,
             }}>
               {deleteError.lines.map((line, i) => (
                 <p key={i} style={{
                   fontSize: 13,
-                  color: i === 0 ? '#64748b' : '#475569',
+                  color: i === 0 ? 'var(--text-3)' : 'var(--text-2)',
                   margin: i === 0 ? '0 0 10px' : '4px 0',
                   fontWeight: line.startsWith('•') ? 400 : 500,
                 }}>
@@ -627,10 +633,10 @@ const Accounts = () => {
                 onClick={() => setDeleteError(null)}
                 style={{
                   padding: '11px', borderRadius: 10,
-                  border: '1.5px solid #e2e8f0',
+                  border: '1.5px solid var(--border)',
                   background: 'none', cursor: 'pointer',
                   fontWeight: 600, fontSize: 14,
-                  color: '#475569',
+                  color: 'var(--text-2)',
                 }}
               >
                 Close
