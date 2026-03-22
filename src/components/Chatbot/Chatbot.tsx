@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send } from 'lucide-react'
+import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare } from 'lucide-react'
 
 interface ChatMessage {
   id: string
-  role: 'user' | 'bot'
+  role: 'user' | 'assistant' | 'tool'
   text: string
   action?: { label: string; path: string }
+  toolName?: string
 }
 
 interface BotRule {
@@ -143,11 +144,12 @@ const getBotResponse = (input: string): { response: string; action?: { label: st
 const Chatbot = () => {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '0',
-      role: 'bot',
-      text: 'Hi! I\'m your Finly assistant 👋\n\nHow can I help you manage your finances today?',
+      role: 'assistant',
+      text: 'Hi! I am your Finly assistant. Ask me anything about expenses, income, budgets, debts, and reports.',
     },
   ])
   const [inputValue, setInputValue] = useState('')
@@ -164,7 +166,7 @@ const Chatbot = () => {
 
   const handleSendMessage = (text?: string) => {
     const messageText = (text || inputValue).trim()
-    if (!messageText) return
+    if (!messageText || isTyping) return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -175,17 +177,29 @@ const Chatbot = () => {
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
     setShowSuggestions(false)
+    setIsTyping(true)
 
     setTimeout(() => {
       const { response, action } = getBotResponse(messageText)
-      const botMessage: ChatMessage = {
+      const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        role: 'bot',
+        role: 'assistant',
         text: response,
         action,
       }
-      setMessages(prev => [...prev, botMessage])
-    }, 300)
+
+      const toolCallMessage: ChatMessage | null = action
+        ? {
+            id: (Date.now() + 2).toString(),
+            role: 'tool',
+            text: `Ready action: navigate to ${action.path}`,
+            toolName: 'navigate',
+          }
+        : null
+
+      setMessages(prev => [...prev, assistantMessage, ...(toolCallMessage ? [toolCallMessage] : [])])
+      setIsTyping(false)
+    }, 520)
   }
 
   const handleActionClick = (path: string) => {
@@ -203,19 +217,28 @@ const Chatbot = () => {
           position: 'fixed',
           bottom: 24,
           right: 24,
-          width: 52,
-          height: 52,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)',
+          width: 56,
+          height: 56,
+          borderRadius: 16,
+          background: 'linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%)',
           border: 'none',
           color: '#fff',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 12px 30px rgba(124, 58, 237, 0.4)',
+          boxShadow: '0 14px 34px rgba(30, 64, 175, 0.38)',
           zIndex: 1000,
-          animation: isOpen ? 'none' : 'bounce 0.6s ease-in-out',
+          animation: isOpen ? 'none' : 'pulseFloat 3.4s ease-in-out infinite',
+          transition: 'transform 0.18s ease, box-shadow 0.2s ease',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = '0 18px 40px rgba(30, 64, 175, 0.42)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = '0 14px 34px rgba(30, 64, 175, 0.38)'
         }}
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
@@ -224,15 +247,19 @@ const Chatbot = () => {
       {/* Chat Panel */}
       {isOpen && (
         <div
+          className="ledger-enter"
           style={{
             position: 'fixed',
             bottom: 96,
             right: 24,
-            width: 320,
-            height: 480,
-            background: '#fff',
-            borderRadius: 20,
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
+            width: 'min(410px, calc(100vw - 24px))',
+            height: 'min(620px, calc(100vh - 128px))',
+            background: 'linear-gradient(165deg, rgba(255,255,255,0.84), rgba(225,240,255,0.7))',
+            borderRadius: 22,
+            boxShadow: '0 28px 65px rgba(15,23,42,0.18), 0 16px 30px rgba(30,64,175,0.16)',
+            border: '1px solid rgba(255,255,255,0.78)',
+            backdropFilter: 'blur(18px) saturate(130%)',
+            WebkitBackdropFilter: 'blur(18px) saturate(130%)',
             zIndex: 999,
             display: 'flex',
             flexDirection: 'column',
@@ -242,26 +269,49 @@ const Chatbot = () => {
           {/* Header */}
           <div
             style={{
-              background: 'linear-gradient(135deg, #7c3aed 0%, #9333ea 100%)',
-              color: '#fff',
-              padding: 16,
-              fontWeight: 800,
-              fontSize: 14,
+              background: 'linear-gradient(135deg, rgba(30,64,175,0.96) 0%, rgba(3,105,161,0.95) 100%)',
+              color: '#e2ecff',
+              padding: '14px 16px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              borderBottom: '1px solid rgba(255,255,255,0.16)',
             }}
           >
-            <span>Finly Assistant 🤖</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 11,
+                  background: 'rgba(255,255,255,0.2)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(255,255,255,0.24)',
+                }}
+              >
+                <Bot size={18} />
+              </span>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.1 }}>Finly AI Agent</div>
+                <div style={{ fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Sparkles size={12} />
+                  Streaming replies
+                </div>
+              </div>
+            </div>
             <button
               onClick={() => setIsOpen(false)}
               type="button"
               style={{
-                background: 'none',
-                border: 'none',
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 10,
                 color: '#fff',
                 cursor: 'pointer',
-                padding: 0,
+                padding: 6,
+                display: 'inline-flex',
               }}
             >
               <X size={20} />
@@ -273,10 +323,10 @@ const Chatbot = () => {
             style={{
               flex: 1,
               overflow: 'auto',
-              padding: 12,
+              padding: 14,
               display: 'flex',
               flexDirection: 'column',
-              gap: 8,
+              gap: 10,
             }}
           >
             {messages.map(msg => (
@@ -286,49 +336,55 @@ const Chatbot = () => {
                     style={{
                       display: 'flex',
                       justifyContent: 'flex-end',
-                      marginBottom: 4,
+                      marginBottom: 2,
                     }}
                   >
                     <div
                       style={{
-                        background: '#7c3aed',
+                        background: 'linear-gradient(135deg, #1d4ed8, #0ea5e9)',
                         color: '#fff',
-                        borderRadius: 12,
-                        padding: '8px 12px',
-                        maxWidth: '85%',
+                        borderRadius: 14,
+                        padding: '10px 12px',
+                        maxWidth: '86%',
                         wordBreak: 'break-word',
-                        fontSize: 13,
+                        fontSize: 13.5,
                         whiteSpace: 'pre-wrap',
+                        boxShadow: '0 10px 22px rgba(30,64,175,0.25)',
                       }}
                     >
                       {msg.text}
                     </div>
                   </div>
-                ) : (
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'flex-start',
-                      gap: 8,
-                    }}
-                  >
-                    <div
+                ) : msg.role === 'assistant' ? (
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 8 }}>
+                    <span
                       style={{
-                        fontSize: 20,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 10,
+                        background: 'rgba(30,64,175,0.12)',
+                        color: '#1d4ed8',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         flexShrink: 0,
+                        marginTop: 2,
                       }}
                     >
-                      🤖
-                    </div>
+                      <Bot size={16} />
+                    </span>
                     <div style={{ flex: 1 }}>
                       <div
                         style={{
-                          background: '#f1f5f9',
-                          borderRadius: 12,
-                          padding: '8px 12px',
-                          fontSize: 13,
+                          background: 'rgba(255,255,255,0.7)',
+                          borderRadius: 14,
+                          padding: '10px 12px',
+                          fontSize: 13.5,
                           whiteSpace: 'pre-wrap',
                           color: '#0f172a',
+                          border: '1px solid rgba(214,227,255,0.88)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
                         }}
                       >
                         {msg.text}
@@ -337,13 +393,14 @@ const Chatbot = () => {
                         <button
                           onClick={() => handleActionClick(msg.action!.path)}
                           type="button"
+                          className="banking-pulse"
                           style={{
-                            marginTop: 6,
-                            background: '#7c3aed',
+                            marginTop: 8,
+                            background: 'linear-gradient(135deg, #1e3a8a, #0369a1)',
                             color: '#fff',
                             border: 'none',
-                            borderRadius: 8,
-                            padding: '6px 10px',
+                            borderRadius: 10,
+                            padding: '8px 11px',
                             fontSize: 12,
                             fontWeight: 700,
                             cursor: 'pointer',
@@ -354,19 +411,79 @@ const Chatbot = () => {
                       )}
                     </div>
                   </div>
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'flex-start',
+                      paddingLeft: 36,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '100%',
+                        background: 'rgba(224,235,255,0.65)',
+                        border: '1px dashed rgba(96,165,250,0.75)',
+                        borderRadius: 12,
+                        padding: '8px 10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        color: '#1e3a8a',
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <Wrench size={14} />
+                      <span style={{ opacity: 0.8 }}>{msg.toolName || 'tool'}</span>
+                      <span style={{ opacity: 0.55 }}>•</span>
+                      <span>{msg.text}</span>
+                    </div>
+                  </div>
                 )}
               </div>
             ))}
+            {isTyping && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 10,
+                    background: 'rgba(30,64,175,0.12)',
+                    color: '#1d4ed8',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <TerminalSquare size={16} />
+                </span>
+                <div
+                  style={{
+                    borderRadius: 12,
+                    padding: '9px 12px',
+                    background: 'rgba(255,255,255,0.72)',
+                    border: '1px solid rgba(214,227,255,0.88)',
+                    color: '#1e3a8a',
+                    fontSize: 12.5,
+                  }}
+                >
+                  Agent is typing...
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Quick Suggestions */}
           {showSuggestions && messages.length === 1 && (
-            <div style={{ padding: '8px 12px', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(214,227,255,0.82)' }}>
               <div
                 style={{
                   display: 'flex',
-                  gap: 6,
+                  gap: 7,
                   flexWrap: 'wrap',
                 }}
               >
@@ -376,13 +493,13 @@ const Chatbot = () => {
                     onClick={() => handleSendMessage(suggestion)}
                     type="button"
                     style={{
-                      background: '#f1f5f9',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 8,
-                      padding: '6px 10px',
+                      background: 'rgba(255,255,255,0.72)',
+                      border: '1px solid rgba(214,227,255,0.95)',
+                      borderRadius: 10,
+                      padding: '7px 10px',
                       fontSize: 12,
                       fontWeight: 600,
-                      color: '#0f172a',
+                      color: '#1e3a8a',
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
                     }}
@@ -400,38 +517,40 @@ const Chatbot = () => {
               display: 'flex',
               gap: 8,
               padding: 12,
-              borderTop: '1px solid #e2e8f0',
-              background: '#f8fafc',
+              borderTop: '1px solid rgba(214,227,255,0.82)',
+              background: 'rgba(245,250,255,0.82)',
             }}
           >
             <input
               type="text"
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
-              onKeyPress={e => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Type a message..."
+              onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+              placeholder="Ask your finance assistant..."
               style={{
                 flex: 1,
-                border: '1px solid #e2e8f0',
-                borderRadius: 8,
-                padding: '8px 10px',
-                fontSize: 13,
+                border: '1px solid rgba(191,219,254,0.9)',
+                borderRadius: 10,
+                padding: '10px 11px',
+                fontSize: 13.5,
                 outline: 'none',
+                background: 'rgba(255,255,255,0.9)',
               }}
             />
             <button
               onClick={() => handleSendMessage()}
               type="button"
               style={{
-                background: '#7c3aed',
+                background: 'linear-gradient(135deg, #1d4ed8, #0ea5e9)',
                 color: '#fff',
                 border: 'none',
-                borderRadius: 8,
-                padding: '8px 10px',
+                borderRadius: 10,
+                padding: '9px 11px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                boxShadow: '0 10px 24px rgba(30,64,175,0.28)',
               }}
             >
               <Send size={16} />
@@ -441,12 +560,21 @@ const Chatbot = () => {
       )}
 
       <style>{`
-        @keyframes bounce {
+        @keyframes pulseFloat {
           0%, 100% {
             transform: scale(1);
           }
           50% {
-            transform: scale(1.1);
+            transform: translateY(-3px) scale(1.04);
+          }
+        }
+
+        @media (max-width: 640px) {
+          .ledger-enter {
+            right: 12px !important;
+            bottom: 84px !important;
+            width: calc(100vw - 24px) !important;
+            height: min(72vh, 560px) !important;
           }
         }
       `}</style>

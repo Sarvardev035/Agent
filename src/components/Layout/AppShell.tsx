@@ -14,10 +14,21 @@ import {
   LogOut,
   Zap,
   Bell,
+  TriangleAlert,
 } from 'lucide-react'
 import { TokenStorage } from '../../lib/security'
 import { useAuthStore } from '../../store/auth.store'
 import Chatbot from '../Chatbot/Chatbot'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, group: 'MAIN' },
@@ -225,6 +236,7 @@ const AppShell = () => {
   const navigate = useNavigate()
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768)
   const [isTablet, setIsTablet] = useState(window.innerWidth > 768 && window.innerWidth <= 1024)
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false)
   const user = useAuthStore(s => s.user)
 
   useEffect(() => {
@@ -391,7 +403,7 @@ const AppShell = () => {
             }}
           >
             <button
-              onClick={logout}
+              onClick={() => setConfirmLogoutOpen(true)}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -512,7 +524,43 @@ const AppShell = () => {
         </AnimatePresence>
       </main>
 
-      {isMobile && <BottomNav onLogout={logout} />}
+      {isMobile && <BottomNav onLogout={() => setConfirmLogoutOpen(true)} />}
+
+      <AlertDialog open={confirmLogoutOpen} onOpenChange={setConfirmLogoutOpen}>
+        <AlertDialogContent
+          className="max-w-md"
+          style={{
+            background: 'linear-gradient(160deg, rgba(255,255,255,0.9), rgba(236,246,255,0.78))',
+            border: '1px solid rgba(255,255,255,0.75)',
+            boxShadow: '0 24px 64px rgba(30,64,175,0.24)',
+            backdropFilter: 'blur(18px) saturate(130%)',
+            WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+            borderRadius: 18,
+          }}
+        >
+          <AlertDialogHeader>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TriangleAlert size={18} color="#1e3a8a" />
+              <AlertDialogTitle>Log out from your profile?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription>
+              You will be signed out and need to log in again to access your finance dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={logout}
+              style={{
+                background: 'linear-gradient(135deg, #1d4ed8, #0ea5e9)',
+                color: '#fff',
+              }}
+            >
+              Log out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Chatbot />
     </div>
   )
