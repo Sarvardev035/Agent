@@ -65,8 +65,11 @@ const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
           left: 0,
           right: 0,
           height: 64,
-          background: '#ffffff',
-          borderTop: '1px solid #e2e8f0',
+          background: 'linear-gradient(150deg, rgba(255,255,255,0.8), rgba(227,240,255,0.6))',
+          borderTop: '1px solid rgba(255,255,255,0.72)',
+          backdropFilter: 'blur(18px) saturate(130%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+          boxShadow: '0 -10px 30px rgba(30,64,175,0.14)',
           display: 'flex',
           alignItems: 'center',
           zIndex: 50,
@@ -92,7 +95,7 @@ const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: isActive ? '#7c3aed' : '#94a3b8',
+                color: isActive ? '#1d4ed8' : '#64748b',
                 fontSize: 10,
                 fontWeight: isActive ? 600 : 400,
                 padding: '8px 0',
@@ -111,7 +114,7 @@ const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
                     transform: 'translateX(-50%)',
                     width: 32,
                     height: 3,
-                    background: '#7c3aed',
+                    background: 'linear-gradient(135deg,#1d4ed8,#38bdf8)',
                     borderRadius: '0 0 4px 4px',
                   }}
                 />
@@ -128,7 +131,9 @@ const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.4)',
+              background: 'rgba(11,30,58,0.36)',
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
               zIndex: 60,
             }}
           />
@@ -138,11 +143,14 @@ const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
               bottom: 0,
               left: 0,
               right: 0,
-              background: 'white',
+              background: 'linear-gradient(165deg, rgba(255,255,255,0.82), rgba(223,239,255,0.72))',
               borderRadius: '20px 20px 0 0',
               padding: '16px 16px 32px',
               zIndex: 70,
-              boxShadow: '0 -8px 32px rgba(0,0,0,0.15)',
+              boxShadow: '0 -14px 38px rgba(30,64,175,0.2)',
+              borderTop: '1px solid rgba(255,255,255,0.82)',
+              backdropFilter: 'blur(18px) saturate(130%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(130%)',
             }}
           >
             <div
@@ -194,7 +202,7 @@ const BottomNav = ({ onLogout }: { onLogout: () => void }) => {
                 width: '100%',
                 padding: '13px',
                 marginTop: 8,
-                background: '#fff1f2',
+                background: 'rgba(239,68,68,0.12)',
                 border: 'none',
                 borderRadius: 12,
                 color: '#ef4444',
@@ -242,12 +250,21 @@ const AppShell = () => {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9' }}>
+    <div
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        background: 'transparent',
+        position: 'relative',
+      }}
+    >
       {!isMobile && (
         <aside
           style={{
             width: isTablet ? 64 : 240,
-            background: '#0a1628',
+            background: 'linear-gradient(180deg, rgba(10,22,40,0.92), rgba(15,35,70,0.84))',
+            backdropFilter: 'blur(16px) saturate(120%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(120%)',
             position: 'fixed',
             top: 0,
             left: 0,
@@ -275,7 +292,7 @@ const AppShell = () => {
                   width: 32,
                   height: 32,
                   borderRadius: 9,
-                  background: 'linear-gradient(135deg,#2563eb,#7c3aed)',
+                  background: 'linear-gradient(135deg,#1d4ed8,#38bdf8)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -349,8 +366,10 @@ const AppShell = () => {
                       borderRadius: isTablet ? 0 : 10,
                       marginBottom: 2,
                       color: isActive ? '#ffffff' : 'rgba(255,255,255,0.5)',
-                      background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      borderLeft: isActive && !isTablet ? '3px solid #2563eb' : '3px solid transparent',
+                      background: isActive
+                        ? 'linear-gradient(135deg, rgba(37,99,235,0.33), rgba(56,189,248,0.18))'
+                        : 'transparent',
+                      borderLeft: isActive && !isTablet ? '3px solid #38bdf8' : '3px solid transparent',
                       textDecoration: 'none',
                       fontSize: 14,
                       fontWeight: 500,
@@ -411,9 +430,10 @@ const AppShell = () => {
               position: 'sticky',
               top: 0,
               zIndex: 30,
-              background: 'rgba(255,255,255,0.95)',
-              backdropFilter: 'blur(12px)',
-              borderBottom: '1px solid var(--border)',
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.76), rgba(229,240,255,0.65))',
+              backdropFilter: 'blur(16px) saturate(125%)',
+              WebkitBackdropFilter: 'blur(16px) saturate(125%)',
+              borderBottom: '1px solid rgba(255,255,255,0.78)',
               padding: '12px 16px',
               display: 'flex',
               alignItems: 'center',
@@ -425,12 +445,12 @@ const AppShell = () => {
                 style={{
                   padding: '6px 10px',
                   borderRadius: 999,
-                  background: 'linear-gradient(135deg,#2563eb,#7c3aed)',
+                  background: 'linear-gradient(135deg,#1d4ed8,#38bdf8)',
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  boxShadow: '0 6px 16px rgba(37,99,235,0.35)',
+                  boxShadow: '0 8px 18px rgba(30,64,175,0.32)',
                 }}
               >
                 <Zap size={16} color="white" />
@@ -445,13 +465,13 @@ const AppShell = () => {
                   width: 36,
                   height: 36,
                   borderRadius: 12,
-                  border: '1px solid var(--border)',
-                  background: '#fff',
+                  border: '1px solid rgba(255,255,255,0.72)',
+                  background: 'rgba(255,255,255,0.72)',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#0f172a',
-                  boxShadow: 'var(--sh-sm)',
+                  color: '#1d4ed8',
+                  boxShadow: '0 8px 22px rgba(30,64,175,0.14)',
                 }}
               >
                 <Bell size={18} />
@@ -462,13 +482,14 @@ const AppShell = () => {
                   width: 36,
                   height: 36,
                   borderRadius: '50%',
-                  background: '#0f172a',
+                  background: 'linear-gradient(135deg,#1e3a8a,#0284c7)',
                   color: '#fff',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontWeight: 800,
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid rgba(255,255,255,0.7)',
+                  boxShadow: '0 10px 24px rgba(30,64,175,0.28)',
                 }}
               >
                 {initials}
@@ -483,7 +504,7 @@ const AppShell = () => {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             style={{ padding: isMobile ? '16px 16px 24px' : '28px 32px' }}
           >
             <Outlet />
