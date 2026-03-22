@@ -16,11 +16,16 @@ import Statistics from './pages/Statistics'
 import CalendarView from './pages/CalendarView'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
+import { seedDefaultCategories } from './lib/seedCategories'
 import './index.css'
 
 export default function App() {
   const initAuth = useAuthStore(s => s.initAuth)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   useEffect(() => { initAuth() }, [initAuth])
+  useEffect(() => {
+    if (isAuthenticated) seedDefaultCategories()
+  }, [isAuthenticated])
 
   return (
     <BrowserRouter>
