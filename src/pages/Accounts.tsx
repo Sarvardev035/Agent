@@ -40,7 +40,16 @@ const Accounts = () => {
   const { convert, rates, loading: rateLoading, lastUpdated, refresh } = useExchangeRates()
 
   useEffect(() => {
-    refreshAccounts()
+    let cancelled = false
+
+    const load = async () => {
+      if (!cancelled) {
+        await refreshAccounts()
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
   }, [refreshAccounts])
 
   const portfolio = useMemo(() => {
