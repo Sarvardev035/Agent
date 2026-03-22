@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { AxiosError } from 'axios'
 import { TokenStorage } from '../lib/security'
+import { authService } from '../services/auth.service'
 
 interface User {
   id: string
