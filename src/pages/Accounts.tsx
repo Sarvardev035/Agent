@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -27,9 +28,12 @@ interface AccountForm {
 }
 
 const Accounts = () => {
+  const navigate = useNavigate()
   const { accounts, refreshAccounts, isLoadingAccounts } = useFinanceStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<{ title: string; lines: string[]; accountId: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState<AccountForm>({
     name: '',
     type: 'CASH',
@@ -77,6 +81,9 @@ const Accounts = () => {
         type: form.type,
         currency: form.currency,
         initialBalance: Number(form.initialBalance) || 0,
+        cardNumber: null,
+        cardType: null,
+        expiryDate: null,
       })
       toast.success('Account created')
       setModalOpen(false)
@@ -89,14 +96,38 @@ const Accounts = () => {
 
   const handleDelete = async () => {
     if (!confirmId) return
+    setDeleting(true)
     try {
-       await api.delete(`/api/accounts/${confirmId}`)
-      toast.success('Account deleted')
+      await api.delete(`/api/accounts/${confirmId}`)
+      toast.success('Account deleted successfully')
       setConfirmId(null)
-      refreshAccounts()
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to delete account'
-      toast.error(msg)
+      await refreshAccounts()
+    } catch (err: any) {
+      const status = err?.response?.status
+        || (err.message?.includes('409') ? 409 : 0)
+
+      if (status === 409 || err.message?.includes('409')
+          || err.message?.includes('transactions')) {
+        setDeleteError({
+          title: 'Cannot delete this account',
+          lines: [
+            'This account has transactions linked to it.',
+            'To delete this account you must first:',
+            '• Delete all expenses from this account',
+            '• Delete all income records from this account',
+            '• Delete all transfers involving this account',
+            'Then try deleting again.',
+          ],
+          accountId: confirmId,
+        })
+        setConfirmId(null)
+      } else {
+        const msg = err instanceof Error ? err.message : 'Failed to delete account'
+        toast.error(msg)
+        setConfirmId(null)
+      }
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -373,6 +404,93 @@ const Accounts = () => {
         message="Delete this account?"
         confirmLabel="Delete"
       />
+
+      {deleteError && (
+        <div
+          onClick={e => e.target === e.currentTarget
+            && setDeleteError(null)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16, zIndex: 200,
+          }}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: 20, padding: 28,
+            maxWidth: 420, width: '100%',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{
+              width: 52, height: 52,
+              borderRadius: '50%',
+              background: '#fff1f2',
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 24, margin: '0 auto 16px',
+            }}>
+              🔒
+            </div>
+            <h3 style={{
+              textAlign: 'center', fontSize: 18,
+              fontWeight: 700, color: '#0f172a',
+              marginBottom: 8,
+            }}>
+              {deleteError.title}
+            </h3>
+            <div style={{
+              background: '#f8fafc',
+              borderRadius: 12, padding: '14px 16px',
+              marginBottom: 20,
+            }}>
+              {deleteError.lines.map((line, i) => (
+                <p key={i} style={{
+                  fontSize: 13,
+                  color: i === 0 ? '#64748b' : '#475569',
+                  margin: i === 0 ? '0 0 10px' : '4px 0',
+                  fontWeight: line.startsWith('•') ? 400 : 500,
+                }}>
+                  {line}
+                </p>
+              ))}
+            </div>
+            <div style={{ display: 'grid',
+              gridTemplateColumns: '1fr 1fr', gap: 10,
+            }}>
+              <button
+                onClick={() => setDeleteError(null)}
+                style={{
+                  padding: '11px', borderRadius: 10,
+                  border: '1.5px solid #e2e8f0',
+                  background: 'none', cursor: 'pointer',
+                  fontWeight: 600, fontSize: 14,
+                  color: '#475569',
+                }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setDeleteError(null)
+                  navigate('/expenses')
+                }}
+                style={{
+                  padding: '11px', borderRadius: 10,
+                  border: 'none',
+                  background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+                  color: 'white', cursor: 'pointer',
+                  fontWeight: 600, fontSize: 14,
+                }}
+              >
+                View Expenses →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

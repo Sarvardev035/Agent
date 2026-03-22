@@ -1,9 +1,9 @@
-import { CreditCard, Wallet, WalletCards } from 'lucide-react'
+import { useState } from 'react'
 import { formatCurrency } from '../../utils/helpers'
 
 interface BankCardProps {
   name: string
-  last4: string | number
+  last4?: string | number
   balance: number
   currency: string
   type: 'BANK_CARD' | 'CASH'
@@ -12,132 +12,130 @@ interface BankCardProps {
   productType?: string
 }
 
-const typeIcon = {
-  BANK_CARD: CreditCard,
-  CASH: Wallet,
-}
-
-const BankCard = ({ name, last4, balance, currency, type, accountId, institution, productType }: BankCardProps) => {
-  const Icon = typeIcon[type]
-  const handleCopy = () => {
-    const number = `•••• •••• •••• ${last4}`
-    navigator.clipboard?.writeText(number).catch(() => {})
-  }
+const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
+  const [flipped, setFlipped] = useState(false)
 
   return (
-    <div className="flip-card" style={{ width: 280, height: 168 }}>
-      <div className="flip-card-inner" style={{ width: '100%', height: '100%' }}>
-        {/* Front */}
-        <div
-          className="flip-card-front"
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 16,
-            padding: 18,
-            color: '#fff',
-            background: 'linear-gradient(135deg, #0a1628, #1e3a6e, #2563eb)',
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: 'var(--sh-lg)',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage:
-                'radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)',
-              backgroundSize: '12px 12px',
-              opacity: 0.6,
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              width: 120,
-              height: 120,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.08)',
-              top: -30,
-              right: -20,
-            }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ fontWeight: 800, letterSpacing: '-0.01em', fontSize: 18 }}>Finly</div>
-              {institution && (
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>{institution}</span>
-              )}
-            </div>
-            <Icon size={20} aria-label={productType ?? type} />
+    <div
+      onMouseEnter={() => setFlipped(true)}
+      onMouseLeave={() => setFlipped(false)}
+      style={{
+        width: 'clamp(240px,80vw,280px)',
+        height: 160,
+        flexShrink: 0,
+        perspective: '1000px',
+      }}
+    >
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        transformStyle: 'preserve-3d',
+        transform: flipped
+          ? 'rotateY(180deg)'
+          : 'rotateY(0deg)',
+        transition: 'transform 0.6s cubic-bezier(0.4,0,0.2,1)',
+      }}>
+
+        {/* FRONT FACE */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 16,
+          padding: '18px 20px',
+          background:
+            'linear-gradient(135deg,#0a1628 0%,#1e3a6e 60%,#2563eb 100%)',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          color: 'white',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', top: -30, right: -30,
+            width: 130, height: 130, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)',
+            pointerEvents: 'none',
+          }}/>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <span style={{
+              fontWeight: 800, fontSize: 15,
+            }}>
+              Finly
+            </span>
+            <span style={{ fontSize: 12, opacity: 0.7 }}>
+              {type === 'CASH' ? '💵 Cash' : '💳 Card'}
+            </span>
           </div>
-          <div style={{ marginTop: 14, display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div
-              aria-hidden
-              style={{
-                width: 46,
-                height: 32,
-                borderRadius: 6,
-                background:
-                  'linear-gradient(135deg, rgba(255,255,255,0.75), rgba(255,255,255,0.3))',
-                boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.18)',
-              }}
-            />
-            <div style={{ fontSize: 18, letterSpacing: '0.14em' }}>•••• •••• •••• {last4}</div>
+          <div style={{
+            fontSize: 13, letterSpacing: '0.15em', opacity: 0.7,
+          }}>
+            •••• •••• •••• ••••
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+          }}>
             <div>
-              <div style={{ fontSize: 11, opacity: 0.7 }}>CARDHOLDER</div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{name}</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, opacity: 0.7 }}>BALANCE</div>
-              <div className="tabular" style={{ fontWeight: 800, fontSize: 18 }}>
+              <div style={{
+                fontSize: 10, opacity: 0.5,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+              }}>
+                Balance
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 700 }}>
                 {formatCurrency(balance, currency)}
               </div>
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.6 }}>
+              {currency}
             </div>
           </div>
         </div>
 
-        {/* Back */}
-        <div
-          className="flip-card-back"
-          onClick={handleCopy}
-          role="button"
-          aria-label="Copy masked card number"
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 16,
-            padding: 18,
-            color: '#fff',
-            background: 'linear-gradient(135deg, #0a1628, #0f2040, #1a3a6b)',
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: 'var(--sh-lg)',
-            cursor: 'pointer',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%)',
-              backgroundSize: '12px 12px',
-              opacity: 0.4,
-            }}
-          />
-          <div style={{ fontSize: 12, opacity: 0.8 }}>Account #{accountId ?? '—'}</div>
-          <div style={{ marginTop: 18, fontSize: 13, opacity: 0.8 }}>Current balance</div>
-          <div className="tabular" style={{ fontSize: 26, fontWeight: 800 }}>
+        {/* BACK FACE */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 16,
+          padding: '20px',
+          background:
+            'linear-gradient(135deg,#0f2040 0%,#0a1628 100%)',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)',
+          color: 'white',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <div style={{ fontSize: 12, opacity: 0.5 }}>
+            Account holder
+          </div>
+          <div style={{
+            fontSize: 16, fontWeight: 700, textAlign: 'center',
+          }}>
+            {name}
+          </div>
+          <div style={{
+            marginTop: 8, fontSize: 13, opacity: 0.6,
+          }}>
+            {type === 'CASH' ? 'Cash Wallet' : 'Bank Card'}
+          </div>
+          <div style={{
+            fontSize: 15, fontWeight: 700, color: '#a78bfa',
+          }}>
             {formatCurrency(balance, currency)}
-          </div>
-          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-            Type: {(productType ?? type).toString().toLowerCase()} • Institution: {institution ?? 'Finly'}
-          </div>
-          <div style={{ marginTop: 14, fontSize: 13, opacity: 0.85 }}>
-            Tap to copy number •••• •••• •••• {last4}
           </div>
         </div>
       </div>

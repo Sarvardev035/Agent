@@ -50,13 +50,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email, password) => {
     set({ isLoading: true })
     try {
-      // 1. Log request details
-      const endpoint = '/api/auth/login'
-      const fullUrl = `https://finly.uyqidir.uz${endpoint}`
-      console.log('🚀 [Auth] Initiating login request')
-      console.log('🔗 [Auth] Full URL:', fullUrl)
-      console.log('📦 [Auth] Payload:', { email, password: '***' })
-
       const response = await authService.login({ email, password })
       const payload = asRecord(response.data)
       const inner = asRecord(payload.data)

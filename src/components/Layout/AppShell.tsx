@@ -1,14 +1,29 @@
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bell, Zap } from 'lucide-react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
+import api from '../../lib/api'
+import { safeArray } from '../../lib/helpers'
 
 const AppShell = () => {
   const location = useLocation()
   const isMobile = useMediaQuery('(max-width: 768px)')
   const isTablet = useMediaQuery('(max-width: 1024px)')
+  const [notifications, setNotifications] = useState<any[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    api.get('/api/notifications')
+      .then(res => {
+        if (!cancelled)
+          setNotifications(safeArray(res.data))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -69,9 +84,22 @@ const AppShell = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#0f172a',
+                position: 'relative',
               }}
             >
               <Bell size={18} />
+              {notifications.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4,
+                  background: '#ef4444', color: 'white',
+                  width: 18, height: 18, borderRadius: '50%',
+                  fontSize: 10, fontWeight: 700,
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  {notifications.length > 9 ? '9+' : notifications.length}
+                </span>
+              )}
             </button>
           </header>
         )}

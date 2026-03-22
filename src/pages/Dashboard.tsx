@@ -173,13 +173,22 @@ const Dashboard = () => {
 
       {/* ── ROW 2: Hero balance card ── */}
       <div style={{
-        background: 'linear-gradient(135deg,#0a1628 0%,#0f2040 40%,#1d4ed8 100%)',
-        borderRadius: 20,
+        background:
+          'linear-gradient(135deg,rgba(10,22,40,0.9) 0%,' +
+          'rgba(30,58,110,0.85) 50%,' +
+          'rgba(37,99,235,0.8) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 24,
         padding: 'clamp(20px,3vw,28px)',
         marginBottom: 20,
         position: 'relative',
         overflow: 'hidden',
         color: 'white',
+        boxShadow:
+          '0 8px 32px rgba(37,99,235,0.3),' +
+          'inset 0 1px 0 rgba(255,255,255,0.15)',
       }}>
         {/* Decorative circles */}
         <div style={{
@@ -261,12 +270,17 @@ const Dashboard = () => {
             whileHover={{ y: -4 }}
             style={{
               borderLeft:`4px solid ${card.color}`,
-              background:card.bg,
+              background: 'rgba(255,255,255,0.7)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255,255,255,0.5)',
               cursor:'pointer',
               padding:'16px',
-              borderRadius:'12px',
-              border:`1px solid ${card.color}20`,
+              borderRadius:'16',
               transition:'all 0.2s',
+              boxShadow:
+                '0 2px 12px rgba(0,0,0,0.06),' +
+                'inset 0 1px 0 rgba(255,255,255,0.8)',
             }}
           >
             <div style={{ fontSize:11,fontWeight:700,

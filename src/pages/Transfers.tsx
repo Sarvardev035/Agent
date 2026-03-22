@@ -9,7 +9,8 @@ import Modal from '../components/ui/Modal'
 import { transfersApi } from '../api/transfersApi'
 import { useFinance } from '../context/FinanceContext'
 import { formatCurrency, smartDate } from '../utils/helpers'
-import { safeArray } from '../lib/helpers'
+import { safeArray, safeObject } from '../lib/helpers'
+import api from '../lib/api'
 
 interface TransferForm {
   amount: string
@@ -25,6 +26,7 @@ const Transfers = () => {
   const [transfers, setTransfers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [rates, setRates] = useState<any>(null)
   const [form, setForm] = useState<TransferForm>({
     amount: '',
     fromAccountId: '',
@@ -54,6 +56,9 @@ const Transfers = () => {
 
   useEffect(() => {
     loadTransfers()
+    api.get('/api/exchange-rates')
+      .then(res => setRates(safeObject(res.data)))
+      .catch(() => {})
   }, [])
 
   const handleSubmit = async () => {
@@ -96,11 +101,29 @@ const Transfers = () => {
   const fromAccount = useMemo(() => accounts.find(a => a.id === form.fromAccountId), [accounts, form.fromAccountId])
   const toAccount = useMemo(() => accounts.find(a => a.id === form.toAccountId), [accounts, form.toAccountId])
   const currenciesDiffer = !!(fromAccount?.currency && toAccount?.currency && fromAccount.currency !== toAccount.currency)
+  
+  const calculateConversion = (
+    amount: number,
+    from: string,
+    to: string,
+    exchangeRates: any
+  ): number => {
+    if (!exchangeRates || from === to) return amount
+    const rateFrom = exchangeRates[from]?.rate || 1
+    const rateTo = exchangeRates[to]?.rate || 1
+    return (amount / rateFrom) * rateTo
+  }
+  
   const convertedAmount = useMemo(() => {
     const amt = Number(form.amount)
-    const rate = Number(form.exchangeRate) || 1
-    return currenciesDiffer ? amt * rate : amt
-  }, [currenciesDiffer, form.amount, form.exchangeRate])
+    if (!currenciesDiffer) return amt
+    return calculateConversion(
+      amt,
+      fromAccount?.currency || 'UZS',
+      toAccount?.currency || 'UZS',
+      rates
+    )
+  }, [currenciesDiffer, form.amount, fromAccount?.currency, toAccount?.currency, rates])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
@@ -278,17 +301,29 @@ const Transfers = () => {
                 style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
               />
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', fontSize: 13, color: 'var(--text-2)' }}>
-              {currenciesDiffer ? (
-                <div>
-                  Preview: {formatCurrency(Number(form.amount) || 0, fromAccount?.currency || 'UZS')} →{' '}
-                  {formatCurrency(convertedAmount || 0, toAccount?.currency || fromAccount?.currency || 'UZS')}
-                </div>
-              ) : (
-                <div>Rates default to 1 when currencies match.</div>
-              )}
-            </div>
+            <div></div>
           </div>
+
+          {currenciesDiffer && form.amount && (
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: 10, padding: '10px 14px',
+              fontSize: 13, color: '#166534',
+              marginBottom: 12,
+            }}>
+              💱 {form.amount} {fromAccount?.currency} ≈{' '}
+              <strong>
+                {convertedAmount.toLocaleString(undefined, { 
+                  minimumFractionDigits: 2, 
+                  maximumFractionDigits: 2 
+                })} {toAccount?.currency}
+              </strong>
+              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                Rate updates automatically
+              </div>
+            </div>
+          )}
           <div>
             <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Description</label>
             <input
@@ -298,6 +333,20 @@ const Transfers = () => {
               style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             />
           </div>
+
+          {form.fromAccountId === form.toAccountId && form.fromAccountId && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: 10,
+              padding: '10px 12px',
+              fontSize: 13,
+              color: '#991b1b',
+            }}>
+              ⚠️ From and To accounts must be different
+            </div>
+          )}
+
           <button
             onClick={handleSubmit}
             type="button"
