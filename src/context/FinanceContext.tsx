@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { accountsApi } from '../api/accountsApi'
 import { safeArray } from '../lib/helpers'
+import { TokenStorage } from '../lib/security'
 
 type FinanceContextValue = {
   accounts: any[]
@@ -15,6 +16,11 @@ export const FinanceProvider = ({ children }: { children: React.ReactNode }) => 
   const [loading, setLoading] = useState(false)
 
   const refreshAccounts = useCallback(async () => {
+    if (!TokenStorage.isValid()) {
+      setAccounts([])
+      return
+    }
+
     try {
       setLoading(true)
       const { data } = await accountsApi.getAll()
