@@ -7,7 +7,6 @@ const CURRENCIES = [
   { code: 'USD', flag: '🇺🇸' },
   { code: 'UZS', flag: '🇺🇿' },
   { code: 'EUR', flag: '🇪🇺' },
-  { code: 'RUB', flag: '🇷🇺' },
 ]
 
 const CurrencyWidget = () => {

@@ -71,7 +71,7 @@ Your account balance updates automatically! 💸`,
 1. Go to "Accounts" page
 2. Click "+ Add Account"
 3. Choose type: Cash or Bank Card
-4. Set currency (UZS, USD, EUR, RUB)
+4. Set currency (UZS, USD, EUR)
 5. Enter initial balance 💳`,
     action: { label: 'Go to Accounts', path: '/accounts' },
   },

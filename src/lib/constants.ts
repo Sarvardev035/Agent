@@ -31,4 +31,5 @@ export const DEBT_TYPES = [
 ] as const
 
 // Currencies
-export const CURRENCIES = ['UZS', 'USD', 'EUR', 'RUB'] as const
+// Backend supports only EUR, USD, UZS
+export const CURRENCIES = ['UZS', 'USD', 'EUR'] as const
