@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 type Theme = 'light' | 'dark' | 'auto';
 
@@ -11,6 +11,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const didMountRef = useRef(false);
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme') as Theme | null;
     return stored || 'auto';
@@ -38,6 +39,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.toggle('dark', shouldBeDark);
       root.setAttribute('data-theme', shouldBeDark ? 'dark' : 'light');
     };
+
+    const root = document.documentElement;
+    if (didMountRef.current) {
+      root.classList.add('theme-transitioning');
+      window.setTimeout(() => {
+        root.classList.remove('theme-transitioning');
+      }, 2000);
+    } else {
+      didMountRef.current = true;
+    }
 
     updateTheme();
     localStorage.setItem('theme', theme);

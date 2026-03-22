@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, Zap } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { useRouteScrollReveal } from '../../hooks/useRouteScrollReveal'
 import api from '../../lib/api'
 import { safeArray } from '../../lib/helpers'
-import { SoundToggle } from '../ui/SoundToggle'
+import BrandLogo from '../ui/BrandLogo'
 
 const AppShell = () => {
   const location = useLocation()
@@ -51,7 +51,7 @@ const AppShell = () => {
               position: 'sticky',
               top: 0,
               zIndex: 20,
-              padding: '12px 4px',
+              padding: '12px 10px',
               background: 'var(--surface-strong)',
               backdropFilter: 'blur(18px) saturate(145%)',
               borderBottom: '1px solid var(--border)',
@@ -63,30 +63,12 @@ const AppShell = () => {
               boxShadow: 'var(--shadow-sm)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div
-                style={{
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  background: 'var(--accent-gradient-soft)',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  boxShadow: '0 12px 28px rgba(95,123,255,0.24)',
-                }}
-              >
-                <Zap size={16} color="white" />
-                <span style={{ fontWeight: 800, letterSpacing: '-0.01em', fontFamily: 'Space Grotesk, Inter, sans-serif' }}>
-                  Finly
-                </span>
-              </div>
-            </div>
+            <BrandLogo />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <SoundToggle />
               <button
                 type="button"
                 aria-label="Notifications"
+                data-button-reset="true"
                 style={{
                   width: 38,
                   height: 38,

@@ -14,6 +14,7 @@ export const SoundToggle = () => {
       onClick={toggle}
       title={muted ? 'Enable sounds' : 'Mute sounds'}
       type="button"
+      data-button-reset="true"
       style={{
         width: 36,
         height: 36,

@@ -32,12 +32,10 @@ const StatCard = ({
 
   return (
     <div
+      className="ui-stat-card"
       style={{
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)',
         borderRadius: 'var(--radius-lg)',
         padding: 20,
-        boxShadow: 'var(--shadow-md)',
-        border: '1px solid var(--border)',
         position: 'relative',
         overflow: 'hidden',
       }}

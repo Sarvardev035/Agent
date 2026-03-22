@@ -6,7 +6,6 @@ import {
   TrendingDown,
   TrendingUp,
   ArrowLeftRight,
-  Menu,
   HandCoins,
   PieChart,
   BarChart3,
@@ -14,6 +13,9 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
+import MobileMenuButton from '../ui/MobileMenuButton'
+import { ThemeToggle } from '../ui/ThemeToggle'
+import { SoundToggle } from '../ui/SoundToggle'
 
 const BottomNav = () => {
   const location = useLocation()
@@ -26,7 +28,7 @@ const BottomNav = () => {
     { path: '/expenses', icon: TrendingDown, label: 'Expenses' },
     { path: '/income', icon: TrendingUp, label: 'Income' },
     { path: '/transfers', icon: ArrowLeftRight, label: 'Transfer' },
-    { action: () => setShowMore(true), icon: Menu, label: 'More' },
+    { action: () => setShowMore(true), label: 'More' },
   ]
 
   const moreItems = [
@@ -64,6 +66,7 @@ const BottomNav = () => {
             <button
               key={tab.label}
               onClick={() => (tab.action ? tab.action() : tab.path && navigate(tab.path))}
+              data-button-reset="true"
               style={{
                 flex: 1,
                 display: 'flex',
@@ -81,7 +84,7 @@ const BottomNav = () => {
               }}
               type="button"
             >
-              <tab.icon size={20} />
+              {'icon' in tab && tab.icon ? <tab.icon size={20} /> : <MobileMenuButton open={showMore} />}
               <span>{tab.label}</span>
               {active && (
                 <span
@@ -139,6 +142,10 @@ const BottomNav = () => {
                   margin: '0 auto 20px',
                 }}
               />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+                <ThemeToggle />
+                <SoundToggle />
+              </div>
               <div style={{ display: 'grid', gap: 10 }}>
                 {moreItems.map(item => (
                   <button
@@ -179,14 +186,12 @@ const BottomNav = () => {
                     gap: 10,
                     padding: '12px 14px',
                     borderRadius: 12,
-                    border: '1px solid var(--accent-border)',
-                    background: 'var(--accent-gradient-warm)',
-                    color: '#fff',
+                    background: 'transparent',
                     fontWeight: 700,
                     fontSize: 14,
                     cursor: 'pointer',
-                    boxShadow: '0 14px 32px rgba(196,93,255,0.2)',
                   }}
+                  className="logout-button"
                   type="button"
                 >
                   <LogOut size={18} />

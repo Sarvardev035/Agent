@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ArrowUpRight, Bitcoin } from 'lucide-react'
 import { formatCurrency } from '../../utils/helpers'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 
@@ -42,13 +43,11 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
       }}>
 
         {/* FRONT FACE */}
-        <div style={{
+        <div className="plastic-account-card" style={{
           position: 'absolute',
           inset: 0,
-          borderRadius: 16,
-          padding: '18px 20px',
-          background:
-            'linear-gradient(135deg,#0a1628 0%,#1e3a6e 60%,#2563eb 100%)',
+          borderRadius: 22,
+          padding: '18px 18px 16px',
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
           color: 'white',
@@ -58,9 +57,15 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
           overflow: 'hidden',
         }}>
           <div style={{
-            position: 'absolute', top: -30, right: -30,
-            width: 130, height: 130, borderRadius: '50%',
-            background: 'rgba(255,255,255,0.06)',
+            position: 'absolute', top: -28, right: -20,
+            width: 120, height: 120, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.12)',
+            pointerEvents: 'none',
+          }}/>
+          <div style={{
+            position: 'absolute', left: -18, bottom: 38,
+            width: 100, height: 100, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.1)',
             pointerEvents: 'none',
           }}/>
           <div style={{
@@ -68,51 +73,50 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-            <span style={{
-              fontWeight: 800, fontSize: 15,
-            }}>
+            <span className="plastic-account-card__brand">
+              <Bitcoin size={16} />
               Finly
             </span>
-            <span style={{ fontSize: 12, opacity: 0.7 }}>
-              {type === 'CASH' ? '💵 Cash' : '💳 Card'}
+            <span className="plastic-account-card__type">
+              {type === 'CASH' ? 'Cash reserve' : 'Plastic account'}
             </span>
-          </div>
-          <div style={{
-            fontSize: 13, letterSpacing: '0.15em', opacity: 0.7,
-          }}>
-            •••• •••• •••• ••••
           </div>
           <div style={{
             display: 'flex',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            alignItems: 'flex-end',
           }}>
-            <div>
-              <div style={{
-                fontSize: 10, opacity: 0.5,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-              }}>
-                Balance
+            <div style={{ fontSize: 13, letterSpacing: '0.15em', opacity: 0.78 }}>
+              •••• •••• •••• ••••
+            </div>
+            <ArrowUpRight size={18} style={{ opacity: 0.7 }} />
+          </div>
+          <div className="plastic-account-card__footer">
+            <div style={{ minWidth: 0 }}>
+              <div className="plastic-account-card__footer-label">
+                Account
               </div>
-              <div className="balance-large" style={{ fontSize: 17 }}>
-                {formatCurrency(balance, currency)}
+              <div className="plastic-account-card__footer-name">
+                {name}
               </div>
             </div>
-            <div style={{ fontSize: 11, opacity: 0.6 }}>
-              {currency}
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div className="plastic-account-card__footer-label">
+                Balance
+              </div>
+              <div className="balance-large" style={{ fontSize: 18 }}>
+                {formatCurrency(balance, currency)}
+              </div>
             </div>
           </div>
         </div>
 
         {/* BACK FACE */}
-        <div style={{
+        <div className="plastic-account-card plastic-account-card--back" style={{
           position: 'absolute',
           inset: 0,
-          borderRadius: 16,
+          borderRadius: 22,
           padding: '20px',
-          background:
-            'linear-gradient(135deg,#0f2040 0%,#0a1628 100%)',
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
           transform: 'rotateY(180deg)',
@@ -123,8 +127,8 @@ const BankCard = ({ name, balance, currency, type }: BankCardProps) => {
           alignItems: 'center',
           gap: 8,
         }}>
-          <div style={{ fontSize: 12, opacity: 0.5 }}>
-            Account holder
+          <div style={{ fontSize: 12, opacity: 0.6 }}>
+            Finly plastic
           </div>
           <div style={{
             fontSize: 16, fontWeight: 700, textAlign: 'center',

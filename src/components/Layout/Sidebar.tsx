@@ -8,12 +8,13 @@ import {
   PieChart,
   BarChart3,
   Calendar,
-  Zap,
   LogOut,
   Wallet,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
 import { SoundToggle } from '../ui/SoundToggle'
+import { ThemeToggle } from '../ui/ThemeToggle'
+import BrandLogo from '../ui/BrandLogo'
 
 type NavItem = {
   label: string
@@ -81,32 +82,7 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 12,
-            background: 'var(--accent-gradient-soft)',
-            display: 'grid',
-            placeItems: 'center',
-            boxShadow: '0 10px 24px rgba(100,120,255,0.22)',
-          }}
-        >
-          <Zap size={18} color="#fff" />
-        </div>
-        {!collapsed && (
-          <span
-            style={{
-              color: '#fff',
-              fontWeight: 800,
-              letterSpacing: '-0.01em',
-              fontFamily: 'Space Grotesk, Inter, sans-serif',
-              fontSize: 18,
-            }}
-          >
-            Finly
-          </span>
-        )}
+        <BrandLogo compact={collapsed} />
       </div>
 
       <nav style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '10px 6px' : '14px 12px' }}>
@@ -194,23 +170,29 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexDirection: collapsed ? 'column' : 'row',
+          }}
+        >
+          <ThemeToggle />
+          <SoundToggle />
           <button
             onClick={handleLogout}
+            className="logout-button"
             style={{
               width: collapsed ? 40 : '100%',
               padding: '10px 12px',
               borderRadius: 12,
-              border: '1px solid var(--accent-border)',
-              background: 'var(--accent-gradient-warm)',
-              color: '#fff',
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
               cursor: 'pointer',
-              boxShadow: '0 12px 28px rgba(196,93,255,0.22)',
               flexShrink: 0,
             }}
             type="button"
@@ -218,11 +200,10 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
             <LogOut size={16} />
             {!collapsed && 'Logout'}
           </button>
-          <SoundToggle />
         </div>
         {!collapsed && (
           <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600, marginTop: 10 }}>
-            Interface sounds
+            Theme, sound, and exit controls
           </div>
         )}
       </div>
