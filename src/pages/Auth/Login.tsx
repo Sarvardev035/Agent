@@ -45,11 +45,17 @@ export default function Login() {
       const tokenData = data?.data ?? data
       const accessToken = tokenData?.accessToken ?? tokenData?.data?.accessToken
       const refreshToken = tokenData?.refreshToken ?? tokenData?.data?.refreshToken
+      const user = tokenData?.user ?? tokenData?.data?.user
 
       if (!accessToken) throw new Error('No token received')
 
       localStorage.setItem('finly_access_token', accessToken)
       localStorage.setItem('finly_refresh_token', refreshToken || '')
+      
+      if (user?.name) localStorage.setItem('finly_user_name', user.name)
+      if (user?.email) localStorage.setItem('finly_user_email', user.email)
+      if (!user?.name) localStorage.setItem('finly_user_email', result.data.email)
+      
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {

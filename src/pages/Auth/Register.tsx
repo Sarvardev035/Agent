@@ -77,6 +77,10 @@ export default function Register() {
       const refreshToken = (inner.refreshToken || root.refreshToken) as string | undefined
       if (accessToken) TokenStorage.set(accessToken)
       if (refreshToken) localStorage.setItem('finly_refresh_token', refreshToken)
+      
+      localStorage.setItem('finly_user_name', result.data.fullName)
+      localStorage.setItem('finly_user_email', result.data.email)
+      
       toast.success('Account created! Welcome to Finly.')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
