@@ -12,6 +12,7 @@ import { formatCurrency, getBudgetColor } from '../utils/helpers'
 import { useFinance } from '../context/FinanceContext'
 import { categoriesService } from '../services/categories.service'
 import { safeArray } from '../lib/helpers'
+import { CURRENCIES } from '../lib/constants'
 
 interface CategoryBudget {
   categoryId: string
@@ -29,8 +30,10 @@ const Budget = () => {
   const [goalModal, setGoalModal] = useState(false)
   const [categoryModal, setCategoryModal] = useState(false)
   const [goalInput, setGoalInput] = useState('')
+  const [goalCurrency, setGoalCurrency] = useState<(typeof CURRENCIES)[number]>('UZS')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [categoryLimit, setCategoryLimit] = useState('')
+  const [categoryCurrency, setCategoryCurrency] = useState<(typeof CURRENCIES)[number]>('UZS')
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([])
 
   const now = new Date()
@@ -102,7 +105,13 @@ const Budget = () => {
     }
     setTimeout(async () => {
       try {
-        await budgetApi.set({ monthlyLimit: parsed, year: currentYear, month: currentMonth })
+        await budgetApi.set({
+          monthlyLimit: parsed,
+          type: 'MONTHLY',
+          currency: goalCurrency,
+          year: currentYear,
+          month: currentMonth,
+        })
         toast.success('Monthly budget saved')
         setGoalModal(false)
         setIncomeGoal(parsed)
@@ -130,6 +139,7 @@ const Budget = () => {
           categoryId: selectedCategory,
           monthlyLimit: parsed,
           type: 'MONTHLY',
+          currency: categoryCurrency,
           year: currentYear,
           month: currentMonth,
         })
@@ -137,6 +147,7 @@ const Budget = () => {
         setCategoryModal(false)
         setCategoryLimit('')
         setSelectedCategory('')
+        setCategoryCurrency('UZS')
         await Promise.allSettled([loadBudget(), refreshAccounts()])
       } catch (err) {
         console.error(err)
@@ -150,7 +161,8 @@ const Budget = () => {
     return Math.min((actualIncome / incomeGoal) * 100, 150)
   }, [actualIncome, incomeGoal])
 
-  const currencySymbol = 'UZS'
+  const goalCurrencySymbol = goalCurrency
+  const categoryCurrencySymbol = categoryCurrency
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 12 }}>
@@ -202,10 +214,10 @@ const Budget = () => {
               <ProgressRing percent={goalProgress} label="Budget vs spent" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>
-                  Budget {currencySymbol} {formatCurrency(incomeGoal).replace('UZS ', '')}
+                  Budget {goalCurrencySymbol} {formatCurrency(incomeGoal).replace('UZS ', '')}
                 </div>
                 <div style={{ color: 'var(--text-2)' }}>
-                  Spent {currencySymbol} {formatCurrency(actualIncome).replace('UZS ', '')}
+                  Spent {goalCurrencySymbol} {formatCurrency(actualIncome).replace('UZS ', '')}
                 </div>
                 <div
                   style={{
@@ -216,7 +228,7 @@ const Budget = () => {
                     fontWeight: 800,
                   }}
                 >
-                  Remaining {currencySymbol} {formatCurrency(Math.max(incomeGoal - actualIncome, 0)).replace('UZS ', '')}
+                  Remaining {goalCurrencySymbol} {formatCurrency(Math.max(incomeGoal - actualIncome, 0)).replace('UZS ', '')}
                 </div>
               </div>
             </>
@@ -345,7 +357,7 @@ const Budget = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontWeight: 800 }}>{cat.category}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                      {currencySymbol} {formatCurrency(cat.spent).replace('UZS ', '')} / {currencySymbol} {formatCurrency(cat.limit).replace('UZS ', '')}
+                      {categoryCurrencySymbol} {formatCurrency(cat.spent).replace('UZS ', '')} / {categoryCurrencySymbol} {formatCurrency(cat.limit).replace('UZS ', '')}
                     </div>
                   </div>
                   <div style={{ marginTop: 8 }}>
@@ -378,7 +390,7 @@ const Budget = () => {
 
       <Modal open={goalModal} onClose={() => setGoalModal(false)} title="Set monthly budget">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly budget ({currencySymbol})</label>
+          <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly budget ({goalCurrencySymbol})</label>
           <input
             type="number"
             value={goalInput || incomeGoal || ''}
@@ -386,6 +398,18 @@ const Budget = () => {
             placeholder="0.00"
             style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
           />
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Currency *</label>
+            <select
+              value={goalCurrency}
+              onChange={e => setGoalCurrency(e.target.value as (typeof CURRENCIES)[number])}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+            >
+              <option value="UZS">🇺🇿 UZS</option>
+              <option value="USD">🇺🇸 USD</option>
+              <option value="EUR">🇪🇺 EUR</option>
+            </select>
+          </div>
           <button
             onClick={handleSaveGoal}
             type="button"
@@ -432,7 +456,7 @@ const Budget = () => {
             )}
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit ({currencySymbol}) *</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Monthly limit ({categoryCurrencySymbol}) *</label>
             <input
               type="number"
               value={categoryLimit}
@@ -446,6 +470,18 @@ const Budget = () => {
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
               Limit is in your account currency
             </div>
+          </div>
+          <div>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Currency *</label>
+            <select
+              value={categoryCurrency}
+              onChange={e => setCategoryCurrency(e.target.value as (typeof CURRENCIES)[number])}
+              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
+            >
+              <option value="UZS">🇺🇿 UZS</option>
+              <option value="USD">🇺🇸 USD</option>
+              <option value="EUR">🇪🇺 EUR</option>
+            </select>
           </div>
           <button
             onClick={handleSaveCategory}

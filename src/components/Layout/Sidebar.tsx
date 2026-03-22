@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   TrendingDown,
@@ -38,7 +38,6 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ collapsed }: SidebarProps) => {
-  const navigate = useNavigate()
   const authStore = useAuthStore()
   const user = authStore.user
   const initials =
@@ -53,7 +52,6 @@ const Sidebar = ({ collapsed }: SidebarProps) => {
 
   const handleLogout = () => {
     authStore.logout()
-    navigate('/login')
   }
 
   return (

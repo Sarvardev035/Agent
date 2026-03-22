@@ -29,7 +29,7 @@ const Dashboard = () => {
   const [chartReady, setChartReady] = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setChartReady(true), 120)
+    const t = setTimeout(() => setChartReady(true), 200)
     return () => clearTimeout(t)
   }, [])
 

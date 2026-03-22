@@ -60,7 +60,7 @@ const Statistics = () => {
   const [vsData, setVsData] = useState<any[]>([])
 
   useEffect(() => {
-    const t = setTimeout(() => setChartReady(true), 120)
+    const t = setTimeout(() => setChartReady(true), 200)
     return () => clearTimeout(t)
   }, [])
 
@@ -269,8 +269,8 @@ const Statistics = () => {
           {loading || !chartReady ? (
             <Skeleton height={240} />
           ) : (
-            <div style={{ minHeight: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ width: '100%', minHeight: 260 }}>
+              <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={vsData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="period" />
@@ -304,8 +304,8 @@ const Statistics = () => {
           ) : breakdown.length === 0 ? (
             <EmptyState title="No data" description="Add expenses to see the distribution." />
           ) : (
-            <div style={{ minHeight: 260 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ width: '100%', minHeight: 260 }}>
+              <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
                     data={breakdown}
@@ -350,8 +350,8 @@ const Statistics = () => {
           ) : incomeSources.length === 0 ? (
             <EmptyState title="No data" description="Record income to see where it comes from." />
           ) : (
-            <div style={{ minHeight: 240 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ width: '100%', minHeight: 240 }}>
+              <ResponsiveContainer width="100%" height={220}>
                 <BarChart layout="vertical" data={incomeSources}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" hide />
@@ -383,8 +383,8 @@ const Statistics = () => {
           ) : netSavings.length === 0 ? (
             <EmptyState title="No data" description="Add income and expenses to calculate savings." />
           ) : (
-            <div style={{ minHeight: 240 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ width: '100%', minHeight: 240 }}>
+              <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={netSavings}>
                   <defs>
                     <linearGradient id="netGradient" x1="0" y1="0" x2="0" y2="1">

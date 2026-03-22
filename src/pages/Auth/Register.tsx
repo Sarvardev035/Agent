@@ -85,21 +85,16 @@ export default function Register() {
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       const axiosErr = err as AxiosError
-      const status = axiosErr.response?.status
+      const statusFromResponse = axiosErr.response?.status
+      const statusFromMessage = err instanceof Error ? Number.parseInt(err.message, 10) : NaN
+      const status = statusFromResponse || (Number.isNaN(statusFromMessage) ? undefined : statusFromMessage)
 
-      if (status === 400) {
-        const payload = asRecord(axiosErr.response?.data)
-        const apiMessage =
-          (typeof payload.message === 'string' && payload.message) ||
-          (typeof payload.error === 'string' && payload.error) ||
-          'Invalid registration data.'
-        setError(apiMessage)
-      } else if (status === 409) {
-        setError('Email already registered')
-      } else if (status === 404) {
-        setError('Connection error: API endpoint not found.')
+      if (status === 409 || (err instanceof Error && err.message?.includes('409'))) {
+        setError('This email is already registered. Please log in instead.')
+      } else if (status === 400) {
+        setError('Please check your information and try again.')
       } else {
-        const msg = err instanceof Error ? err.message : 'Registration failed'
+        const msg = err instanceof Error ? err.message : 'Registration failed. Try again.'
         setError(msg)
       }
     } finally {
@@ -320,7 +315,24 @@ export default function Register() {
               }}
             >
               <AlertTriangle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
-              <span>{error}</span>
+              <span>
+                {error}
+                {error.includes('already registered') && (
+                  <span>
+                    {' '}
+                    <span
+                      onClick={() => navigate('/login')}
+                      style={{
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Go to login →
+                    </span>
+                  </span>
+                )}
+              </span>
             </motion.div>
           )}
 

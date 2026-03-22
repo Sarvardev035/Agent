@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { AxiosError } from 'axios'
 import { TokenStorage } from '../lib/security'
-import { authService } from '../services/auth.service'
 
 interface User {
   id: string
@@ -14,7 +13,7 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
-  logout: () => Promise<void>
+  logout: () => void
   initAuth: () => void
 }
 
@@ -106,9 +105,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  logout: async () => {
-    await authService.logout()
+  logout: () => {
+    localStorage.removeItem('finly_access_token')
+    localStorage.removeItem('finly_refresh_token')
+    localStorage.removeItem('finly_user_name')
+    localStorage.removeItem('finly_user_email')
+    localStorage.removeItem('finly_theme')
+    sessionStorage.clear()
     TokenStorage.clear()
     set({ user: null, isAuthenticated: false })
+    window.location.href = '/login'
   },
 }))

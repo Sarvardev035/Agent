@@ -38,7 +38,6 @@ const BottomNav = () => {
 
   const logout = () => {
     authStore.logout()
-    navigate('/login')
   }
 
   return (
