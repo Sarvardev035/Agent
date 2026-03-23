@@ -413,36 +413,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               type="button"
               data-button-reset="true"
               className="settings-panel__logout"
-              style={{ color: '#a5b4fc' }}
-              onClick={() => {
-                navigate('/community')
-                setSettingsOpen(false)
-              }}
-              onFocus={() => screenReader.speak('Community')}
-              onMouseEnter={() => screenReader.speak('Community')}
-            >
-              <span>💬 Community</span>
-            </button>
-
-            <button
-              type="button"
-              data-button-reset="true"
-              className="settings-panel__logout"
-              style={{ color: '#a7f3d0' }}
-              onClick={() => {
-                navigate('/notes')
-                setSettingsOpen(false)
-              }}
-              onFocus={() => screenReader.speak('My notes')}
-              onMouseEnter={() => screenReader.speak('My notes')}
-            >
-              <span>📝 My Notes</span>
-            </button>
-
-            <button
-              type="button"
-              data-button-reset="true"
-              className="settings-panel__logout"
               onClick={() => {
                 setSettingsOpen(false)
                 onRequestLogout()
