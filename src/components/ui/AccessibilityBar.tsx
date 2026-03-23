@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { screenReader } from '../../lib/screenReader'
+import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
 
 const PAGE_DESCRIPTIONS: Record<string, string> = {
   '/dashboard': 'Dashboard page. Your financial overview.',
@@ -23,9 +23,13 @@ export const AccessibilityBar = () => {
 
   useEffect(() => {
     const sync = () => setActive(screenReader.isActive())
+    const off = onAccessibilityChange(setActive)
     sync()
     window.addEventListener('storage', sync)
-    return () => window.removeEventListener('storage', sync)
+    return () => {
+      off()
+      window.removeEventListener('storage', sync)
+    }
   }, [])
 
   useEffect(() => {
@@ -52,10 +56,12 @@ export const AccessibilityBar = () => {
         zIndex: 999,
         fontSize: 13,
         color: 'white',
+        flexWrap: 'wrap',
+        gap: 8,
       }}
     >
-      <span>♿ Accessibility mode ON — Screen reader active</span>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}>♿ Accessibility mode ON — Screen reader active</span>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button
           onClick={() => screenReader.stop()}
           style={{
@@ -105,4 +111,3 @@ export const AccessibilityBar = () => {
     </div>
   )
 }
-

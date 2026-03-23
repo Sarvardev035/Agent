@@ -31,7 +31,19 @@ const Notes = () => {
   const [notes, setNotes] = useState<Note[]>(loadNotes)
   const [active, setActive] = useState<Note | null>(null)
   const [search, setSearch] = useState('')
+  const [isPhone, setIsPhone] = useState(() => window.matchMedia('(max-width: 768px)').matches)
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)')
+    const onChange = (e: MediaQueryListEvent) => setIsPhone(e.matches)
+    if (media.addEventListener) {
+      media.addEventListener('change', onChange)
+      return () => media.removeEventListener('change', onChange)
+    }
+    media.addListener(onChange)
+    return () => media.removeListener(onChange)
+  }, [])
 
   useEffect(() => {
     if (!active) return
@@ -176,11 +188,18 @@ const Notes = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: active ? '260px 1fr' : 'repeat(auto-fill,minmax(220px,1fr))',
+          gridTemplateColumns: active ? (isPhone ? '1fr' : '260px 1fr') : 'repeat(auto-fill,minmax(220px,1fr))',
           gap: 16,
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            order: isPhone && active ? 2 : 1,
+          }}
+        >
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
@@ -248,13 +267,37 @@ const Notes = () => {
         </div>
 
         {active && (
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', minHeight: 400 }}>
+          <div
+            className="card"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 400,
+              order: isPhone ? 1 : 2,
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                 Auto-saving...
                 <span style={{ marginLeft: 6 }}>💾</span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
+                {isPhone && (
+                  <button
+                    onClick={() => setActive(null)}
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      padding: '4px 10px',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      color: 'var(--text-2)',
+                    }}
+                  >
+                    ← Back
+                  </button>
+                )}
                 <button
                   onClick={() => togglePin(active.id)}
                   style={{
@@ -366,4 +409,3 @@ const Notes = () => {
 }
 
 export default Notes
-

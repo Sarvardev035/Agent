@@ -25,7 +25,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import LanguageTranslator from '../ui/LanguageTranslator'
 import { UserProfileStorage } from '../../lib/security'
-import { screenReader } from '../../lib/screenReader'
+import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
 
 type NavItem = {
   label: string
@@ -66,6 +66,7 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const [accessibilityActive, setAccessibilityActive] = useState(screenReader.isActive())
   const [muted, setMuted] = useState(() => sounds.getMuted())
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
@@ -103,6 +104,8 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  useEffect(() => onAccessibilityChange(setAccessibilityActive), [])
 
   const handleSoundToggle = () => {
     startTransition(() => {
@@ -365,7 +368,7 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               className="settings-panel__logout"
               style={{ color: '#c4b5fd' }}
               onClick={() => {
-                if (screenReader.isActive()) {
+                if (accessibilityActive) {
                   screenReader.disable()
                 } else {
                   screenReader.enable()
@@ -375,7 +378,9 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               onMouseEnter={() => screenReader.speak('Accessibility mode toggle')}
             >
               <span>♿ Accessibility Mode</span>
-              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>Screen reader</span>
+              <span style={{ fontSize: 10, opacity: 0.65, marginLeft: 'auto' }}>
+                {accessibilityActive ? 'ON' : 'OFF'} · Screen reader
+              </span>
             </button>
 
             <button

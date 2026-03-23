@@ -5,9 +5,19 @@ type SummaryLike = {
   savings?: number
 }
 
+const ACCESSIBILITY_EVENT = 'finly-accessibility-change'
+
 let isActive = false
 let synth: SpeechSynthesis | null = null
 let voice: SpeechSynthesisVoice | null = null
+
+const emitAccessibilityChange = () => {
+  window.dispatchEvent(
+    new CustomEvent(ACCESSIBILITY_EVENT, {
+      detail: { active: isActive },
+    })
+  )
+}
 
 const getVoice = (): SpeechSynthesisVoice | null => {
   if (!window.speechSynthesis) return null
@@ -21,6 +31,7 @@ export const screenReader = {
   enable: () => {
     isActive = true
     localStorage.setItem('finly_accessibility', 'true')
+    emitAccessibilityChange()
     synth = window.speechSynthesis
     voice = getVoice()
     window.speechSynthesis.onvoiceschanged = () => {
@@ -38,6 +49,7 @@ export const screenReader = {
     if (synth) synth.cancel()
     isActive = false
     localStorage.setItem('finly_accessibility', 'false')
+    emitAccessibilityChange()
     screenReader.speak('Accessibility mode disabled.', true)
   },
 
@@ -77,3 +89,13 @@ export const initAccessibility = () => {
   if (saved === 'true') screenReader.enable()
 }
 
+export const onAccessibilityChange = (handler: (active: boolean) => void) => {
+  const listener = (event: Event) => {
+    const customEvent = event as CustomEvent<{ active: boolean }>
+    handler(Boolean(customEvent.detail?.active))
+  }
+  window.addEventListener(ACCESSIBILITY_EVENT, listener as EventListener)
+  return () => {
+    window.removeEventListener(ACCESSIBILITY_EVENT, listener as EventListener)
+  }
+}
