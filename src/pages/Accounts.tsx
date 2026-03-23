@@ -172,6 +172,40 @@ const Accounts = () => {
     setActiveQuickActionsFor(null)
   }
 
+  const handleDeleteCard = async (account: Account) => {
+    try {
+      setDeletingId(account.id)
+      await api.delete(`/api/accounts/${account.id}`)
+
+      sounds.expense()
+
+      // Log the card deletion to activity log
+      const log = {
+        id: `log_${Date.now()}`,
+        action: 'CARD_DROPPED',
+        message: `Card "${account.name}" (${account.type}) was dropped`,
+        type: account.type,
+        currency: account.currency,
+        balance: account.balance,
+        time: new Date().toISOString(),
+        icon: '🗑️',
+      }
+      const existing = JSON.parse(localStorage.getItem('finly_activity_log') || '[]')
+      existing.unshift(log)
+      localStorage.setItem('finly_activity_log', JSON.stringify(existing.slice(0, 50)))
+
+      toast.success(`Card "${account.name}" has been dropped`)
+      setActiveQuickActionsFor(null)
+      await refreshAccounts()
+    } catch (err: any) {
+      sounds.error()
+      const msg = err?.response?.data?.error || err?.message || 'Failed to drop card'
+      toast.error(msg)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="page-content page-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{
@@ -355,8 +389,8 @@ const Accounts = () => {
                         borderRadius: 12,
                         padding: 8,
                         display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 8,
+                        gridTemplateColumns: '1fr 1fr 1fr',
+                        gap: 6,
                         zIndex: 3,
                         backdropFilter: 'blur(8px)',
                       }}
@@ -395,6 +429,38 @@ const Accounts = () => {
                         }}
                       >
                         ↓ Receive
+                      </button>
+                      <button
+                        type="button"
+                        data-button-reset="true"
+                        disabled={deletingId === acc.id}
+                        onClick={() => handleDeleteCard(acc)}
+                        style={{
+                          border: '1px solid rgba(239,68,68,0.35)',
+                          borderRadius: 10,
+                          padding: '8px 6px',
+                          background: 'rgba(239,68,68,0.15)',
+                          color: deletingId === acc.id ? 'rgba(248,113,113,0.5)' : '#fca5a5',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: deletingId === acc.id ? 'not-allowed' : 'pointer',
+                          opacity: deletingId === acc.id ? 0.5 : 1,
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                          if (deletingId !== acc.id) {
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.25)'
+                            e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)'
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (deletingId !== acc.id) {
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.15)'
+                            e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)'
+                          }
+                        }}
+                      >
+                        {deletingId === acc.id ? '⏳' : '🗑️'} Drop
                       </button>
                     </div>
                   )}
