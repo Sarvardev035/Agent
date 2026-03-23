@@ -35,6 +35,9 @@ const Debts = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [repayModal, setRepayModal] = useState<{ id: string; amount: string; accountId?: string } | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [isSavingDebt, setIsSavingDebt] = useState(false)
+  const [isRepayingDebt, setIsRepayingDebt] = useState(false)
+  const [isDeletingDebt, setIsDeletingDebt] = useState(false)
   const [form, setForm] = useState<DebtForm>({
     personName: '',
     amount: '',
@@ -67,7 +70,8 @@ const Debts = () => {
 
   useEffect(() => {
     loadDebts()
-  }, [])
+    refreshAccounts()
+  }, [refreshAccounts])
 
   const filtered = useMemo(() => debts.filter(d => d.type === tab), [debts, tab])
 
@@ -77,75 +81,91 @@ const Debts = () => {
     return { borrowed, lent }
   }, [debts])
 
-  const handleSubmit = () => {
-    setTimeout(async () => {
-      if (!form.personName || !form.amount) {
-        sounds.error()
-        toast.error('Please fill person and amount')
-        return
-      }
-      try {
-        await debtsApi.create({
-          personName: form.personName,
-          amount: Number(form.amount),
-          currency: form.currency as 'USD' | 'EUR' | 'UZS',
-          dueDate: form.dueDate,
-          type: form.type,
-          description: form.description,
-          accountId: form.accountId || undefined,
-        })
-        sounds.notification()
-        toast.success('Debt recorded!')
-        setModalOpen(false)
-        setForm(prev => ({ ...prev, amount: '', description: '' }))
-        await Promise.allSettled([loadDebts(), refreshAccounts()])
-      } catch (err) {
-        console.error(err)
-        sounds.error()
-        toast.error('Failed to save debt')
-      }
-    }, 0)
+  const getErrorMessage = (err: unknown, fallback: string) => {
+    if (err instanceof Error && err.message) return err.message
+    return fallback
+  }
+
+  const handleSubmit = async () => {
+    const amount = Number(form.amount)
+    if (!form.personName.trim() || !Number.isFinite(amount) || amount <= 0) {
+      sounds.error()
+      toast.error('Please enter valid person and amount')
+      return
+    }
+    if (!form.dueDate) {
+      sounds.error()
+      toast.error('Please choose a due date')
+      return
+    }
+    try {
+      setIsSavingDebt(true)
+      await debtsApi.create({
+        personName: form.personName.trim(),
+        amount,
+        currency: form.currency as 'USD' | 'EUR' | 'UZS',
+        dueDate: form.dueDate,
+        type: form.type,
+        description: form.description.trim() || undefined,
+        accountId: form.accountId || undefined,
+      })
+      sounds.notification()
+      toast.success('Debt recorded!')
+      setModalOpen(false)
+      setForm(prev => ({ ...prev, amount: '', description: '', personName: '' }))
+      await Promise.allSettled([loadDebts(), refreshAccounts()])
+    } catch (err) {
+      console.error('Failed to save debt:', err)
+      sounds.error()
+      toast.error(getErrorMessage(err, 'Failed to save debt'))
+    } finally {
+      setIsSavingDebt(false)
+    }
   }
 
   const handleDelete = async () => {
     if (!confirmId) return
     try {
+      setIsDeletingDebt(true)
       await debtsApi.delete(confirmId)
       sounds.success()
       toast.success('Debt removed')
       setConfirmId(null)
       await Promise.allSettled([loadDebts(), refreshAccounts()])
     } catch (err) {
-      console.error(err)
+      console.error('Failed to delete debt:', err)
       sounds.error()
-      toast.error('Failed to delete debt')
+      toast.error(getErrorMessage(err, 'Failed to delete debt'))
+    } finally {
+      setIsDeletingDebt(false)
     }
   }
 
   const handleRepay = async () => {
     if (!repayModal) return
     const paymentAmount = Number(repayModal.amount)
-    if (!paymentAmount) {
+    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
       sounds.error()
       toast.error('Enter repayment amount')
       return
     }
-    setTimeout(async () => {
-      try {
-        await debtsApi.repay(repayModal.id, {
-          paymentAmount,
-          accountId: repayModal.accountId || undefined,
-        })
-        sounds.success()
-        toast.success('Repayment recorded! ✅')
-        setRepayModal(null)
-        await Promise.allSettled([loadDebts(), refreshAccounts()])
-      } catch (err) {
-        console.error(err)
-        sounds.error()
-        toast.error('Failed to record repayment')
-      }
-    }, 0)
+    try {
+      setIsRepayingDebt(true)
+      await debtsApi.repay(repayModal.id, {
+        paymentAmount,
+        accountId: repayModal.accountId || undefined,
+      })
+      sounds.success()
+      toast.success('Repayment recorded! ✅')
+      setRepayModal(null)
+      await Promise.allSettled([loadDebts(), refreshAccounts()])
+    } catch (err) {
+      console.error('Failed to record repayment:', err)
+      sounds.error()
+      toast.error(getErrorMessage(err, 'Failed to record repayment'))
+    } finally {
+      setIsRepayingDebt(false)
+    }
   }
 
   const renderDueBadge = (dueDate?: string) => {
@@ -510,6 +530,7 @@ const Debts = () => {
           <button
             onClick={handleSubmit}
             type="button"
+            disabled={isSavingDebt}
             style={{
               width: '100%',
               height: 48,
@@ -519,10 +540,11 @@ const Debts = () => {
               color: '#fff',
               fontWeight: 800,
               boxShadow: '0 12px 30px rgba(37,99,235,0.35)',
-              cursor: 'pointer',
+              cursor: isSavingDebt ? 'not-allowed' : 'pointer',
+              opacity: isSavingDebt ? 0.7 : 1,
             }}
           >
-            Save debt
+            {isSavingDebt ? 'Saving...' : 'Save debt'}
           </button>
         </div>
       </Modal>
@@ -562,6 +584,7 @@ const Debts = () => {
           <button
             onClick={handleRepay}
             type="button"
+            disabled={isRepayingDebt}
             style={{
               width: '100%',
               height: 48,
@@ -570,11 +593,12 @@ const Debts = () => {
               background: 'linear-gradient(135deg,#16a34a,#15803d)',
               color: '#fff',
               fontWeight: 800,
-              cursor: 'pointer',
+              cursor: isRepayingDebt ? 'not-allowed' : 'pointer',
+              opacity: isRepayingDebt ? 0.7 : 1,
               boxShadow: '0 12px 30px rgba(22,163,74,0.25)',
             }}
           >
-            Save repayment
+            {isRepayingDebt ? 'Saving...' : 'Save repayment'}
           </button>
         </div>
       </Modal>
@@ -585,7 +609,7 @@ const Debts = () => {
         onConfirm={handleDelete}
         title="Delete debt?"
         message="This will permanently remove the debt record."
-        confirmLabel="Delete"
+        confirmLabel={isDeletingDebt ? 'Deleting...' : 'Delete'}
       />
     </div>
   )

@@ -38,6 +38,11 @@ const Transfers = () => {
     exchangeRate: '1',
   })
 
+  const getErrorMessage = (err: unknown, fallback: string) => {
+    if (err instanceof Error && err.message) return err.message
+    return fallback
+  }
+
   const loadTransfers = async () => {
     try {
       setLoading(true)
@@ -58,11 +63,11 @@ const Transfers = () => {
   }
 
   useEffect(() => {
-    loadTransfers()
+    void Promise.allSettled([loadTransfers(), refreshAccounts()])
     fetchExchangeRates()
       .then(setRates)
       .catch(() => {})
-  }, [])
+  }, [refreshAccounts])
 
   const handleSubmit = async () => {
     if (!form.amount || !form.fromAccountId || !form.toAccountId) {
@@ -75,34 +80,32 @@ const Transfers = () => {
       toast.error('Choose different accounts')
       return
     }
-    setTimeout(async () => {
-      try {
-        await transfersApi.create({
-          amount: Number(form.amount),
-          fromAccountId: form.fromAccountId,
-          toAccountId: form.toAccountId,
-          description: form.description,
-          transferDate: form.transferDate,
-          exchangeRate: Number(form.exchangeRate) || 1,
-        })
-        sounds.transfer()
-        toast.success('Transfer completed!')
-        setModalOpen(false)
-        setForm({
-          amount: '',
-          fromAccountId: '',
-          toAccountId: '',
-          description: '',
-          transferDate: format(new Date(), 'yyyy-MM-dd'),
-          exchangeRate: '1',
-        })
-        await Promise.allSettled([loadTransfers(), refreshAccounts()])
-      } catch (err) {
-        console.error(err)
-        sounds.error()
-        toast.error('Failed to save transfer')
-      }
-    }, 0)
+    try {
+      await transfersApi.create({
+        amount: Number(form.amount),
+        fromAccountId: form.fromAccountId,
+        toAccountId: form.toAccountId,
+        description: form.description,
+        transferDate: form.transferDate,
+        exchangeRate: Number(form.exchangeRate) || 1,
+      })
+      sounds.transfer()
+      toast.success('Transfer completed!')
+      setModalOpen(false)
+      setForm({
+        amount: '',
+        fromAccountId: '',
+        toAccountId: '',
+        description: '',
+        transferDate: format(new Date(), 'yyyy-MM-dd'),
+        exchangeRate: '1',
+      })
+      await Promise.allSettled([loadTransfers(), refreshAccounts()])
+    } catch (err) {
+      console.error('Failed to save transfer:', err)
+      sounds.error()
+      toast.error(getErrorMessage(err, 'Failed to save transfer'))
+    }
   }
 
   const fromAccount = useMemo(() => accounts.find(a => a.id === form.fromAccountId), [accounts, form.fromAccountId])
