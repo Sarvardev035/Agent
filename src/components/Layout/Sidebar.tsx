@@ -21,7 +21,6 @@ import LanguageTranslator from '../ui/LanguageTranslator'
 import { SoundButton } from '../ui/SoundButton'
 import { UserProfileStorage } from '../../lib/security'
 import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
-import { ProfileModal } from '../Profile/ProfileModal'
 
 type NavItem = {
   label: string
@@ -62,7 +61,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
-  const [showProfile, setShowProfile] = useState(false)
   const [accessibilityActive, setAccessibilityActive] = useState(screenReader.isActive())
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
@@ -192,26 +190,20 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
       >
         {!isTablet && (
           <div
-            onClick={() => setShowProfile(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 10,
               padding: '10px 12px',
               borderRadius: 12,
-              cursor: 'pointer',
+              cursor: 'default',
               marginBottom: 6,
               transition: 'all 0.18s ease',
               border: '1px solid transparent',
+              opacity: 0.7,
             }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
-              e.currentTarget.style.borderColor = 'rgba(124,58,237,0.3)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.borderColor = 'transparent'
-            }}
+            onMouseEnter={() => {}}
+            onMouseLeave={() => {}}
           >
             {/* Avatar with gradient ring */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -494,9 +486,10 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
           </div>
         </div>
       )}
-      {showProfile && (
+      {/* Profile Modal disabled - users cannot edit profile */}
+      {/* {showProfile && (
         <ProfileModal onClose={() => setShowProfile(false)} />
-      )}
+      )} */}
     </aside>
   )
 }
