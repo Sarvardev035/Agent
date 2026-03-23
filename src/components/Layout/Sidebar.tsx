@@ -14,13 +14,10 @@ import {
   Moon,
   Settings2,
   Sun,
-  Volume2,
-  VolumeX,
   Wallet,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
 import BrandLogo from '../ui/BrandLogo'
-import { sounds } from '../../lib/sounds'
 import { useTheme } from '../../contexts/ThemeContext'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import LanguageTranslator from '../ui/LanguageTranslator'
@@ -67,7 +64,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [accessibilityActive, setAccessibilityActive] = useState(screenReader.isActive())
-  const [muted, setMuted] = useState(() => sounds.getMuted())
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
   const storedProfile = UserProfileStorage.get()
@@ -106,13 +102,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   }, [])
 
   useEffect(() => onAccessibilityChange(setAccessibilityActive), [])
-
-  const handleSoundToggle = () => {
-    startTransition(() => {
-      const nextMuted = sounds.toggleMute()
-      setMuted(nextMuted)
-    })
-  }
 
   return (
     <aside
@@ -318,31 +307,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
                 </div>
               </div>
               <ThemeToggle compact />
-            </div>
-
-            <div className="settings-panel__row">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: muted ? '#fda4af' : '#86efac' }}>
-                  {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                </span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
-                    {muted ? 'Sound Off' : 'Sound On'}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
-                    Coin sounds and alerts
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                data-button-reset="true"
-                onClick={handleSoundToggle}
-                className={`settings-panel__switch${!muted ? ' is-success' : ''}`}
-                aria-label={muted ? 'Enable sounds' : 'Mute sounds'}
-              >
-                <span className="settings-panel__switch-thumb" />
-              </button>
             </div>
 
             <div className="settings-panel__row" style={{ alignItems: 'flex-start' }}>
