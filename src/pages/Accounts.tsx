@@ -342,28 +342,6 @@ const Accounts = () => {
                     type={mapAccountType(acc.type)}
                     accountId={acc.id}
                   />
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      setConfirmDeleteAccount(acc)
-                    }}
-                    type="button"
-                    aria-label="Delete account"
-                    style={{
-                      position: 'absolute',
-                      top: 10,
-                      right: 10,
-                      border: 'none',
-                      background: 'rgba(255,255,255,0.8)',
-                      color: '#ef4444',
-                      padding: 6,
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      boxShadow: 'var(--sh-sm)',
-                    }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
 
                   {activeQuickActionsFor === acc.id && (
                     <div

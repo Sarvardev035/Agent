@@ -151,7 +151,7 @@ const AppShell = () => {
           </header>
         )}
 
-        {!isCompactLayout && (
+        {!isCompactLayout && location.pathname === '/dashboard' && (
           <div
             style={{
               position: 'absolute',
