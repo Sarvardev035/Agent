@@ -11,15 +11,12 @@ import {
   Calendar,
   LogOut,
   ChevronUp,
-  Moon,
   Settings2,
-  Sun,
   Wallet,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
 import BrandLogo from '../ui/BrandLogo'
 import { useTheme } from '../../contexts/ThemeContext'
-import { ThemeToggle } from '../ui/ThemeToggle'
 import LanguageTranslator from '../ui/LanguageTranslator'
 import { UserProfileStorage } from '../../lib/security'
 import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
@@ -291,23 +288,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
             }}
           >
             <div className="settings-panel__title">Settings</div>
-
-            <div className="settings-panel__row">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: isDark ? '#c4b5fd' : '#fbbf24' }}>
-                  {isDark ? <Moon size={16} /> : <Sun size={16} />}
-                </span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
-                    {isDark ? 'Dark Mode' : 'Light Mode'}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
-                    2s scene transition
-                  </div>
-                </div>
-              </div>
-              <ThemeToggle compact />
-            </div>
 
             <div className="settings-panel__row" style={{ alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
