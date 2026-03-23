@@ -263,71 +263,84 @@ export default function Register() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0a1628 0%, #0f2040 40%, #1a1a2e 100%)',
+      background: 'linear-gradient(to br, #f0f4f8 0%, #d9e2ec 50%, #c5d5e0 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 20,
+      padding: '16px',
       fontFamily: "'Plus Jakarta Sans', sans-serif",
       position: 'relative',
       overflow: 'hidden',
     }}>
       <motion.div
-        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+        animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.4, 0.2] }}
         transition={{ duration: 8, repeat: Infinity }}
         style={{
-          position: 'absolute', top: -100, right: -100,
-          width: 500, height: 500, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(37,99,235,0.2) 0%, transparent 70%)',
+          position: 'absolute', top: '-10%', right: '-10%',
+          width: '500px', height: '500px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }}
+      />
+      
+      <motion.div
+        animate={{ scale: [1, 1.1, 1], opacity: [0.15, 0.3, 0.15] }}
+        transition={{ duration: 10, repeat: Infinity, delay: 2 }}
+        style={{
+          position: 'absolute', bottom: '-5%', left: '-5%',
+          width: '400px', height: '400px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)',
           pointerEvents: 'none',
         }}
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0,  scale: 1 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
         style={{
-          background: 'rgba(255,255,255,0.98)',
-          borderRadius: 24,
-          padding: '40px 36px',
+          background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '20px',
+          padding: 'clamp(24px, 5vw, 40px)',
           width: '100%',
-          maxWidth: 420,
-          boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+          maxWidth: '460px',
+          boxShadow: '0 24px 64px rgba(15, 23, 42, 0.12), 0 0 1px rgba(0, 0, 0, 0.1)',
           position: 'relative',
+          border: '1px solid rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(8px)',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.1, type: 'spring', stiffness: 300 }}
             style={{
-              width: 56, height: 56, borderRadius: 16,
-              background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+              width: '56px', height: '56px', borderRadius: '14px',
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: 16,
-              boxShadow: '0 8px 24px rgba(37,99,235,0.4)',
+              marginBottom: '16px',
+              boxShadow: '0 12px 32px rgba(59, 130, 246, 0.3)',
             }}
           >
             <Zap size={26} color="white" fill="white" />
           </motion.div>
           <h1 style={{
-            fontSize: 26, fontWeight: 700, color: '#0a1628',
-            margin: '0 0 6px', letterSpacing: '-0.02em',
+            fontSize: 'clamp(24px, 6vw, 28px)', fontWeight: '700', color: '#0f172a',
+            margin: '0 0 8px', letterSpacing: '-0.02em',
           }}>
             Create account
           </h1>
-          <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>
-            Join Finly and manage your finances smarter
+          <p style={{ fontSize: '14px', color: '#64748b', margin: '0', lineHeight: '1.5' }}>
+            Join Finly and manage your finances
           </p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Name field */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600,
-              color: '#374151', marginBottom: 6 }}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600',
+              color: '#374151', marginBottom: '8px' }}>
               Full name
             </label>
             <input
@@ -338,16 +351,16 @@ export default function Register() {
               required
               maxLength={100}
               style={{
-                width: '100%', height: 46,
+                width: '100%', height: '48px',
                 padding: '0 14px',
-                border: '1.5px solid #e2e8f0', borderRadius: 10,
-                fontSize: 14, color: '#0f172a',
+                border: '1.5px solid #e2e8f0', borderRadius: '12px',
+                fontSize: '14px', color: '#0f172a',
                 background: '#f8fafc', outline: 'none',
-                transition: 'all 0.2s',
+                transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
               }}
               onFocus={e => {
-                e.currentTarget.style.borderColor = '#2563eb'
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'
+                e.currentTarget.style.borderColor = '#3b82f6'
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
                 e.currentTarget.style.background = '#fff'
               }}
               onBlur={e => {
@@ -359,9 +372,9 @@ export default function Register() {
           </div>
 
           {/* Email field */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600,
-              color: '#374151', marginBottom: 6 }}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600',
+              color: '#374151', marginBottom: '8px' }}>
               Email address
             </label>
             <input
@@ -373,16 +386,16 @@ export default function Register() {
               required
               maxLength={255}
               style={{
-                width: '100%', height: 46,
+                width: '100%', height: '48px',
                 padding: '0 14px',
-                border: '1.5px solid #e2e8f0', borderRadius: 10,
-                fontSize: 14, color: '#0f172a',
+                border: '1.5px solid #e2e8f0', borderRadius: '12px',
+                fontSize: '14px', color: '#0f172a',
                 background: '#f8fafc', outline: 'none',
-                transition: 'all 0.2s',
+                transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
               }}
               onFocus={e => {
-                e.currentTarget.style.borderColor = '#2563eb'
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'
+                e.currentTarget.style.borderColor = '#3b82f6'
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
                 e.currentTarget.style.background = '#fff'
               }}
               onBlur={e => {
@@ -394,9 +407,9 @@ export default function Register() {
           </div>
 
           {/* Password field */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600,
-              color: '#374151', marginBottom: 6 }}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600',
+              color: '#374151', marginBottom: '8px' }}>
               Password
             </label>
             <div style={{ position: 'relative' }}>
@@ -412,16 +425,16 @@ export default function Register() {
                 required
                 maxLength={128}
                 style={{
-                  width: '100%', height: 46,
+                  width: '100%', height: '48px',
                   padding: '0 44px 0 14px',
-                  border: '1.5px solid #e2e8f0', borderRadius: 10,
-                  fontSize: 14, color: '#0f172a',
+                  border: '1.5px solid #e2e8f0', borderRadius: '12px',
+                  fontSize: '14px', color: '#0f172a',
                   background: '#f8fafc', outline: 'none',
-                  transition: 'all 0.2s',
+                  transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
                 }}
                 onFocus={e => {
-                  e.currentTarget.style.borderColor = '#2563eb'
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'
+                  e.currentTarget.style.borderColor = '#3b82f6'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
                   e.currentTarget.style.background = '#fff'
                 }}
                 onBlur={e => {
@@ -432,10 +445,10 @@ export default function Register() {
               />
               <button type="button" onClick={() => setShowPass(p => !p)}
                 style={{
-                  position: 'absolute', right: 12, top: '50%',
+                  position: 'absolute', right: '12px', top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none', border: 'none',
-                  cursor: 'pointer', color: '#94a3b8', padding: 4,
+                  cursor: 'pointer', color: '#94a3b8', padding: '4px',
                   display: 'flex', alignItems: 'center',
                 }}>
                 {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -444,12 +457,12 @@ export default function Register() {
 
             {/* Password strength */}
             {password && (
-              <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
+              <div style={{ marginTop: '10px', display: 'flex', gap: '6px' }}>
                 {[0, 1, 2, 3].map(i => (
                   <div
                     key={i}
                     style={{
-                      flex: 1, height: 3, borderRadius: 2,
+                      flex: 1, height: '4px', borderRadius: '2px',
                       background: i < passwordStrength ? '#22c55e' : '#e2e8f0',
                       transition: 'all 0.2s',
                     }}
@@ -462,34 +475,19 @@ export default function Register() {
           {/* Error message */}
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1,  y: 0 }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
               style={{
-                background: '#fff1f2', border: '1px solid #fecdd3',
-                borderRadius: 10, padding: '10px 14px',
-                fontSize: 13, color: '#be123c',
-                display: 'flex', alignItems: 'flex-start', gap: 8,
-                marginBottom: 16,
+                background: '#fef2f2', border: '1px solid #fecdd3',
+                borderRadius: '12px', padding: '12px 14px',
+                fontSize: '13px', color: '#be123c',
+                display: 'flex', alignItems: 'flex-start', gap: '8px',
+                marginBottom: '18px',
               }}
             >
-              <AlertTriangle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+              <AlertTriangle size={15} style={{ marginTop: '2px', flexShrink: 0 }} />
               <span>
                 {error}
-                {error.includes('already registered') && (
-                  <span>
-                    {' '}
-                    <span
-                      onClick={() => navigate('/login')}
-                      style={{
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Go to login →
-                    </span>
-                  </span>
-                )}
               </span>
             </motion.div>
           )}
@@ -500,19 +498,19 @@ export default function Register() {
             disabled={loading || !fullName || !email || !password}
             className="auth-submit-button"
             style={{
-              width: '100%', height: 48,
+              width: '100%', height: '50px',
               background: (loading || !fullName || !email || !password)
                 ? '#bfdbfe'
-                : 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
               color: '#ffffff', border: 'none',
-              borderRadius: 12, fontSize: 15, fontWeight: 600,
+              borderRadius: '12px', fontSize: '15px', fontWeight: '600',
               cursor: (loading || !fullName || !email || !password) ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center',
-              justifyContent: 'center', gap: 8,
-              transition: 'all 0.2s',
+              justifyContent: 'center', gap: '8px',
+              transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
               boxShadow: (loading || !fullName || !email || !password)
                 ? 'none'
-                : '0 4px 16px rgba(37,99,235,0.4)',
+                : '0 8px 24px rgba(59, 130, 246, 0.3)',
               letterSpacing: '0.01em',
             }}
           >
@@ -532,57 +530,58 @@ export default function Register() {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
-            margin: '20px 0',
+            gap: '12px',
+            margin: '22px 0',
           }}>
             <div style={{
-              flex: 1, height: 1,
-              background: 'rgba(255,255,255,0.12)',
+              flex: 1, height: '1px',
+              background: '#e2e8f0',
             }} />
             <span style={{
-              fontSize: 12,
-              color: 'rgba(255,255,255,0.35)',
+              fontSize: '12px',
+              color: '#94a3b8',
               whiteSpace: 'nowrap',
-              fontWeight: 500,
+              fontWeight: '500',
             }}>
               or connect with
             </span>
             <div style={{
-              flex: 1, height: 1,
-              background: 'rgba(255,255,255,0.12)',
+              flex: 1, height: '1px',
+              background: '#e2e8f0',
             }} />
           </div>
 
           <div style={{
             display: 'flex',
             justifyContent: 'center',
-            gap: 16,
-            marginBottom: 20,
+            gap: '12px',
+            marginBottom: '20px',
+            flexWrap: 'wrap',
           }}>
             {[
               {
                 name: 'Google',
                 icon: <GoogleIcon />,
-                bg: 'rgba(66,133,244,0.1)',
-                border: 'rgba(66,133,244,0.3)',
-                hover: 'rgba(66,133,244,0.2)',
-                shadow: 'rgba(66,133,244,0.4)',
+                bg: 'rgba(66,133,244,0.08)',
+                border: 'rgba(66,133,244,0.25)',
+                hover: 'rgba(66,133,244,0.15)',
+                shadow: 'rgba(66,133,244,0.25)',
               },
               {
                 name: 'LinkedIn',
                 icon: <LinkedInIcon />,
-                bg: 'rgba(10,102,194,0.1)',
-                border: 'rgba(10,102,194,0.3)',
-                hover: 'rgba(10,102,194,0.2)',
-                shadow: 'rgba(10,102,194,0.4)',
+                bg: 'rgba(10,102,194,0.08)',
+                border: 'rgba(10,102,194,0.25)',
+                hover: 'rgba(10,102,194,0.15)',
+                shadow: 'rgba(10,102,194,0.25)',
               },
               {
                 name: 'Facebook',
                 icon: <FacebookIcon />,
-                bg: 'rgba(24,119,242,0.1)',
-                border: 'rgba(24,119,242,0.3)',
-                hover: 'rgba(24,119,242,0.2)',
-                shadow: 'rgba(24,119,242,0.4)',
+                bg: 'rgba(24,119,242,0.08)',
+                border: 'rgba(24,119,242,0.25)',
+                hover: 'rgba(24,119,242,0.15)',
+                shadow: 'rgba(24,119,242,0.25)',
               },
             ].map(social => (
               <SocialButton key={social.name} {...social} />
@@ -592,28 +591,28 @@ export default function Register() {
 
         <div style={{
           textAlign: 'center',
-          marginTop: 20,
+          marginTop: '16px',
         }}>
           <p style={{
-            fontSize: 14,
-            color: 'rgba(255,255,255,0.5)',
-            margin: 0,
+            fontSize: '14px',
+            color: '#64748b',
+            margin: '0',
           }}>
             Already have an account?{' '}
             <span
               onClick={() => navigate('/login')}
               style={{
-                color: '#a78bfa',
-                fontWeight: 600,
+                color: '#3b82f6',
+                fontWeight: '600',
                 cursor: 'pointer',
                 textDecoration: 'none',
                 transition: 'color 0.15s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.color = 'white'
+                e.currentTarget.style.color = '#2563eb'
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.color = '#a78bfa'
+                e.currentTarget.style.color = '#3b82f6'
               }}
             >
               Sign in
