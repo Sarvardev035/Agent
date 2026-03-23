@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import MobileMenuButton from '../ui/MobileMenuButton'
 import { ThemeToggle } from '../ui/ThemeToggle'
-import { SoundToggle } from '../ui/SoundToggle'
 import LanguageTranslator from '../ui/LanguageTranslator'
 import { screenReader } from '../../lib/screenReader'
 
@@ -148,7 +147,6 @@ const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
               />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
                 <ThemeToggle />
-                <SoundToggle />
               </div>
               <div
                 style={{

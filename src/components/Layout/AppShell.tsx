@@ -13,6 +13,7 @@ import { sounds } from '../../lib/sounds'
 import { useAuthStore } from '../../store/auth.store'
 import Chatbot from '../Chatbot/Chatbot'
 import { AccessibilityBar } from '../ui/AccessibilityBar'
+import { GlobalSearch } from '../ui/GlobalSearch'
 
 const AppShell = () => {
   const location = useLocation()
@@ -21,6 +22,7 @@ const AppShell = () => {
   const [notifications, setNotifications] = useState<any[]>([])
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [searchOpenOnMobile, setSearchOpenOnMobile] = useState(false)
   const routeContentRef = useRef<HTMLDivElement | null>(null)
   const logout = useAuthStore(state => state.logout)
   const sidebarWidth = isCompactLayout ? 0 : isDesktopCondensed ? 64 : 240
@@ -79,7 +81,7 @@ const AppShell = () => {
               position: 'sticky',
               top: 0,
               zIndex: 20,
-              padding: '12px 10px',
+              padding: '10px 14px',
               background: 'var(--surface-strong)',
               backdropFilter: 'blur(18px) saturate(145%)',
               borderBottom: '1px solid var(--border)',
@@ -87,12 +89,17 @@ const AppShell = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              gap: 10,
               borderRadius: 18,
               boxShadow: 'var(--shadow-sm)',
             }}
           >
-            <BrandLogo />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {!searchOpenOnMobile && <BrandLogo />}
+            <div style={{ flex: searchOpenOnMobile ? 1 : 'unset' }}>
+              <GlobalSearch onOpenChange={setSearchOpenOnMobile} />
+            </div>
+            {!searchOpenOnMobile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
                 aria-label="Notifications"
@@ -126,8 +133,30 @@ const AppShell = () => {
                   </span>
                 )}
               </button>
-            </div>
+              </div>
+            )}
           </header>
+        )}
+
+        {!isCompactLayout && (
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 30,
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              padding: '12px 0 12px',
+              marginBottom: 12,
+              background: 'rgba(241,245,249,0.85)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <GlobalSearch />
+          </div>
         )}
 
         <AnimatePresence mode="wait">
