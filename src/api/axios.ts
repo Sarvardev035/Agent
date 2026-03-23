@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { API_BASE_URL } from '../lib/config'
 import { TokenStorage, UserProfileStorage } from '../lib/security'
+import { showCoffeeToast } from '../lib/coffeeToast'
 
 let redirectingToLogin = false
 let activeRequests = 0
@@ -211,11 +212,6 @@ api.interceptors.response.use(
     return response
   },
   error => {
-    const isConnectivityError =
-      error.code === 'ERR_NETWORK'
-      || error.code === 'ECONNABORTED'
-      || (!error.response && !!error.request)
-
     const originalConfig = error.config as Record<string, any> | undefined
     const requestPath = String(originalConfig?.url || '')
     const isRefreshRequest = requestPath.includes('/api/auth/token/refresh')
@@ -223,6 +219,25 @@ api.interceptors.response.use(
       requestPath.includes('/api/auth/login')
       || requestPath.includes('/api/auth/register')
       || isRefreshRequest
+
+    const isNetworkError =
+      error.code === 'ERR_NETWORK'
+      || error.code === 'ECONNABORTED'
+      || error.message === 'Network Error'
+      || !error.response
+
+    if (isNetworkError) {
+      const offline = typeof navigator !== 'undefined' ? !navigator.onLine : false
+      finalizeRequest(originalConfig, {
+        offline,
+        backendError: true,
+        message: offline
+          ? 'You are offline. We will reconnect automatically when the internet returns.'
+          : 'The backend took too long to respond. Please try again in a moment.',
+      })
+      showCoffeeToast()
+      return Promise.reject(new Error('SERVER_COFFEE'))
+    }
 
     if (error.response?.status === 401 && originalConfig && !originalConfig.__isRetryRequest && !isAuthRequest) {
       originalConfig.__isRetryRequest = true
@@ -256,26 +271,7 @@ api.interceptors.response.use(
         window.location.replace('/login')
       }
     }
-    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      console.warn('CORS or network error on:', error.config?.url)
-    }
-
-    if (isConnectivityError) {
-      const offline = typeof navigator !== 'undefined' ? !navigator.onLine : false
-      const message = offline
-        ? 'You are offline. We will retry when the connection comes back.'
-        : error.code === 'ECONNABORTED'
-          ? 'The backend took too long to respond. Please try again in a moment.'
-          : 'No response from backend. Please check your connection and retry.'
-
-      finalizeRequest(error.config, {
-        offline,
-        backendError: true,
-        message,
-      })
-    } else {
-      finalizeRequest(error.config)
-    }
+    finalizeRequest(error.config)
 
     const msg =
       error.response?.data?.message ||

@@ -7,7 +7,6 @@ import { Trash2 } from 'lucide-react'
 import BankCard from '../components/ui/BankCard'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/ui/EmptyState'
-import ConfirmDialog from '../components/ui/ConfirmDialog'
 import CardNumberField from '../components/ui/CardNumberField'
 import { useFinanceStore } from '../store/finance.store'
 import { Account } from '../services/accounts.service'
@@ -18,6 +17,7 @@ import { safeArray, mapAccountType } from '../lib/helpers'
 import { ACCOUNT_TYPES, CARD_TYPES, CURRENCIES } from '../lib/constants'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { sounds } from '../lib/sounds'
+import { ActivityLog } from '../components/ui/ActivityLog'
 
 type AccountType = (typeof ACCOUNT_TYPES)[number]['value']
 type CurrencyCode = (typeof CURRENCIES)[number]
@@ -46,9 +46,8 @@ const Accounts = () => {
   const [searchParams] = useSearchParams()
   const { accounts, refreshAccounts, isLoadingAccounts } = useFinanceStore()
   const [modalOpen, setModalOpen] = useState(false)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
-  const [deleteError, setDeleteError] = useState<{ title: string; lines: string[]; accountId: string } | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<Account | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [form, setForm] = useState<AccountForm>(getDefaultAccountForm)
   const [displayCurrency, setDisplayCurrency] = useState('USD')
   const [activeQuickActionsFor, setActiveQuickActionsFor] = useState<string | null>(null)
@@ -135,42 +134,36 @@ const Accounts = () => {
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirmId) return
-    setDeleting(true)
+  const handleDeleteAccount = async (account: Account) => {
+    setDeletingId(account.id)
     try {
-      await api.delete(`/api/accounts/${confirmId}`)
-      sounds.success()
-      toast.success('Account deleted successfully')
-      setConfirmId(null)
+      await api.delete(`/api/accounts/${account.id}`)
+
+      sounds.expense()
+
+      const log = {
+        id: `log_${Date.now()}`,
+        action: 'ACCOUNT_DELETED',
+        message: `Account "${account.name}" was deleted`,
+        type: account.type,
+        currency: account.currency,
+        balance: account.balance,
+        time: new Date().toISOString(),
+        icon: '🗑️',
+      }
+      const existing = JSON.parse(localStorage.getItem('finly_activity_log') || '[]')
+      existing.unshift(log)
+      localStorage.setItem('finly_activity_log', JSON.stringify(existing.slice(0, 50)))
+
+      toast.success(`Account "${account.name}" deleted`)
+      setConfirmDeleteAccount(null)
       await refreshAccounts()
     } catch (err: any) {
-      const status = err?.response?.status
-        || (err.message?.includes('409') ? 409 : 0)
-
-      if (status === 409 || err.message?.includes('409')
-          || err.message?.includes('transactions')) {
-        setDeleteError({
-          title: 'Cannot delete this account',
-          lines: [
-            'This account has transactions linked to it.',
-            'To delete this account you must first:',
-            '• Delete all expenses from this account',
-            '• Delete all income records from this account',
-            '• Delete all transfers involving this account',
-            'Then try deleting again.',
-          ],
-          accountId: confirmId,
-        })
-        setConfirmId(null)
-      } else {
-        const msg = err instanceof Error ? err.message : 'Failed to delete account'
-        sounds.error()
-        toast.error(msg)
-        setConfirmId(null)
-      }
+      sounds.error()
+      const msg = err?.message || 'Failed to delete account'
+      toast.error(msg)
     } finally {
-      setDeleting(false)
+      setDeletingId(null)
     }
   }
 
@@ -216,36 +209,39 @@ const Accounts = () => {
             Manage your cash, cards, and banks.
           </p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '11px 20px',
-            background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 12,
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
-            transition: 'all 0.2s ease',
-            whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(124,58,237,0.45)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(124,58,237,0.35)'
-          }}
-        >
-          + Add Account
-        </button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <ActivityLog />
+          <button
+            onClick={() => setModalOpen(true)}
+            type="button"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '11px 20px',
+              background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 12,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+              transition: 'all 0.2s ease',
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(124,58,237,0.45)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(124,58,237,0.35)'
+            }}
+          >
+            + Add Account
+          </button>
+        </div>
       </div>
 
       <div
@@ -349,7 +345,7 @@ const Accounts = () => {
                   <button
                     onClick={e => {
                       e.stopPropagation()
-                      setConfirmId(acc.id)
+                      setConfirmDeleteAccount(acc)
                     }}
                     type="button"
                     aria-label="Delete account"
@@ -658,96 +654,228 @@ const Accounts = () => {
         </div>
       )}
 
-      <ConfirmDialog
-        open={confirmId !== null}
-        onCancel={() => setConfirmId(null)}
-        onConfirm={handleDelete}
-        message="Delete this account?"
-        confirmLabel="Delete"
-      />
-
-      {deleteError && (
+      {confirmDeleteAccount && (
         <div
-          onClick={e => e.target === e.currentTarget
-            && setDeleteError(null)}
+          onClick={e => {
+            if (e.target === e.currentTarget) setConfirmDeleteAccount(null)
+          }}
           style={{
             position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'center',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
-            padding: 16, zIndex: 200,
+            padding: 16,
+            zIndex: 999,
+            animation: 'fadeIn 0.2s ease-out',
           }}
         >
           <div style={{
-            background: 'var(--surface-strong)',
-            borderRadius: 20, padding: 28,
-            maxWidth: 420, width: '100%',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
-            border: '1px solid var(--border)',
+            background: 'var(--card-bg)',
+            borderRadius: 24,
+            padding: '32px 28px',
+            maxWidth: 380,
+            width: '100%',
+            boxShadow:
+              '0 32px 80px rgba(0,0,0,0.3), ' +
+              '0 0 0 1px rgba(255,255,255,0.05)',
+            animation: 'slideUpBounce 0.35s cubic-bezier(0.34,1.56,0.64,1)',
+            textAlign: 'center',
           }}>
+
             <div style={{
-              width: 52, height: 52,
+              width: 72, height: 72,
               borderRadius: '50%',
-              background: '#fff1f2',
+              background: 'rgba(239,68,68,0.1)',
               display: 'flex', alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 24, margin: '0 auto 16px',
+              margin: '0 auto 20px',
+              position: 'relative',
             }}>
-              🔒
+              <div style={{
+                position: 'absolute', inset: -4,
+                borderRadius: '50%',
+                border: '2px solid rgba(239,68,68,0.3)',
+                animation: 'pulseRing 1.5s ease-out infinite',
+              }}/>
+              <span style={{ fontSize: 32 }}>🗑️</span>
             </div>
+
             <h3 style={{
-              textAlign: 'center', fontSize: 18,
-              fontWeight: 700, color: 'var(--text-1)',
-              marginBottom: 8,
+              fontSize: 20, fontWeight: 800,
+              color: 'var(--text-1)',
+              margin: '0 0 8px',
+              letterSpacing: '-0.02em',
             }}>
-              {deleteError.title}
+              Delete Account?
             </h3>
+
+            <p style={{
+              fontSize: 14, color: 'var(--text-3)',
+              margin: '0 0 6px', lineHeight: 1.5,
+            }}>
+              You are about to delete
+            </p>
+
             <div style={{
-              background: 'var(--surface)',
-              borderRadius: 12, padding: '14px 16px',
-              marginBottom: 20,
+              background: 'var(--surface-2)',
+              borderRadius: 12,
+              padding: '12px 16px',
+              margin: '0 0 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
             }}>
-              {deleteError.lines.map((line, i) => (
-                <p key={i} style={{
-                  fontSize: 13,
-                  color: i === 0 ? 'var(--text-3)' : 'var(--text-2)',
-                  margin: i === 0 ? '0 0 10px' : '4px 0',
-                  fontWeight: line.startsWith('•') ? 400 : 500,
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: 18, flexShrink: 0,
+              }}>
+                {confirmDeleteAccount.type === 'CASH' ? '💵' : '💳'}
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{
+                  fontSize: 14, fontWeight: 700,
+                  color: 'var(--text-1)',
                 }}>
-                  {line}
-                </p>
-              ))}
+                  {confirmDeleteAccount.name}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {confirmDeleteAccount.type} ·{' '}
+                  {confirmDeleteAccount.currency} ·{' '}
+                  Balance: {formatCurrency(
+                    confirmDeleteAccount.balance,
+                    confirmDeleteAccount.currency
+                  )}
+                </div>
+              </div>
             </div>
-            <div style={{ display: 'grid',
-              gridTemplateColumns: '1fr 1fr', gap: 10,
+
+            <div style={{
+              background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.2)',
+              borderRadius: 12,
+              padding: '10px 14px',
+              marginBottom: 24,
+              fontSize: 13,
+              color: '#ef4444',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+              textAlign: 'left',
+            }}>
+              <span style={{ flexShrink: 0, fontSize: 16 }}>⚠️</span>
+              <span>
+                <strong>There is no comeback.</strong> This account
+                and all its data will be permanently deleted.
+                This action cannot be undone.
+              </span>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
             }}>
               <button
-                onClick={() => setDeleteError(null)}
+                onClick={() => setConfirmDeleteAccount(null)}
                 style={{
-                  padding: '11px', borderRadius: 10,
+                  height: 46,
+                  borderRadius: 12,
                   border: '1.5px solid var(--border)',
-                  background: 'none', cursor: 'pointer',
-                  fontWeight: 600, fontSize: 14,
+                  background: 'var(--surface)',
                   color: 'var(--text-2)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
                 }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'var(--surface-2)'
+                  e.currentTarget.style.transform = 'scale(1.02)'
+                  e.currentTarget.style.borderColor = 'var(--text-3)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'var(--surface)'
+                  e.currentTarget.style.transform = 'scale(1)'
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                }}
+                onMouseDown={e =>
+                  e.currentTarget.style.transform = 'scale(0.97)'}
+                onMouseUp={e =>
+                  e.currentTarget.style.transform = 'scale(1.02)'}
               >
-                Close
+                ← Keep it
               </button>
+
               <button
-                onClick={() => {
-                  setDeleteError(null)
-                  navigate('/expenses')
-                }}
+                onClick={() => handleDeleteAccount(confirmDeleteAccount)}
+                disabled={!!deletingId}
                 style={{
-                  padding: '11px', borderRadius: 10,
+                  height: 46,
+                  borderRadius: 12,
                   border: 'none',
-                  background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
-                  color: 'white', cursor: 'pointer',
-                  fontWeight: 600, fontSize: 14,
+                  background: deletingId
+                    ? 'rgba(239,68,68,0.4)'
+                    : 'linear-gradient(135deg,#ef4444,#dc2626)',
+                  color: 'white',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: deletingId ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: deletingId
+                    ? 'none'
+                    : '0 4px 14px rgba(239,68,68,0.4), ' +
+                      '0 0 0 0 rgba(239,68,68,0)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+                onMouseEnter={e => {
+                  if (deletingId) return
+                  e.currentTarget.style.transform = 'scale(1.04) translateY(-1px)'
+                  e.currentTarget.style.boxShadow =
+                    '0 8px 24px rgba(239,68,68,0.5), ' +
+                    '0 0 0 4px rgba(239,68,68,0.12)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'scale(1) translateY(0)'
+                  e.currentTarget.style.boxShadow =
+                    '0 4px 14px rgba(239,68,68,0.4)'
+                }}
+                onMouseDown={e => {
+                  if (deletingId) return
+                  e.currentTarget.style.transform = 'scale(0.97)'
+                }}
+                onMouseUp={e => {
+                  if (deletingId) return
+                  e.currentTarget.style.transform = 'scale(1.04)'
                 }}
               >
-                View Expenses →
+                {deletingId ? (
+                  <>
+                    <div style={{
+                      width: 14, height: 14,
+                      border: '2px solid rgba(255,255,255,0.4)',
+                      borderTopColor: 'white',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }}/>
+                    Deleting...
+                  </>
+                ) : (
+                  <>🗑️ Delete</>
+                )}
               </button>
             </div>
           </div>

@@ -9,11 +9,11 @@ import { useRouteScrollReveal } from '../../hooks/useRouteScrollReveal'
 import api from '../../lib/api'
 import { safeArray } from '../../lib/helpers'
 import BrandLogo from '../ui/BrandLogo'
-import { sounds } from '../../lib/sounds'
 import { useAuthStore } from '../../store/auth.store'
 import Chatbot from '../Chatbot/Chatbot'
 import { AccessibilityBar } from '../ui/AccessibilityBar'
 import { GlobalSearch } from '../ui/GlobalSearch'
+import { SoundButton } from '../ui/SoundButton'
 
 const AppShell = () => {
   const location = useLocation()
@@ -48,11 +48,24 @@ const AppShell = () => {
     if (loggingOut) return
 
     setLoggingOut(true)
-    sounds.frog()
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(120, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.15)
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.25)
+    } catch {}
 
     window.setTimeout(() => {
       logout()
-    }, 420)
+    }, 300)
   }
 
   return (
@@ -141,21 +154,17 @@ const AppShell = () => {
         {!isCompactLayout && (
           <div
             style={{
-              position: 'sticky',
-              top: 0,
+              position: 'absolute',
+              top: 16,
+              right: 20,
               zIndex: 30,
               display: 'flex',
-              justifyContent: 'flex-end',
               alignItems: 'center',
-              padding: '12px 0 12px',
-              marginBottom: 12,
-              background: 'rgba(241,245,249,0.85)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              borderBottom: '1px solid var(--border)',
+              gap: 8,
             }}
           >
             <GlobalSearch />
+            <SoundButton />
           </div>
         )}
 
@@ -177,127 +186,205 @@ const AppShell = () => {
       {showLogoutConfirm && (
         <div
           onClick={e => {
-            if (e.target === e.currentTarget && !loggingOut) {
+            if (e.target === e.currentTarget) {
               startTransition(() => setShowLogoutConfirm(false))
             }
           }}
           style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center',
             justifyContent: 'center',
-            padding: 16,
-            zIndex: 999,
+            padding: 16, zIndex: 999,
+            animation: 'fadeIn 0.2s ease-out',
           }}
         >
-          <div
-            className="glass-card"
-            style={{
+          <div style={{
+            background: 'var(--card-bg)',
+            borderRadius: 28,
+            padding: '36px 32px',
+            maxWidth: 360, width: '100%',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.35)',
+            animation: 'slideUpBounce 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+            textAlign: 'center',
+          }}>
+
+            <div style={{
+              width: 80, height: 80,
               borderRadius: 24,
-              padding: 32,
-              maxWidth: 360,
-              width: '100%',
-              boxShadow: '0 24px 64px rgba(0,0,0,0.3)',
-              border: '1px solid var(--border)',
-              textAlign: 'center',
-              animation: 'slideUp 0.2s ease-out',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 52,
-                marginBottom: 12,
-                lineHeight: 1,
-              }}
-            >
-              🐸
+              background: 'linear-gradient(135deg,#1e293b,#334155)',
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              position: 'relative',
+              overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }}>
+              <div style={{
+                position: 'absolute', inset: 0,
+                background:
+                  'linear-gradient(90deg,' +
+                  'transparent 0%,' +
+                  'rgba(255,255,255,0.08) 50%,' +
+                  'transparent 100%)',
+                animation: 'shimmerSweep 2s ease-in-out infinite',
+              }}/>
+              <span style={{
+                fontSize: 36,
+                animation: 'doorWiggle 0.5s ease-in-out 0.5s',
+              }}>
+                🚪
+              </span>
             </div>
 
-            <h3
-              style={{
-                fontSize: 20,
-                fontWeight: 800,
-                color: 'var(--text-1)',
-                margin: '0 0 8px',
-                letterSpacing: '-0.02em',
-              }}
-            >
+            <h3 style={{
+              fontSize: 22, fontWeight: 800,
+              color: 'var(--text-1)',
+              margin: '0 0 10px',
+              letterSpacing: '-0.02em',
+            }}>
               Leaving so soon?
             </h3>
 
-            <p
-              style={{
-                fontSize: 14,
-                color: 'var(--text-3)',
-                margin: '0 0 28px',
-                lineHeight: 1.5,
-              }}
-            >
-              Are you sure you want to log out of Finly?
+            <p style={{
+              fontSize: 14, color: 'var(--text-3)',
+              margin: '0 0 28px', lineHeight: 1.6,
+            }}>
+              Are you sure you want to log out of{' '}
+              <strong style={{ color: 'var(--text-2)' }}>Finly</strong>?
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 10,
+            }}>
+
               <button
-                type="button"
-                data-button-reset="true"
-                disabled={loggingOut}
                 onClick={() => startTransition(() => setShowLogoutConfirm(false))}
                 style={{
-                  padding: '12px',
-                  borderRadius: 12,
+                  height: 48, borderRadius: 14,
                   border: '1.5px solid var(--border)',
-                  background: 'transparent',
+                  background: 'var(--surface)',
                   color: 'var(--text-2)',
-                  fontSize: 14,
-                  fontWeight: 600,
+                  fontSize: 15, fontWeight: 600,
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.18s cubic-bezier(0.4,0,0.2,1)',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 6,
+                  position: 'relative', overflow: 'hidden',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'var(--surface)'
-                  e.currentTarget.style.borderColor = 'var(--text-3)'
-                  e.currentTarget.style.transform = 'scale(1.02)'
+                  e.currentTarget.style.transform =
+                    'scale(1.04) translateY(-2px)'
+                  e.currentTarget.style.boxShadow =
+                    '0 8px 20px rgba(0,0,0,0.12)'
+                  e.currentTarget.style.borderColor = '#7c3aed'
+                  e.currentTarget.style.color = '#7c3aed'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.transform = 'scale(1) translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
                   e.currentTarget.style.borderColor = 'var(--border)'
-                  e.currentTarget.style.transform = 'scale(1)'
+                  e.currentTarget.style.color = 'var(--text-2)'
                 }}
+                onMouseDown={e => {
+                  const btn = e.currentTarget
+                  const ripple = document.createElement('span')
+                  const rect = btn.getBoundingClientRect()
+                  const size = Math.max(rect.width, rect.height)
+                  ripple.style.cssText = `
+                    position:absolute;
+                    width:${size}px; height:${size}px;
+                    left:${e.clientX-rect.left-size/2}px;
+                    top:${e.clientY-rect.top-size/2}px;
+                    background:rgba(124,58,237,0.15);
+                    border-radius:50%;
+                    transform:scale(0);
+                    animation:rippleOut 0.5s ease-out forwards;
+                    pointer-events:none;
+                  `
+                  btn.appendChild(ripple)
+                  setTimeout(() => ripple.remove(), 500)
+                  e.currentTarget.style.transform = 'scale(0.97)'
+                }}
+                onMouseUp={e =>
+                  e.currentTarget.style.transform =
+                    'scale(1.04) translateY(-2px)'}
               >
                 Stay 😊
               </button>
 
               <button
-                type="button"
-                data-button-reset="true"
-                disabled={loggingOut}
                 onClick={handleConfirmLogout}
+                disabled={loggingOut}
                 style={{
-                  padding: '12px',
-                  borderRadius: 12,
-                  border: 'none',
-                  background: 'linear-gradient(135deg,#ef4444,#dc2626)',
+                  height: 48, borderRadius: 14, border: 'none',
+                  background:
+                    'linear-gradient(135deg,#ef4444 0%,#dc2626 100%)',
                   color: 'white',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  boxShadow: '0 4px 14px rgba(239,68,68,0.35)',
+                  fontSize: 15, fontWeight: 700,
+                  cursor: loggingOut ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.18s cubic-bezier(0.4,0,0.2,1)',
+                  boxShadow: '0 4px 16px rgba(239,68,68,0.4)',
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 6,
+                  position: 'relative', overflow: 'hidden',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'scale(1.04)'
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(239,68,68,0.5)'
+                  if (loggingOut) return
+                  e.currentTarget.style.transform =
+                    'scale(1.04) translateY(-2px)'
+                  e.currentTarget.style.boxShadow =
+                    '0 10px 28px rgba(239,68,68,0.55), ' +
+                    '0 0 0 4px rgba(239,68,68,0.15)'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'scale(1)'
-                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(239,68,68,0.35)'
+                  e.currentTarget.style.transform = 'scale(1) translateY(0)'
+                  e.currentTarget.style.boxShadow =
+                    '0 4px 16px rgba(239,68,68,0.4)'
                 }}
+                onMouseDown={e => {
+                  if (loggingOut) return
+                  const btn = e.currentTarget
+                  const ripple = document.createElement('span')
+                  const rect = btn.getBoundingClientRect()
+                  const size = Math.max(rect.width, rect.height)
+                  ripple.style.cssText = `
+                    position:absolute;
+                    width:${size}px; height:${size}px;
+                    left:${e.clientX-rect.left-size/2}px;
+                    top:${e.clientY-rect.top-size/2}px;
+                    background:rgba(255,255,255,0.25);
+                    border-radius:50%;
+                    transform:scale(0);
+                    animation:rippleOut 0.5s ease-out forwards;
+                    pointer-events:none;
+                  `
+                  btn.appendChild(ripple)
+                  setTimeout(() => ripple.remove(), 500)
+                  e.currentTarget.style.transform = 'scale(0.97)'
+                }}
+                onMouseUp={e =>
+                  e.currentTarget.style.transform =
+                    'scale(1.04) translateY(-2px)'}
               >
-                {loggingOut ? 'Logging out...' : 'Log out 🚪'}
+                {loggingOut ? (
+                  <>
+                    <div style={{
+                      width: 14, height: 14,
+                      border: '2px solid rgba(255,255,255,0.4)',
+                      borderTopColor: 'white',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }}/>
+                    Logging out...
+                  </>
+                ) : (
+                  <>Log out 🚪</>
+                )}
               </button>
             </div>
           </div>

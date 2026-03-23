@@ -292,8 +292,8 @@ export const GlobalSearch = ({ onOpenChange }: GlobalSearchProps) => {
           alignItems: 'center',
           width: open ? openWidth : `${closedSize}px`,
           height: closedSize,
-          background: open ? 'var(--card-bg)' : 'rgba(124,58,237,0.12)',
-          border: open ? '1.5px solid #7c3aed' : '1.5px solid rgba(124,58,237,0.25)',
+          background: open ? 'var(--card-bg)' : 'transparent',
+          border: open ? '1.5px solid #7c3aed' : '1px solid rgba(255,255,255,0.15)',
           borderRadius: 20,
           overflow: 'hidden',
           transition:
@@ -330,7 +330,7 @@ export const GlobalSearch = ({ onOpenChange }: GlobalSearchProps) => {
             height={iconSize}
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#7c3aed"
+            stroke={open ? '#7c3aed' : 'var(--text-2)'}
             strokeWidth="2.5"
             strokeLinecap="round"
             style={{
