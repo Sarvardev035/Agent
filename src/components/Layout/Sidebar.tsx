@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   TrendingDown,
@@ -17,6 +17,8 @@ import {
   Volume2,
   VolumeX,
   Wallet,
+  MessageCircle,
+  StickyNote,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
 import BrandLogo from '../ui/BrandLogo'
@@ -25,6 +27,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import LanguageTranslator from '../ui/LanguageTranslator'
 import { UserProfileStorage } from '../../lib/security'
+import { screenReader } from '../../lib/screenReader'
 
 type NavItem = {
   label: string
@@ -43,6 +46,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Budget', path: '/budget', icon: PieChart, group: 'MANAGE' },
   { label: 'Statistics', path: '/statistics', icon: BarChart3, group: 'MANAGE' },
   { label: 'Calendar', path: '/calendar', icon: Calendar, group: 'MANAGE' },
+  { label: 'Community', path: '/community', icon: MessageCircle, group: 'MANAGE' },
+  { label: 'Notes', path: '/notes', icon: StickyNote, group: 'MANAGE' },
 ]
 
 interface SidebarProps {
@@ -53,9 +58,11 @@ interface SidebarProps {
 const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const authStore = useAuthStore()
   const user = authStore.user
+  const navigate = useNavigate()
   const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [muted, setMuted] = useState(() => sounds.getMuted())
+  const [showAbout, setShowAbout] = useState(false)
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
   const storedProfile = UserProfileStorage.get()
@@ -339,6 +346,61 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
             <button
               type="button"
               data-button-reset="true"
+              className="settings-panel__action"
+              onClick={() => {
+                screenReader.enable()
+                setSettingsOpen(false)
+              }}
+            >
+              <span>♿</span>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Accessibility Mode</div>
+                <div style={{ fontSize: 10, opacity: 0.5 }}>Screen reader</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__action"
+              onClick={() => { navigate('/community'); setSettingsOpen(false) }}
+            >
+              <span>💬</span>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Community</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__action"
+              onClick={() => { navigate('/notes'); setSettingsOpen(false) }}
+            >
+              <span>📝</span>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>My Notes</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__action"
+              onClick={() => { setShowAbout(true); setSettingsOpen(false) }}
+            >
+              <span>ℹ️</span>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>About Finly</div>
+                <div style={{ fontSize: 10, opacity: 0.5 }}>v1.0 · Hackathon 2026</div>
+              </div>
+            </button>
+
+            <div className="settings-panel__divider" />
+
+            <button
+              type="button"
+              data-button-reset="true"
               className="settings-panel__logout"
               onClick={() => {
                 setSettingsOpen(false)
@@ -351,6 +413,53 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
           </div>
         )}
       </div>
+
+      {showAbout && (
+        <div
+          onClick={() => setShowAbout(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', padding: 16, zIndex: 9999,
+          }}
+        >
+          <div
+            className="glass-card"
+            onClick={e => e.stopPropagation()}
+            style={{
+              borderRadius: 24, padding: 32, maxWidth: 360,
+              width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.3)',
+              border: '1px solid var(--border)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 60, marginBottom: 12 }}>⚡</div>
+            <h2 style={{ color: 'var(--text-1)', margin: '0 0 4px', fontSize: 24 }}>Finly</h2>
+            <p style={{ color: 'var(--text-3)', fontSize: 14, margin: '0 0 8px' }}>Personal Finance Manager</p>
+            <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 4px' }}>Built for Hackathon 2026</p>
+            <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 4px' }}>Frontend: React + TypeScript + Vite</p>
+            <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 4px' }}>Backend: Java Spring Boot</p>
+            <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 16px' }}>
+              Features: Expenses, Income, Transfers, Debts, Budget, Analytics,
+              Accessibility, Community, Notes
+            </p>
+            <p style={{ color: 'var(--text-3)', fontSize: 13, margin: '0 0 20px' }}>Team: Sarvar + Backend Dev</p>
+            <button
+              onClick={() => setShowAbout(false)}
+              style={{
+                padding: '10px 24px', borderRadius: 12,
+                background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+                color: 'white', border: 'none',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }
