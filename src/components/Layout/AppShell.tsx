@@ -13,6 +13,7 @@ import { useAuthStore } from '../../store/auth.store'
 import Chatbot from '../Chatbot/Chatbot'
 import { AccessibilityBar } from '../ui/AccessibilityBar'
 import { GlobalSearch } from '../ui/GlobalSearch'
+import { SoundButton } from '../ui/SoundButton'
 
 const AppShell = () => {
   const location = useLocation()
@@ -113,6 +114,7 @@ const AppShell = () => {
             </div>
             {isMobile && !searchOpenOnMobile && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SoundButton />
               <button
                 type="button"
                 aria-label="Notifications"
@@ -162,7 +164,7 @@ const AppShell = () => {
               alignItems: 'center',
               padding: '12px 32px',
               margin: '-24px -32px 16px',
-              background: 'rgba(241,245,249,0.85)',
+              background: 'inherit',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
               borderBottom: '1px solid var(--border)',
