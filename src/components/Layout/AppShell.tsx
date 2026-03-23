@@ -14,6 +14,7 @@ import Chatbot from '../Chatbot/Chatbot'
 import { AccessibilityBar } from '../ui/AccessibilityBar'
 import { GlobalSearch } from '../ui/GlobalSearch'
 import { SoundButton } from '../ui/SoundButton'
+import { ThemeToggle } from '../ui/ThemeToggle'
 
 const AppShell = () => {
   const location = useLocation()
@@ -165,6 +166,7 @@ const AppShell = () => {
           >
             <GlobalSearch />
             <SoundButton />
+            <ThemeToggle compact />
           </div>
         )}
 
