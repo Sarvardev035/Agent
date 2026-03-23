@@ -7,7 +7,7 @@ import TransactionItem from '../components/ui/TransactionItem'
 import { expensesApi } from '../api/expensesApi'
 import { incomeApi } from '../api/incomeApi'
 import { useFinance } from '../context/FinanceContext'
-import { smartDate } from '../utils/helpers'
+import { smartDate } from '../lib/helpers'
 import { safeArray } from '../lib/helpers'
 
 type CalendarTx = {

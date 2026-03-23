@@ -30,7 +30,7 @@ import EmptyState from '../components/ui/EmptyState'
 import StatCard from '../components/ui/StatCard'
 import AnimatedBars from '../components/ui/AnimatedBars'
 import { statsApi } from '../api/statsApi'
-import { formatCurrency, getCategoryMeta } from '../utils/helpers'
+import { formatCurrency, getCategoryMeta } from '../lib/helpers'
 import { safeArray } from '../lib/helpers'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 

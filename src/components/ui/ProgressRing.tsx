@@ -1,4 +1,4 @@
-import { getBudgetColor } from '../../utils/helpers'
+import { getBudgetColor } from '../../lib/helpers'
 import Skeleton from './Skeleton'
 
 interface ProgressRingProps {

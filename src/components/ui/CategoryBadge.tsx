@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { getCategoryMeta } from '../../utils/helpers'
+import { getCategoryMeta } from '../../lib/helpers'
 
 interface CategoryBadgeProps {
   category: string

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import CategoryBadge from './CategoryBadge'
-import { formatCurrency, getCategoryMeta, smartDate } from '../../utils/helpers'
+import { formatCurrency, getCategoryMeta, smartDate } from '../../lib/helpers'
 
 type TransactionType = 'income' | 'expense'
 

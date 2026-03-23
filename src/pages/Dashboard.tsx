@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import { useDashboardStats } from '../hooks/useDashboardStats'
-import { formatCurrency } from '../utils/helpers'
+import { formatCurrency } from '../lib/helpers'
 import AnimatedBars from '../components/ui/AnimatedBars'
 import { UserProfileStorage } from '../lib/security'
 import { screenReader } from '../lib/screenReader'

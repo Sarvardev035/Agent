@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { modalVariants } from '../../utils/animations'
+import { modalVariants } from '../../lib/animations'
 
 interface ModalProps {
   open: boolean

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ArrowUpRight, Bitcoin } from 'lucide-react'
-import { formatCurrency } from '../../utils/helpers'
+import { formatCurrency } from '../../lib/helpers'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 
 interface BankCardProps {

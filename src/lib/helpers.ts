@@ -1,8 +1,8 @@
 import {
   differenceInDays,
-  eachDayOfInterval,
   endOfMonth,
   format,
+  formatDistanceToNow,
   isToday,
   isYesterday,
   parseISO,
@@ -10,16 +10,6 @@ import {
 } from 'date-fns'
 
 export { formatCurrency } from './currency'
-
-export const toArray = <T,>(data: unknown): T[] => {
-  if (!data) return []
-  if (Array.isArray(data)) return data as T[]
-  const obj = data as Record<string, unknown>
-  if (Array.isArray(obj.content)) return obj.content as T[]
-  if (Array.isArray(obj.data)) return obj.data as T[]
-  if (typeof data === 'object') return [data] as T[]
-  return []
-}
 
 export const safeArray = <T,>(data: unknown): T[] => {
   if (!data) return []
@@ -130,4 +120,22 @@ export const isThisMonth = (dateStr: string): boolean => {
   const { start, end } = thisMonthRange()
   const d = parseISO(dateStr)
   return d >= start && d <= end
+}
+
+export const isTokenExpired = (token: string | null) => {
+  try {
+    if (!token) return true
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return Date.now() >= payload.exp * 1000
+  } catch {
+    return true
+  }
+}
+
+export const timeAgo = (date: string) => {
+  try {
+    return formatDistanceToNow(new Date(date), { addSuffix: true })
+  } catch {
+    return ''
+  }
 }
