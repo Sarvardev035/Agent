@@ -51,6 +51,7 @@ const Accounts = () => {
   const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState<AccountForm>(getDefaultAccountForm)
   const [displayCurrency, setDisplayCurrency] = useState('USD')
+  const [activeQuickActionsFor, setActiveQuickActionsFor] = useState<string | null>(null)
   const { convert, rates, loading: rateLoading, lastUpdated, refresh } = useExchangeRates()
   const isPhone = useMediaQuery('(max-width: 640px)')
   const isCardAccount = form.type === 'BANK_CARD'
@@ -171,6 +172,11 @@ const Accounts = () => {
     } finally {
       setDeleting(false)
     }
+  }
+
+  const handleQuickNavigate = (path: string, accountId: string) => {
+    navigate(`${path}?accountId=${encodeURIComponent(accountId)}`)
+    setActiveQuickActionsFor(null)
   }
 
   return (
@@ -297,7 +303,14 @@ const Accounts = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,280px),1fr))', gap: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'flex-start',
+        }}
+      >
         {isLoadingAccounts ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} height={180} />)
         ) : accounts.length === 0 ? (
@@ -312,12 +325,19 @@ const Accounts = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 style={{
+                  flex: isPhone ? '1 1 100%' : '0 1 calc(20% - 10px)',
+                  width: isPhone ? '100%' : 'calc(20% - 10px)',
+                  minWidth: isPhone ? '100%' : 230,
+                  maxWidth: isPhone ? '100%' : 'calc(20% - 10px)',
                   borderRadius: 18,
                   outline: focusedAccountId === acc.id ? '2px solid #7c3aed' : 'none',
                   boxShadow: focusedAccountId === acc.id ? '0 0 0 4px rgba(124,58,237,0.15)' : 'none',
                 }}
               >
-                <div style={{ position: 'relative' }}>
+                <div
+                  style={{ position: 'relative' }}
+                  onClick={() => setActiveQuickActionsFor(prev => (prev === acc.id ? null : acc.id))}
+                >
                   <BankCard
                     name={acc.name}
                      last4={String(acc.id).slice(-4)}
@@ -327,7 +347,10 @@ const Accounts = () => {
                     accountId={acc.id}
                   />
                   <button
-                    onClick={() => setConfirmId(acc.id)}
+                    onClick={e => {
+                      e.stopPropagation()
+                      setConfirmId(acc.id)
+                    }}
                     type="button"
                     aria-label="Delete account"
                     style={{
@@ -345,6 +368,62 @@ const Accounts = () => {
                   >
                     <Trash2 size={16} />
                   </button>
+
+                  {activeQuickActionsFor === acc.id && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 8,
+                        right: 8,
+                        bottom: 8,
+                        background: 'rgba(15,23,42,0.86)',
+                        border: '1px solid rgba(255,255,255,0.18)',
+                        borderRadius: 12,
+                        padding: 8,
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 8,
+                        zIndex: 3,
+                        backdropFilter: 'blur(8px)',
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        data-button-reset="true"
+                        onClick={() => handleQuickNavigate('/transfers', acc.id)}
+                        style={{
+                          border: '1px solid rgba(59,130,246,0.35)',
+                          borderRadius: 10,
+                          padding: '8px 6px',
+                          background: 'rgba(59,130,246,0.15)',
+                          color: '#bfdbfe',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ↔ Transfer
+                      </button>
+                      <button
+                        type="button"
+                        data-button-reset="true"
+                        onClick={() => handleQuickNavigate('/income', acc.id)}
+                        style={{
+                          border: '1px solid rgba(16,185,129,0.35)',
+                          borderRadius: 10,
+                          padding: '8px 6px',
+                          background: 'rgba(16,185,129,0.15)',
+                          color: '#a7f3d0',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ↓ Receive
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -516,14 +595,15 @@ const Accounts = () => {
                         border: `1.5px solid ${cardTypeError ? '#ef4444' : 'var(--border)'}`,
                         borderRadius: 10,
                         fontSize: 14,
-                        background: cardTypeError ? '#fef2f2' : 'var(--surface)',
-                        color: 'var(--text-1)',
+                        background: cardTypeError ? '#fef2f2' : '#ffffff',
+                        color: '#111827',
+                        colorScheme: 'light',
                         cursor: 'pointer',
                       }}
                     >
-                      <option value="">Select card type</option>
+                      <option value="" style={{ color: '#6b7280', background: '#ffffff' }}>Select card type</option>
                       {CARD_TYPES.map(card => (
-                        <option key={card.value} value={card.value}>
+                        <option key={card.value} value={card.value} style={{ color: '#111827', background: '#ffffff' }}>
                           {card.label}
                         </option>
                       ))}
