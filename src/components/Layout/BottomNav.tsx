@@ -16,6 +16,7 @@ import MobileMenuButton from '../ui/MobileMenuButton'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { SoundToggle } from '../ui/SoundToggle'
 import LanguageTranslator from '../ui/LanguageTranslator'
+import { screenReader } from '../../lib/screenReader'
 
 interface BottomNavProps {
   onRequestLogout: () => void
@@ -39,6 +40,8 @@ const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
     { path: '/budget', label: 'Budget', icon: PieChart },
     { path: '/statistics', label: 'Statistics', icon: BarChart3 },
     { path: '/calendar', label: 'Calendar', icon: Calendar },
+    { path: '/community', label: 'Community', icon: Calendar },
+    { path: '/notes', label: 'Notes', icon: PieChart },
   ]
 
   return (
@@ -65,6 +68,8 @@ const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
             <button
               key={tab.label}
               onClick={() => (tab.action ? tab.action() : tab.path && navigate(tab.path))}
+              onFocus={() => screenReader.speak(`${tab.label} tab`)}
+              onMouseEnter={() => screenReader.speak(`${tab.label} tab`)}
               data-button-reset="true"
               style={{
                 flex: 1,
@@ -167,6 +172,8 @@ const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
                       navigate(item.path)
                       startTransition(() => setShowMore(false))
                     }}
+                    onFocus={() => screenReader.speak(`${item.label} page`)}
+                    onMouseEnter={() => screenReader.speak(`${item.label} page`)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -193,6 +200,8 @@ const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
                     startTransition(() => setShowMore(false))
                     onRequestLogout()
                   }}
+                  onFocus={() => screenReader.speak('Log out')}
+                  onMouseEnter={() => screenReader.speak('Log out')}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

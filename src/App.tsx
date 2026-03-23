@@ -17,6 +17,9 @@ import Statistics from './pages/Statistics'
 import CalendarView from './pages/CalendarView'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
+import VRMode from './pages/VRMode'
+import Community from './pages/Community'
+import Notes from './pages/Notes'
 import { seedDefaultCategories } from './lib/seedCategories'
 import NetworkStatus from './components/ui/NetworkStatus'
 import './index.css'
@@ -75,7 +78,10 @@ export default function App() {
                 <Route path="/calendar"   element={<CalendarView />} />
                 <Route path="/accounts"   element={<Accounts />} />
                 <Route path="/categories" element={<Categories />} />
+                <Route path="/community" element={<Community />} />
+                <Route path="/notes" element={<Notes />} />
               </Route>
+              <Route path="/vr" element={<VRMode />} />
             </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

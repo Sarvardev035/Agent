@@ -14,6 +14,7 @@ import { categoriesService } from '../services/categories.service'
 import { safeArray } from '../lib/helpers'
 import { CURRENCIES } from '../lib/constants'
 import { sounds } from '../lib/sounds'
+import { screenReader } from '../lib/screenReader'
 
 type IncomeFormState = {
   amount: string
@@ -123,7 +124,9 @@ const Income = () => {
     setTimeout(async () => {
       if (!formData.amount || !formData.incomeDate || !formData.accountId || !formData.categoryId) {
         sounds.error()
-        toast.error('Please fill amount, date, account, category, and currency')
+        const errorText = 'Please fill amount, date, account, category, and currency'
+        toast.error(errorText)
+        screenReader.speak(`Error: ${errorText}`, true)
         return
       }
       try {
@@ -137,6 +140,7 @@ const Income = () => {
         })
         sounds.income()
         toast.success('Income recorded! 💰')
+        screenReader.speak('Income added successfully', true)
         setShowModal(false)
         setFormData({
           amount: '',
@@ -150,7 +154,9 @@ const Income = () => {
       } catch (err) {
         console.error(err)
         sounds.error()
-        toast.error('Failed to add income')
+        const errorText = 'Failed to add income'
+        toast.error(errorText)
+        screenReader.speak(`Error: ${errorText}`, true)
       }
     }, 0)
   }

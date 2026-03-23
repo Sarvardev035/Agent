@@ -16,6 +16,7 @@ import { useDashboardStats } from '../hooks/useDashboardStats'
 import { formatCurrency } from '../utils/helpers'
 import AnimatedBars from '../components/ui/AnimatedBars'
 import { UserProfileStorage } from '../lib/security'
+import { screenReader } from '../lib/screenReader'
 
 const Dashboard = () => {
   const navigate = useNavigate()
@@ -109,6 +110,12 @@ const Dashboard = () => {
   const openDebts = stats?.openDebts || []
   const budgetUsedPct = stats?.budgetUsedPct ?? 0
 
+  useEffect(() => {
+    if (!loading) {
+      screenReader.readDashboard(summary)
+    }
+  }, [loading, summary.totalBalance, summary.totalIncome, summary.totalExpense, summary.savings])
+
   return (
     <div style={{ padding: 'clamp(16px,3vw,32px)' }}>
       {/* ── ROW 1: Welcome header ── */}
@@ -147,7 +154,9 @@ const Dashboard = () => {
             alignItems: 'center', gap: 6,
             color: 'var(--text-2)', fontSize: 13,
             transition: 'all 0.2s',
-          }}>
+          }}
+          onFocus={() => screenReader.speak('Notifications')}
+          onMouseEnter={() => screenReader.speak('Notifications')}>
             🔔
           </button>
         </div>

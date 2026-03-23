@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { FinanceProvider } from './context/FinanceContext'
+import { initAccessibility } from './lib/screenReader'
+
+initAccessibility()
 
 const root = document.getElementById('root')
 if (!root) throw new Error('No root element found')

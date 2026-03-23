@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   TrendingDown,
@@ -25,6 +25,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import LanguageTranslator from '../ui/LanguageTranslator'
 import { UserProfileStorage } from '../../lib/security'
+import { screenReader } from '../../lib/screenReader'
 
 type NavItem = {
   label: string
@@ -45,16 +46,26 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Calendar', path: '/calendar', icon: Calendar, group: 'MANAGE' },
 ]
 
+const CommunityIcon = ({ size = 18 }: { size?: number }) => (
+  <span style={{ fontSize: Math.max(12, size - 2), lineHeight: 1 }}>💬</span>
+)
+
+const NotesIcon = ({ size = 18 }: { size?: number }) => (
+  <span style={{ fontSize: Math.max(12, size - 2), lineHeight: 1 }}>📝</span>
+)
+
 interface SidebarProps {
   collapsed?: boolean
   onRequestLogout: () => void
 }
 
 const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
+  const navigate = useNavigate()
   const authStore = useAuthStore()
   const user = authStore.user
   const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showAbout, setShowAbout] = useState(false)
   const [muted, setMuted] = useState(() => sounds.getMuted())
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
@@ -69,9 +80,17 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
         .split(' ')
         .map(part => part[0])
         .join('')
-        .slice(0, 2)
-        .toUpperCase() || 'U',
+      .slice(0, 2)
+      .toUpperCase() || 'U',
     [displayName]
+  )
+  const navItems = useMemo(
+    () => [
+      ...NAV_ITEMS,
+      { label: 'Community', path: '/community', icon: CommunityIcon, group: 'MANAGE' as const },
+      { label: 'Notes', path: '/notes', icon: NotesIcon, group: 'MANAGE' as const },
+    ],
+    []
   )
 
   useEffect(() => {
@@ -138,10 +157,12 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
                 {group}
               </div>
             )}
-            {NAV_ITEMS.filter(i => i.group === group).map(item => (
+            {navItems.filter(i => i.group === group).map(item => (
               <NavLink
                 key={item.path}
                 to={item.path}
+                onFocus={() => screenReader.speak(`${item.label} page link`)}
+                onMouseEnter={() => screenReader.speak(`${item.label} page link`)}
                 style={({ isActive }) => ({
                   display: 'flex',
                   alignItems: 'center',
@@ -237,6 +258,8 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
           data-button-reset="true"
           className={`settings-launcher${settingsOpen ? ' is-open' : ''}`}
           onClick={() => startTransition(() => setSettingsOpen(prev => !prev))}
+          onFocus={() => screenReader.speak('Open settings panel')}
+          onMouseEnter={() => screenReader.speak('Open settings panel')}
           style={{
             width: '100%',
             justifyContent: isTablet ? 'center' : 'flex-start',
@@ -340,10 +363,92 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               type="button"
               data-button-reset="true"
               className="settings-panel__logout"
+              style={{ color: '#c4b5fd' }}
+              onClick={() => {
+                if (screenReader.isActive()) {
+                  screenReader.disable()
+                } else {
+                  screenReader.enable()
+                }
+              }}
+              onFocus={() => screenReader.speak('Accessibility mode toggle')}
+              onMouseEnter={() => screenReader.speak('Accessibility mode toggle')}
+            >
+              <span>♿ Accessibility Mode</span>
+              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>Screen reader</span>
+            </button>
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__logout"
+              style={{ color: '#93c5fd' }}
+              onClick={() => {
+                navigate('/vr')
+                setSettingsOpen(false)
+              }}
+              onFocus={() => screenReader.speak('VR mode')}
+              onMouseEnter={() => screenReader.speak('VR mode')}
+            >
+              <span>🥽 VR Mode</span>
+              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>3D Dashboard</span>
+            </button>
+
+            <div className="settings-panel__divider" />
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__logout"
+              style={{ color: '#e2e8f0' }}
+              onClick={() => setShowAbout(true)}
+              onFocus={() => screenReader.speak('About Finly')}
+              onMouseEnter={() => screenReader.speak('About Finly')}
+            >
+              <span>ℹ️ About Finly</span>
+              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>v1.0 · Hackathon 2026</span>
+            </button>
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__logout"
+              style={{ color: '#a5b4fc' }}
+              onClick={() => {
+                navigate('/community')
+                setSettingsOpen(false)
+              }}
+              onFocus={() => screenReader.speak('Community')}
+              onMouseEnter={() => screenReader.speak('Community')}
+            >
+              <span>💬 Community</span>
+            </button>
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__logout"
+              style={{ color: '#a7f3d0' }}
+              onClick={() => {
+                navigate('/notes')
+                setSettingsOpen(false)
+              }}
+              onFocus={() => screenReader.speak('My notes')}
+              onMouseEnter={() => screenReader.speak('My notes')}
+            >
+              <span>📝 My Notes</span>
+            </button>
+
+            <button
+              type="button"
+              data-button-reset="true"
+              className="settings-panel__logout"
               onClick={() => {
                 setSettingsOpen(false)
                 onRequestLogout()
               }}
+              onFocus={() => screenReader.speak('Log out')}
+              onMouseEnter={() => screenReader.speak('Log out')}
             >
               <LogOut size={16} />
               <span>Log out</span>
@@ -351,6 +456,63 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
           </div>
         )}
       </div>
+      {showAbout && (
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowAbout(false)
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(2,6,23,0.7)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 150,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: 'min(560px, 100%)',
+              borderRadius: 20,
+              border: '1px solid var(--border)',
+              background: 'var(--surface-strong)',
+              boxShadow: 'var(--shadow-lg)',
+            }}
+          >
+            <div style={{ textAlign: 'center', padding: 24 }}>
+              <div style={{ fontSize: 60, marginBottom: 12 }}>⚡</div>
+              <h2 style={{ margin: '0 0 6px', color: 'var(--text-1)' }}>Finly</h2>
+              <p style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>Personal Finance Manager</p>
+              <p style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>Built for Hackathon 2026</p>
+              <p style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>Frontend: React + TypeScript + Vite</p>
+              <p style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>Backend: Java Spring Boot</p>
+              <p style={{ margin: '0 0 6px', color: 'var(--text-2)' }}>
+                Features: Expenses, Income, Transfers, Debts, Budget, Analytics, VR Mode, Accessibility, Community, Notes
+              </p>
+              <p style={{ margin: '0 0 18px', color: 'var(--text-2)' }}>Team: Sarvar + Backend Dev</p>
+              <button
+                type="button"
+                data-button-reset="true"
+                onClick={() => setShowAbout(false)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  color: 'var(--text-1)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }
