@@ -20,6 +20,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import LanguageTranslator from '../ui/LanguageTranslator'
 import { UserProfileStorage } from '../../lib/security'
 import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
+import { ProfileModal } from '../Profile/ProfileModal'
 
 type NavItem = {
   label: string
@@ -60,6 +61,7 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [accessibilityActive, setAccessibilityActive] = useState(screenReader.isActive())
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
@@ -189,37 +191,70 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
       >
         {!isTablet && (
           <div
+            onClick={() => setShowProfile(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 10,
-              padding: '8px 12px',
+              padding: '10px 12px',
+              borderRadius: 12,
+              cursor: 'pointer',
               marginBottom: 6,
+              transition: 'all 0.18s ease',
+              border: '1px solid transparent',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+              e.currentTarget.style.borderColor = 'rgba(124,58,237,0.3)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.borderColor = 'transparent'
             }}
           >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontWeight: 700,
-                fontSize: 12,
-                flexShrink: 0,
-              }}
-            >
-              {initials}
+            {/* Avatar with gradient ring */}
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  boxShadow: '0 0 0 2px rgba(124,58,237,0.4)',
+                  transition: 'box-shadow 0.2s',
+                  flexShrink: 0,
+                }}
+              >
+                {initials}
+              </div>
+              {/* Online dot */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  border: '2px solid #0a1628',
+                }}
+              />
             </div>
+
+            {/* Name + email */}
             <div style={{ minWidth: 0, flex: 1 }}>
               <div
                 style={{
                   color: 'white',
                   fontWeight: 600,
-                  fontSize: 12,
+                  fontSize: 13,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -239,6 +274,17 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
                 {displayEmail}
               </div>
             </div>
+
+            {/* Edit icon hint */}
+            <span
+              style={{
+                fontSize: 12,
+                color: 'rgba(255,255,255,0.3)',
+                flexShrink: 0,
+              }}
+            >
+              ✎
+            </span>
           </div>
         )}
 
@@ -431,6 +477,9 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
             </div>
           </div>
         </div>
+      )}
+      {showProfile && (
+        <ProfileModal onClose={() => setShowProfile(false)} />
       )}
     </aside>
   )
