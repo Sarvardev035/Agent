@@ -11,6 +11,8 @@ import {
   BarChart3,
   Calendar,
   LogOut,
+  MessageCircle,
+  StickyNote,
 } from 'lucide-react'
 import MobileMenuButton from '../ui/MobileMenuButton'
 import { ThemeToggle } from '../ui/ThemeToggle'
@@ -39,6 +41,8 @@ const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
     { path: '/budget', label: 'Budget', icon: PieChart },
     { path: '/statistics', label: 'Statistics', icon: BarChart3 },
     { path: '/calendar', label: 'Calendar', icon: Calendar },
+    { path: '/community', label: 'Community', icon: MessageCircle },
+    { path: '/notes', label: 'Notes', icon: StickyNote },
   ]
 
   return (

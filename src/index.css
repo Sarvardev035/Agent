@@ -650,6 +650,29 @@ button:disabled {
   transform: translateX(3px);
 }
 
+.settings-panel__action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s ease, transform 0.15s ease;
+  text-align: left;
+}
+
+.settings-panel__action:hover {
+  background: rgba(255,255,255,0.06);
+  color: white;
+  transform: translateX(3px);
+}
+
 .transfer-action-button {
   position: relative;
   isolation: isolate;

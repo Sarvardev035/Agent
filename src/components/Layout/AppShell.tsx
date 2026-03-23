@@ -12,6 +12,7 @@ import BrandLogo from '../ui/BrandLogo'
 import { sounds } from '../../lib/sounds'
 import { useAuthStore } from '../../store/auth.store'
 import Chatbot from '../Chatbot/Chatbot'
+import { AccessibilityBar } from '../ui/AccessibilityBar'
 
 const AppShell = () => {
   const location = useLocation()
@@ -54,6 +55,7 @@ const AppShell = () => {
 
   return (
     <div className="app-shell-root min-h-screen bg-slate-100">
+      <AccessibilityBar />
       {!isCompactLayout && (
         <Sidebar collapsed={isDesktopCondensed} onRequestLogout={handleRequestLogout} />
       )}
