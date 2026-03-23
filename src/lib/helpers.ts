@@ -86,6 +86,9 @@ export const CATEGORY_META: Record<
   INVESTMENT: { emoji: '📈', bg: '#ecfdf5', color: '#065f46', label: 'Investment', barColor: '#059669' },
 }
 
+export const getCategoryMeta = (category?: string) =>
+  CATEGORY_META[category ?? 'OTHER'] ?? CATEGORY_META.OTHER
+
 export const getBudgetColor = (pct: number) =>
   pct >= 100
     ? { bar: '#ef4444', text: '#be123c', bg: '#fff1f2' }
