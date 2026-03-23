@@ -12,7 +12,7 @@ import {
 } from '../../lib/security'
 import { sounds } from '../../lib/sounds'
 import AuthLinkGrid from '../../components/ui/AuthLinkGrid'
-import { API_BASE_URL } from '../../lib/config'
+import { visitTracker } from '../../lib/visitTracker'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -61,19 +61,19 @@ export default function Login() {
         name: user?.name || user?.fullName || result.data.email.split('@')[0],
         email: user?.email || result.data.email,
       })
+      visitTracker.markHasAccount()
       
       sounds.success()
       toast.success('Welcome back!')
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Login failed'
-      // Show exact error message from API (includes URL and CORS hints)
       if (msg.includes('401') || msg.includes('credentials')) {
         sounds.error()
         setError('Incorrect email or password.')
       } else {
         sounds.error()
-        setError(msg)
+        setError('Unable to sign in right now. Please try again.')
       }
     } finally {
       setIsLoading(false)
@@ -309,9 +309,6 @@ export default function Login() {
               Privacy Policy
             </Link>
           </p>
-          <div style={{ textAlign: 'center', marginTop: 10, fontSize: 10, color: '#ccc' }}>
-            Backend: {API_BASE_URL}
-          </div>
         </form>
 
         <div style={{

@@ -22,7 +22,16 @@ import Community from './pages/Community'
 import Notes from './pages/Notes'
 import { seedDefaultCategories } from './lib/seedCategories'
 import NetworkStatus from './components/ui/NetworkStatus'
+import { TokenStorage } from './lib/security'
+import { visitTracker } from './lib/visitTracker'
 import './index.css'
+
+const SmartRedirect = () => {
+  if (TokenStorage.isValid()) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return <Navigate to={visitTracker.getAuthPage()} replace />
+}
 
 export default function App() {
   const initAuth = useAuthStore(s => s.initAuth)
@@ -59,6 +68,8 @@ export default function App() {
         />
         <NetworkStatus />
         <Routes>
+          <Route path="/" element={<SmartRedirect />} />
+
           {/* Public routes */}
           <Route element={<PublicRoute />}>
             <Route path="/login"    element={<Login />} />
@@ -84,7 +95,7 @@ export default function App() {
               <Route path="/vr" element={<VRMode />} />
             </Route>
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<SmartRedirect />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

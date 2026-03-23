@@ -231,6 +231,27 @@ button:disabled {
   }
 }
 
+@keyframes rippleFade {
+  from {
+    opacity: 1;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+@keyframes shineSweep {
+  from { left: -60%; }
+  to   { left: 120%; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%      { opacity: 0.6; transform: scale(1.08); }
+}
+
 .brand-logo {
   display: inline-flex;
   align-items: center;
