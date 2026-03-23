@@ -109,6 +109,51 @@ const Dashboard = () => {
 
   const openDebts = stats?.openDebts || []
   const budgetUsedPct = stats?.budgetUsedPct ?? 0
+  const quickStats = [
+    {
+      label: 'Net Savings',
+      value: summary.savings,
+      color: '#7c3aed',
+      bg: '#f5f3ff',
+      icon: '💰',
+      path: '/statistics',
+    },
+    {
+      label: 'Accounts',
+      value: accounts.length,
+      color: '#2563eb',
+      bg: '#eff6ff',
+      icon: '💳',
+      path: '/accounts',
+      isCount: true,
+    },
+    {
+      label: 'Open Debts',
+      value: openDebts.length,
+      color: '#f59e0b',
+      bg: '#fffbeb',
+      icon: '🤝',
+      path: '/debts',
+      isCount: true,
+    },
+    {
+      label: 'Budget Health',
+      value: budgetUsedPct,
+      color: '#10b981',
+      bg: '#ecfdf5',
+      icon: '🎯',
+      path: '/budget',
+      isPct: true,
+    },
+  ]
+
+  const formatStatValue = (value: number, isPct?: boolean) => {
+    if (isPct) {
+      return `${Math.round(value).toLocaleString('en-US')}%`
+    }
+    return formatCurrency(value)
+  }
+  const softWrapNumber = (text: string) => text.split(',').join(',\u200b')
 
   useEffect(() => {
     if (!loading) {
@@ -258,15 +303,16 @@ const Dashboard = () => {
         gap:12,
         marginBottom:20,
       }}>
-        {[
-          { label:'Net Savings',   value:summary.savings,      color:'#7c3aed', bg:'#f5f3ff', icon:'💰' },
-          { label:'Accounts',      value:accounts.length,          color:'#2563eb', bg:'#eff6ff', icon:'💳', isCount:true },
-          { label:'Open Debts',    value:openDebts.length,         color:'#f59e0b', bg:'#fffbeb', icon:'🤝', isCount:true },
-          { label:'Budget Health', value:budgetUsedPct,            color:'#10b981', bg:'#ecfdf5', icon:'🎯', isPct:true },
-        ].map(card => (
-          <motion.div key={card.label}
-            whileHover={{ y: -4 }}
+        {quickStats.map(card => (
+          <motion.button
+            key={card.label}
+            whileHover={{ y: -5, scale: 1.01 }}
+            transition={{ duration: 0.22, delay: 0.06 }}
+            onClick={() => navigate(card.path)}
+            type="button"
             style={{
+              width: '100%',
+              textAlign: 'left',
               borderLeft:`4px solid ${card.color}`,
               background: 'rgba(255,255,255,0.7)',
               backdropFilter: 'blur(16px)',
@@ -274,10 +320,11 @@ const Dashboard = () => {
               border: '1px solid rgba(255,255,255,0.5)',
               cursor:'pointer',
               padding:'16px',
-              borderRadius:'16',
-              transition:'all 0.2s',
+              borderRadius: 16,
+              overflow: 'hidden',
+              transition:'box-shadow 0.28s ease 0.06s, transform 0.28s ease 0.06s',
               boxShadow:
-                '0 2px 12px rgba(0,0,0,0.06),' +
+                '0 10px 24px rgba(15,23,42,0.09),' +
                 'inset 0 1px 0 rgba(255,255,255,0.8)',
             }}
           >
@@ -287,14 +334,22 @@ const Dashboard = () => {
             }}>
               {card.icon} {card.label}
             </div>
-            <div className="stat-number" style={{ color: card.color }}>
+            <div
+              className="stat-number"
+              style={{
+                color: card.color,
+                whiteSpace: 'normal',
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+                lineHeight: 1.15,
+                maxWidth: '100%',
+              }}
+            >
               {card.isCount
                 ? card.value
-                : card.isPct
-                  ? `${Math.round(card.value)}%`
-                  : formatCurrency(card.value)}
+                : softWrapNumber(formatStatValue(card.value, card.isPct))}
             </div>
-          </motion.div>
+          </motion.button>
         ))}
       </div>
 
@@ -490,18 +545,25 @@ const Dashboard = () => {
               display:'flex',flexDirection:'column',gap:10,
             }}>
               {accounts.slice(0,4).map((acc:any) => (
-                <motion.div key={acc.id}
-                  whileHover={{ x: 4 }}
+                <motion.button
+                  key={acc.id}
+                  whileHover={{ x: 6, y: -1 }}
+                  transition={{ duration: 0.22, delay: 0.06 }}
+                  onClick={() => navigate(`/accounts?accountId=${encodeURIComponent(acc.id)}`)}
+                  type="button"
                   style={{
-                  display:'flex',alignItems:'center',
-                  justifyContent:'space-between',
-                  padding:'12px 14px',
-                  background:'var(--surface-2)',
-                  borderRadius:12,
-                  border:'1px solid var(--border)',
-                  transition:'all 0.15s',
-                  cursor:'pointer',
-                }}
+                   display:'flex',alignItems:'center',
+                   justifyContent:'space-between',
+                   padding:'12px 14px',
+                   background:'var(--surface-2)',
+                   borderRadius:14,
+                   border:'1px solid var(--border)',
+                   boxShadow:'0 8px 20px rgba(15,23,42,0.08)',
+                   transition:'all 0.22s ease 0.06s',
+                   cursor:'pointer',
+                   width: '100%',
+                   textAlign: 'left',
+                 }}
                 >
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <div style={{
@@ -525,12 +587,16 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <div className="amount" style={{
-                    fontSize:14,
-                    color:'var(--text-1)',
-                  }}>
-                    {formatCurrency(acc.balance, acc.currency)}
+                     fontSize:14,
+                     color:'var(--text-1)',
+                     maxWidth: '48%',
+                     whiteSpace: 'normal',
+                     overflowWrap: 'anywhere',
+                     wordBreak: 'break-word',
+                   }}>
+                    {softWrapNumber(formatCurrency(acc.balance, acc.currency))}
                   </div>
-                </motion.div>
+                </motion.button>
               ))}
             </div>
           )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -43,6 +43,7 @@ const getDefaultAccountForm = (): AccountForm => ({
 
 const Accounts = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { accounts, refreshAccounts, isLoadingAccounts } = useFinanceStore()
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -58,6 +59,7 @@ const Accounts = () => {
     ? 'Card type is required for BANK_CARD accounts'
     : null
   const isSubmitDisabled = isCardAccount && (Boolean(cardNumberError) || Boolean(cardTypeError))
+  const focusedAccountId = searchParams.get('accountId')
 
   useEffect(() => {
     let cancelled = false
@@ -303,7 +305,18 @@ const Accounts = () => {
         ) : (
           <AnimatePresence>
             {accounts.map(acc => (
-              <motion.div key={acc.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <motion.div
+                key={acc.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                style={{
+                  borderRadius: 18,
+                  outline: focusedAccountId === acc.id ? '2px solid #7c3aed' : 'none',
+                  boxShadow: focusedAccountId === acc.id ? '0 0 0 4px rgba(124,58,237,0.15)' : 'none',
+                }}
+              >
                 <div style={{ position: 'relative' }}>
                   <BankCard
                     name={acc.name}
