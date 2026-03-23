@@ -186,6 +186,12 @@ export const ProfileModal = ({ onClose }: Props) => {
   const userEmail = localStorage.getItem('finly_user_email') || ''
   const initials = userName.substring(0, 2).toUpperCase()
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768
+  const isTablet =
+    typeof window !== 'undefined' &&
+    window.innerWidth > 768 &&
+    window.innerWidth <= 1024
+
   return (
     <>
       {/* Overlay */}
@@ -194,64 +200,80 @@ export const ProfileModal = ({ onClose }: Props) => {
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(5,5,20,0.7)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          background: 'rgba(5,5,20,0.75)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: isMobile ? 'flex-end' : 'center',
           justifyContent: 'center',
           zIndex: 500,
-          padding: 16,
+          padding: isMobile ? 0 : 20,
           animation: 'fadeIn 0.2s ease-out',
         }}
       >
         {/* Glass modal */}
         <div
           style={{
-            background: 'rgba(15,20,50,0.85)',
-            backdropFilter: 'blur(30px) saturate(200%)',
-            WebkitBackdropFilter: 'blur(30px) saturate(200%)',
-            border: '1px solid rgba(124,58,237,0.35)',
-            borderRadius: 24,
-            padding: 0,
-            width: '100%',
-            maxWidth: 440,
-            boxShadow:
-              '0 0 0 1px rgba(255,255,255,0.05) inset,' +
-              '0 24px 64px rgba(0,0,0,0.6),' +
-              '0 0 80px rgba(124,58,237,0.15)',
+            background: 'rgba(12,16,42,0.88)',
+            backdropFilter: 'blur(32px) saturate(200%)',
+            WebkitBackdropFilter: 'blur(32px) saturate(200%)',
+            border: '1px solid rgba(124,58,237,0.3)',
+            width: isMobile ? '100%' : isTablet ? '70vw' : '50vw',
+            height: isMobile ? '85vh' : isTablet ? '75vh' : '70vh',
+            maxWidth: isMobile ? '100%' : 640,
+            borderRadius: isMobile ? '20px 20px 0 0' : 20,
+            display: 'flex',
+            flexDirection: 'column',
             overflow: 'hidden',
-            animation: 'slideUp 0.25s cubic-bezier(0.4,0,0.2,1)',
+            boxShadow:
+              '0 0 0 1px rgba(255,255,255,0.04) inset,' +
+              '0 32px 80px rgba(0,0,0,0.7),' +
+              '0 0 100px rgba(124,58,237,0.12)',
+            animation: isMobile
+              ? 'slideFromBottom 0.3s cubic-bezier(0.4,0,0.2,1)'
+              : 'scaleIn 0.25s cubic-bezier(0.4,0,0.2,1)',
           }}
         >
-          {/* Header with gradient top border */}
+          {/* HEADER — fixed, does not scroll */}
           <div
             style={{
               background:
                 'linear-gradient(180deg,' +
-                'rgba(124,58,237,0.2) 0%,' +
+                'rgba(124,58,237,0.18) 0%,' +
                 'transparent 100%)',
-              borderBottom: '1px solid rgba(255,255,255,0.07)',
-              padding: '24px 24px 20px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              padding: isMobile ? '16px 20px' : '20px 28px',
+              flexShrink: 0,
             }}
           >
-            {/* Close button */}
+            {/* Close + title row */}
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'flex-end',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 marginBottom: 16,
               }}
             >
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: 'white',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Edit Profile
+              </div>
               <button
                 onClick={onClose}
                 style={{
                   width: 30,
                   height: 30,
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '50%',
-                  color: 'rgba(255,255,255,0.6)',
+                  color: 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   fontSize: 14,
                   display: 'flex',
@@ -260,59 +282,64 @@ export const ProfileModal = ({ onClose }: Props) => {
                   transition: 'all 0.15s',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background =
-                    'rgba(239,68,68,0.2)'
+                  e.currentTarget.style.background = 'rgba(239,68,68,0.2)'
                   e.currentTarget.style.color = '#ef4444'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background =
-                    'rgba(255,255,255,0.08)'
-                  e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.07)'
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
                 }}
               >
                 ✕
               </button>
             </div>
 
-            {/* Avatar */}
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+            {/* Avatar row — horizontal, saves space */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                marginBottom: 18,
+              }}
+            >
               <div
                 style={{
-                  width: 72,
-                  height: 72,
+                  width: isMobile ? 48 : 56,
+                  height: isMobile ? 48 : 56,
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg,#7c3aed,#2563eb)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  margin: '0 auto 12px',
-                  fontSize: 26,
+                  fontSize: isMobile ? 18 : 22,
                   fontWeight: 800,
                   color: 'white',
-                  boxShadow:
-                    '0 0 0 3px rgba(124,58,237,0.3),' +
-                    '0 0 0 6px rgba(124,58,237,0.1)',
+                  flexShrink: 0,
+                  boxShadow: '0 0 0 3px rgba(124,58,237,0.25)',
                 }}
               >
                 {initials}
               </div>
-              <div
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: 'white',
-                  marginBottom: 3,
-                }}
-              >
-                {userName}
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: 'rgba(255,255,255,0.4)',
-                }}
-              >
-                {userEmail}
+              <div>
+                <div
+                  style={{
+                    fontSize: isMobile ? 14 : 16,
+                    fontWeight: 700,
+                    color: 'white',
+                  }}
+                >
+                  {userName}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'rgba(255,255,255,0.4)',
+                    marginTop: 2,
+                  }}
+                >
+                  {userEmail}
+                </div>
               </div>
             </div>
 
@@ -321,9 +348,9 @@ export const ProfileModal = ({ onClose }: Props) => {
               style={{
                 display: 'flex',
                 gap: 4,
-                background: 'rgba(0,0,0,0.25)',
-                borderRadius: 12,
-                padding: 4,
+                background: 'rgba(0,0,0,0.3)',
+                borderRadius: 10,
+                padding: 3,
               }}
             >
               {TABS.map(tab => (
@@ -332,40 +359,46 @@ export const ProfileModal = ({ onClose }: Props) => {
                   onClick={() => setActiveTab(tab.key)}
                   style={{
                     flex: 1,
-                    padding: '8px 6px',
-                    borderRadius: 9,
+                    padding: isMobile ? '7px 4px' : '8px 6px',
+                    borderRadius: 8,
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: 12,
+                    fontSize: isMobile ? 11 : 12,
                     fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 5,
+                    gap: 4,
                     background:
                       activeTab === tab.key
-                        ? 'rgba(124,58,237,0.35)'
+                        ? 'rgba(124,58,237,0.4)'
                         : 'transparent',
                     color:
                       activeTab === tab.key
                         ? 'white'
-                        : 'rgba(255,255,255,0.4)',
-                    borderBottom:
-                      activeTab === tab.key
-                        ? '1px solid rgba(124,58,237,0.6)'
-                        : '1px solid transparent',
-                    transition: 'all 0.2s ease',
+                        : 'rgba(255,255,255,0.35)',
+                    transition: 'all 0.2s',
                   }}
                 >
-                  <span style={{ fontSize: 14 }}>{tab.icon}</span>
+                  <span style={{ fontSize: isMobile ? 13 : 15 }}>
+                    {tab.icon}
+                  </span>
                   {tab.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Tab content */}
-          <div style={{ padding: '24px' }}>
+          {/* BODY — scrollable */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: isMobile ? '20px 20px' : '24px 28px',
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(124,58,237,0.3) transparent',
+            }}
+          >
             {/* ── NAME TAB ── */}
             {activeTab === 'name' && (
               <div
@@ -712,8 +745,17 @@ export const ProfileModal = ({ onClose }: Props) => {
                 </div>
               </div>
             )}
+          </div>
 
-            {/* ── SAVE BUTTON ── */}
+          {/* FOOTER — fixed, does not scroll */}
+          <div
+            style={{
+              padding: isMobile ? '16px 20px' : '16px 28px',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+              background: 'rgba(0,0,0,0.2)',
+            }}
+          >
             <button
               onClick={
                 activeTab === 'name'
@@ -725,15 +767,14 @@ export const ProfileModal = ({ onClose }: Props) => {
               disabled={loading}
               style={{
                 width: '100%',
-                height: 48,
-                marginTop: 20,
+                height: isMobile ? 46 : 50,
                 background: loading
-                  ? 'rgba(124,58,237,0.4)'
-                  : 'linear-gradient(135deg,#7c3aed 0%,#2563eb 100%)',
+                  ? 'rgba(124,58,237,0.35)'
+                  : 'linear-gradient(135deg,#7c3aed,#2563eb)',
                 color: 'white',
                 border: 'none',
                 borderRadius: 12,
-                fontSize: 15,
+                fontSize: isMobile ? 14 : 15,
                 fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 display: 'flex',
@@ -743,12 +784,12 @@ export const ProfileModal = ({ onClose }: Props) => {
                 transition: 'all 0.2s ease',
                 boxShadow: loading
                   ? 'none'
-                  : '0 4px 20px rgba(124,58,237,0.4)',
+                  : '0 4px 20px rgba(124,58,237,0.35)',
                 letterSpacing: '0.01em',
               }}
               onMouseEnter={e => {
                 if (!loading) {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.transform = 'translateY(-1px)'
                   e.currentTarget.style.boxShadow =
                     '0 8px 28px rgba(124,58,237,0.5)'
                 }
@@ -756,7 +797,7 @@ export const ProfileModal = ({ onClose }: Props) => {
               onMouseLeave={e => {
                 e.currentTarget.style.transform = 'translateY(0)'
                 e.currentTarget.style.boxShadow =
-                  '0 4px 20px rgba(124,58,237,0.4)'
+                  '0 4px 20px rgba(124,58,237,0.35)'
               }}
             >
               {loading ? (
@@ -768,7 +809,7 @@ export const ProfileModal = ({ onClose }: Props) => {
                       borderRadius: '50%',
                       border: '2px solid rgba(255,255,255,0.3)',
                       borderTopColor: 'white',
-                      animation: 'spin 0.8s linear infinite',
+                      animation: 'spin 0.7s linear infinite',
                     }}
                   />
                   Saving...
