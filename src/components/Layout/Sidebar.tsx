@@ -18,6 +18,7 @@ import { useAuthStore } from '../../store/auth.store'
 import BrandLogo from '../ui/BrandLogo'
 import { useTheme } from '../../contexts/ThemeContext'
 import LanguageTranslator from '../ui/LanguageTranslator'
+import { SoundButton } from '../ui/SoundButton'
 import { UserProfileStorage } from '../../lib/security'
 import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
 import { ProfileModal } from '../Profile/ProfileModal'
@@ -348,6 +349,21 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
                 </div>
               </div>
               <LanguageTranslator compact />
+            </div>
+
+            <div className="settings-panel__row" style={{ alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ color: '#a78bfa' }}>🔊</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
+                    Sound effects
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                    Toggle click and success sounds
+                  </div>
+                </div>
+              </div>
+              <SoundButton />
             </div>
 
             <div className="settings-panel__divider" />

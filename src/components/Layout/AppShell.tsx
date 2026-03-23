@@ -13,12 +13,11 @@ import { useAuthStore } from '../../store/auth.store'
 import Chatbot from '../Chatbot/Chatbot'
 import { AccessibilityBar } from '../ui/AccessibilityBar'
 import { GlobalSearch } from '../ui/GlobalSearch'
-import { SoundButton } from '../ui/SoundButton'
-import { ThemeToggle } from '../ui/ThemeToggle'
 
 const AppShell = () => {
   const location = useLocation()
   const isCompactLayout = useMediaQuery('(max-width: 1024px)')
+  const isMobile = useMediaQuery('(max-width: 768px)')
   const isDesktopCondensed = useMediaQuery('(max-width: 1280px)')
   const [notifications, setNotifications] = useState<any[]>([])
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -112,7 +111,7 @@ const AppShell = () => {
             <div style={{ flex: searchOpenOnMobile ? 1 : 'unset' }}>
               <GlobalSearch onOpenChange={setSearchOpenOnMobile} />
             </div>
-            {!searchOpenOnMobile && (
+            {isMobile && !searchOpenOnMobile && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
@@ -152,21 +151,24 @@ const AppShell = () => {
           </header>
         )}
 
-        {!isCompactLayout && location.pathname === '/dashboard' && (
+        {!isCompactLayout && (
           <div
             style={{
-              position: 'absolute',
-              top: 16,
-              right: 20,
+              position: 'sticky',
+              top: 0,
               zIndex: 30,
               display: 'flex',
+              justifyContent: 'flex-end',
               alignItems: 'center',
-              gap: 8,
+              padding: '12px 32px',
+              margin: '-24px -32px 16px',
+              background: 'rgba(241,245,249,0.85)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              borderBottom: '1px solid var(--border)',
             }}
           >
             <GlobalSearch />
-            <SoundButton />
-            <ThemeToggle compact />
           </div>
         )}
 

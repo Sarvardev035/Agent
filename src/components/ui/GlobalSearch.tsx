@@ -55,9 +55,10 @@ export const GlobalSearch = ({ onOpenChange }: GlobalSearchProps) => {
 
   const isMobile = windowWidth <= 768
   const isTablet = windowWidth > 768 && windowWidth <= 1024
+  const isDesktop = windowWidth > 1024
   const closedSize = isMobile ? 36 : 40
-  const openWidth = isMobile ? `${Math.max(220, windowWidth - 80)}px` : isTablet ? '280px' : '380px'
-  const dropdownWidth = isMobile ? `${Math.max(240, windowWidth - 24)}px` : isTablet ? '300px' : '420px'
+  const openWidth = isMobile ? `${windowWidth - 80}px` : isTablet ? '280px' : '380px'
+  const dropdownWidth = isMobile ? `${windowWidth - 24}px` : isTablet ? '300px' : '420px'
   const fontSize = isMobile ? 13 : 14
   const iconSize = isMobile ? 16 : 18
 
@@ -399,7 +400,7 @@ export const GlobalSearch = ({ onOpenChange }: GlobalSearchProps) => {
             top: 'calc(100% + 8px)',
             right: 0,
             width: dropdownWidth,
-            maxWidth: isMobile ? '100vw' : 440,
+            maxWidth: isMobile ? '100vw' : isDesktop ? 440 : 420,
             background: 'var(--card-bg)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
