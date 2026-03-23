@@ -86,6 +86,11 @@ const Expenses = () => {
     }
   }
 
+  const getCategoryName = (categoryId: string): string => {
+    const category = categoryOptions.find(cat => cat.id === categoryId)
+    return category?.name || categoryId
+  }
+
   useEffect(() => {
     loadExpenses()
     loadCategories()
@@ -409,12 +414,13 @@ const Expenses = () => {
                 <AnimatePresence>
                   {items.map((item: any) => {
                     const account = accounts.find(acc => acc.id === item.accountId)
+                    const categoryName = getCategoryName(item.categoryId)
                     return (
                       <TransactionItem
                         key={item.id}
                         type="expense"
                         amount={item.amount}
-                        category={item.category || item.categoryId || 'OTHER'}
+                        category={item.category || categoryName || 'OTHER'}
                         date={item.date}
                         description={item.description}
                         currency={account?.currency || 'UZS'}

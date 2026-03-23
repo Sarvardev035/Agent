@@ -120,7 +120,6 @@ const Accounts = () => {
             }
           : {}),
       })
-      sounds.success()
       toast.success('Account created! 🎉')
       setModalOpen(false)
       setForm(getDefaultAccountForm())
