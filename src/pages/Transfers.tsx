@@ -9,8 +9,8 @@ import Modal from '../components/ui/Modal'
 import { transfersApi } from '../api/transfersApi'
 import { useFinance } from '../context/FinanceContext'
 import { formatCurrency, smartDate } from '../utils/helpers'
-import { safeArray, safeObject } from '../lib/helpers'
-import api from '../lib/api'
+import { safeArray } from '../lib/helpers'
+import { convert, fetchExchangeRates } from '../lib/currency'
 import { sounds } from '../lib/sounds'
 
 interface TransferForm {
@@ -59,8 +59,8 @@ const Transfers = () => {
 
   useEffect(() => {
     loadTransfers()
-    api.get('/api/exchange-rates')
-      .then(res => setRates(safeObject(res.data)))
+    fetchExchangeRates()
+      .then(setRates)
       .catch(() => {})
   }, [])
 
@@ -109,27 +109,10 @@ const Transfers = () => {
   const toAccount = useMemo(() => accounts.find(a => a.id === form.toAccountId), [accounts, form.toAccountId])
   const currenciesDiffer = !!(fromAccount?.currency && toAccount?.currency && fromAccount.currency !== toAccount.currency)
   
-  const calculateConversion = (
-    amount: number,
-    from: string,
-    to: string,
-    exchangeRates: any
-  ): number => {
-    if (!exchangeRates || from === to) return amount
-    const rateFrom = exchangeRates[from]?.rate || 1
-    const rateTo = exchangeRates[to]?.rate || 1
-    return (amount / rateFrom) * rateTo
-  }
-  
   const convertedAmount = useMemo(() => {
     const amt = Number(form.amount)
     if (!currenciesDiffer) return amt
-    return calculateConversion(
-      amt,
-      fromAccount?.currency || 'UZS',
-      toAccount?.currency || 'UZS',
-      rates
-    )
+    return convert(amt, fromAccount?.currency || 'UZS', toAccount?.currency || 'UZS', rates || {})
   }, [currenciesDiffer, form.amount, fromAccount?.currency, toAccount?.currency, rates])
 
   return (
@@ -149,12 +132,12 @@ const Transfers = () => {
             alignItems: 'center',
             gap: 8,
             border: 'none',
-            background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
+            background: 'transparent',
             color: '#fff',
             padding: '10px 12px',
             borderRadius: 12,
             fontWeight: 800,
-            boxShadow: '0 12px 30px rgba(37,99,235,0.3)',
+            boxShadow: 'none',
             cursor: 'pointer',
           }}
         >
@@ -371,11 +354,11 @@ const Transfers = () => {
               height: 48,
               borderRadius: 14,
               border: 'none',
-              background: 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
+              background: 'transparent',
               color: '#fff',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 12px 30px rgba(37,99,235,0.35)',
+              boxShadow: 'none',
             }}
           >
             Save transfer

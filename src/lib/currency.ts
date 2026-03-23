@@ -1,5 +1,6 @@
-// Uses exchangerate-api.com (free, no key needed for basic)
-// Falls back to hardcoded UZS rates if API unavailable
+import { useEffect, useState } from 'react'
+import api from './api'
+import { safeArray } from './helpers'
 
 const FALLBACK_RATES: Record<string, number> = {
   USD: 1,
@@ -11,14 +12,37 @@ let ratesCache: Record<string, number> | null = null
 let ratesFetchedAt = 0
 const CACHE_TTL = 1000 * 60 * 30 // 30 minutes
 
+type ExchangeRateItem = {
+  baseCurrency?: string
+  targetCurrency?: string
+  rate?: number
+}
+
+export const normalizeExchangeRates = (payload: unknown): Record<string, number> => {
+  const normalized: Record<string, number> = { ...FALLBACK_RATES }
+  const rows = safeArray<ExchangeRateItem>(payload)
+
+  rows.forEach(row => {
+    const base = row.baseCurrency
+    const target = row.targetCurrency
+    const rate = Number(row.rate)
+
+    if (!base || !target || !Number.isFinite(rate) || rate <= 0) return
+
+    if (base === 'USD') normalized[target] = rate
+    if (target === 'USD') normalized[base] = 1 / rate
+  })
+
+  return normalized
+}
+
 export const fetchExchangeRates = async (): Promise<Record<string, number>> => {
   const now = Date.now()
   if (ratesCache && now - ratesFetchedAt < CACHE_TTL) return ratesCache
 
   try {
-    const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD')
-    const data = await res.json()
-    ratesCache = data.rates as Record<string, number>
+    const res = await api.get('/api/exchange-rates')
+    ratesCache = normalizeExchangeRates(res.data)
     ratesFetchedAt = now
     return ratesCache
   } catch {
@@ -56,9 +80,6 @@ export const formatCurrency = (
     return `${currency} ${num.toLocaleString('en-US')}`
   }
 }
-
-// React hook for live rates
-import { useEffect, useState } from 'react'
 
 export const useExchangeRates = () => {
   const [rates, setRates] = useState<Record<string, number>>(FALLBACK_RATES)

@@ -23,6 +23,8 @@ import BrandLogo from '../ui/BrandLogo'
 import { sounds } from '../../lib/sounds'
 import { useTheme } from '../../contexts/ThemeContext'
 import { ThemeToggle } from '../ui/ThemeToggle'
+import LanguageTranslator from '../ui/LanguageTranslator'
+import { UserProfileStorage } from '../../lib/security'
 
 type NavItem = {
   label: string
@@ -56,10 +58,9 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const [muted, setMuted] = useState(() => sounds.getMuted())
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
-  const storedName =
-    (typeof window !== 'undefined' && window.localStorage.getItem('finly_user_name')) || ''
-  const storedEmail =
-    (typeof window !== 'undefined' && window.localStorage.getItem('finly_user_email')) || ''
+  const storedProfile = UserProfileStorage.get()
+  const storedName = storedProfile.name
+  const storedEmail = storedProfile.email
   const displayName = user?.name || storedName || 'User'
   const displayEmail = user?.email || storedEmail || ''
   const initials = useMemo(
@@ -316,6 +317,21 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               >
                 <span className="settings-panel__switch-thumb" />
               </button>
+            </div>
+
+            <div className="settings-panel__row" style={{ alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ color: '#71e7ff' }}>🌐</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
+                    Live language
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                    Google Translate, 50+ languages
+                  </div>
+                </div>
+              </div>
+              <LanguageTranslator compact />
             </div>
 
             <div className="settings-panel__divider" />

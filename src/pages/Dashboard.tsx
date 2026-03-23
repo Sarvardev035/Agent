@@ -2,26 +2,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { format, subDays } from 'date-fns'
 import CountUp from 'react-countup'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, TrendingUp, TrendingDown, ArrowLeftRight, HandCoins } from 'lucide-react'
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import { useDashboardStats } from '../hooks/useDashboardStats'
-import { formatCurrency, getCategoryMeta } from '../utils/helpers'
-import TransactionItem from '../components/ui/TransactionItem'
-import EmptyState from '../components/ui/EmptyState'
-import ProgressBar from '../components/ui/ProgressBar'
+import { formatCurrency } from '../utils/helpers'
+import AnimatedBars from '../components/ui/AnimatedBars'
+import { UserProfileStorage } from '../lib/security'
 
 const Dashboard = () => {
   const navigate = useNavigate()
@@ -42,23 +36,11 @@ const Dashboard = () => {
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
   const userName = useMemo(() => {
-    return localStorage.getItem('finly_user_name')
-      || localStorage.getItem('finly_user_email')?.split('@')[0]
+    const profile = UserProfileStorage.get()
+    return profile.name
+      || profile.email?.split('@')[0]
       || 'there'
   }, [])
-
-  const topCategories = useMemo(() => {
-    if (!stats?.expenses) return []
-    const totals: Record<string, number> = {}
-    stats.expenses.forEach((e: any) => {
-      const key = e.category || e.categoryId || 'OTHER'
-      totals[key] = (totals[key] || 0) + (e.amount || 0)
-    })
-    return Object.entries(totals)
-      .map(([k, v]) => ({ key: k, amount: v }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 4)
-  }, [stats?.expenses])
 
   const last7DaysData = useMemo(() => {
     const today = new Date()
@@ -124,8 +106,8 @@ const Dashboard = () => {
     savings: (stats?.monthlyIncome ?? 0) - (stats?.monthlyExpenses ?? 0),
   }
 
-  const openDebts = [] // Placeholder
-  const budgetUsedPct = 0 // Placeholder
+  const openDebts = stats?.openDebts || []
+  const budgetUsedPct = stats?.budgetUsedPct ?? 0
 
   return (
     <div style={{ padding: 'clamp(16px,3vw,32px)' }}>
@@ -354,7 +336,7 @@ const Dashboard = () => {
       {/* ── ROW 5: Two column — Transactions + Accounts ── */}
       <div style={{
         display:'grid',
-        gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth > 1024 ? '1fr 380px' : '1fr',
+        gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,340px),1fr))',
         gap:16,
         marginBottom:20,
       }}>
@@ -550,7 +532,7 @@ const Dashboard = () => {
       {chartReady && (
         <div style={{
           display:'grid',
-          gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth > 1024 ? '1fr 1fr' : '1fr',
+          gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,360px),1fr))',
           gap:16,
           marginBottom:20,
         }}>
@@ -594,7 +576,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Expenses by category pie */}
+          {/* Spending breakdown */}
           <div style={{
             background:'var(--card-bg)',
             borderRadius:'14px',
@@ -615,39 +597,43 @@ const Dashboard = () => {
                 color:'var(--text-3)',fontSize:13,
                 flexDirection:'column',gap:8,
               }}>
-                <span style={{fontSize:32}}>🥧</span>
+                <span style={{fontSize:32}}>📊</span>
                 No spending data yet
               </div>
             ) : (
-              <div style={{width:'100%',minHeight:200}}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={expByCategory}
-                      dataKey="amount"
-                      nameKey="category"
-                      cx="40%" cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={3}
-                    >
-                      {expByCategory.map((_:any,i:number)=>(
-                        <Cell key={i} fill={[
-                          '#7c3aed','#2563eb','#10b981',
-                          '#f59e0b','#ef4444','#06b6d4',
-                        ][i%6]}/>
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        background:'var(--card-bg)',
-                        border:'1px solid var(--border)',
-                        borderRadius:10,fontSize:12,
-                      }}
-                      formatter={(value: any) => formatCurrency(value as number)}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div style={{display:'grid',gap:14}}>
+                <div style={{
+                  display:'flex',
+                  justifyContent:'space-between',
+                  alignItems:'center',
+                  gap:12,
+                  flexWrap:'wrap',
+                }}>
+                  <p style={{
+                    margin:0,
+                    fontSize:12,
+                    color:'var(--text-3)',
+                    fontWeight:600,
+                  }}>
+                    Top categories from your real expense data
+                  </p>
+                  <span style={{
+                    fontSize:11,
+                    color:'var(--text-3)',
+                    letterSpacing:'0.08em',
+                    textTransform:'uppercase',
+                    fontWeight:700,
+                  }}>
+                    Live ranking
+                  </span>
+                </div>
+                <AnimatedBars
+                  items={expByCategory.slice(0, 5)}
+                  valueKey="amount"
+                  labelKey="category"
+                  color="linear-gradient(90deg,#43A19E,#7B43A1,#F2317A)"
+                  formatter={value => formatCurrency(value)}
+                />
               </div>
             )}
           </div>

@@ -11,6 +11,7 @@ import { safeArray } from '../../lib/helpers'
 import BrandLogo from '../ui/BrandLogo'
 import { sounds } from '../../lib/sounds'
 import { useAuthStore } from '../../store/auth.store'
+import Chatbot from '../Chatbot/Chatbot'
 
 const AppShell = () => {
   const location = useLocation()
@@ -272,6 +273,7 @@ const AppShell = () => {
         </div>
       )}
 
+      <Chatbot />
       {isCompactLayout && <BottomNav onRequestLogout={handleRequestLogout} />}
     </div>
   )

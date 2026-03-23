@@ -1,10 +1,13 @@
 import axios from 'axios'
+import { API_BASE_URL } from '../lib/config'
+import { TokenStorage, UserProfileStorage } from '../lib/security'
 
 let redirectingToLogin = false
 let activeRequests = 0
 let activeSlowRequests = 0
 let nextRequestId = 1
 const requestMeta = new Map<number, { timer?: number; slow: boolean }>()
+let refreshPromise: Promise<string | null> | null = null
 
 type NetworkStatusDetail = {
   offline: boolean
@@ -34,6 +37,81 @@ const emitNetworkStatus = (patch: Partial<NetworkStatusDetail>) => {
 }
 
 const slowMessage = 'Backend is responding slowly. Finly is still waiting for the server.'
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+
+const extractAccessToken = (value: unknown): string | null => {
+  const root = asRecord(value)
+  const inner = asRecord(root.data)
+  const result = asRecord(root.result)
+  const candidates = [
+    root.accessToken,
+    root.access_token,
+    root.token,
+    inner.accessToken,
+    inner.access_token,
+    inner.token,
+    result.accessToken,
+    result.access_token,
+    result.token,
+  ]
+  const found = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0)
+  return found ?? null
+}
+
+const extractRefreshToken = (value: unknown): string | null => {
+  const root = asRecord(value)
+  const inner = asRecord(root.data)
+  const result = asRecord(root.result)
+  const candidates = [
+    root.refreshToken,
+    root.refresh_token,
+    inner.refreshToken,
+    inner.refresh_token,
+    result.refreshToken,
+    result.refresh_token,
+  ]
+  const found = candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0)
+  return found ?? null
+}
+
+const performTokenRefresh = async (): Promise<string | null> => {
+  const refreshToken = TokenStorage.getRefreshToken()
+  if (!refreshToken) return null
+
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(
+        `${API_BASE_URL}/api/auth/token/refresh`,
+        { refreshToken },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          timeout: 10000,
+        }
+      )
+      .then(response => {
+        const nextAccessToken = extractAccessToken(response.data)
+        const nextRefreshToken = extractRefreshToken(response.data)
+        if (!nextAccessToken) throw new Error('No access token returned from refresh')
+        TokenStorage.setTokens(nextAccessToken, nextRefreshToken || refreshToken)
+        return nextAccessToken
+      })
+      .catch(() => {
+        TokenStorage.clear()
+        UserProfileStorage.clear()
+        return null
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+
+  return refreshPromise
+}
 
 const bindBrowserNetworkEvents = () => {
   if (typeof window === 'undefined' || window.__FINLY_NETWORK_EVENTS_BOUND__) return
@@ -89,7 +167,7 @@ export const unwrap = <T>(response: { data: any }): T => {
 }
 
 const api = axios.create({
-  baseURL: 'https://finly.uyqidir.uz',
+  baseURL: API_BASE_URL,
   withCredentials: false,
   headers: {
     'Content-Type': 'application/json',
@@ -119,7 +197,7 @@ api.interceptors.request.use(config => {
     requestMeta.set(requestId, { timer, slow: false })
   }
 
-  const token = localStorage.getItem('finly_access_token')
+  const token = TokenStorage.get()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -138,13 +216,40 @@ api.interceptors.response.use(
       || error.code === 'ECONNABORTED'
       || (!error.response && !!error.request)
 
+    const originalConfig = error.config as Record<string, any> | undefined
+    const requestPath = String(originalConfig?.url || '')
+    const isRefreshRequest = requestPath.includes('/api/auth/token/refresh')
+    const isAuthRequest =
+      requestPath.includes('/api/auth/login')
+      || requestPath.includes('/api/auth/register')
+      || isRefreshRequest
+
+    if (error.response?.status === 401 && originalConfig && !originalConfig.__isRetryRequest && !isAuthRequest) {
+      originalConfig.__isRetryRequest = true
+      finalizeRequest(originalConfig)
+      return performTokenRefresh().then(nextAccessToken => {
+        if (!nextAccessToken) {
+          const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+          const isAuthRoute = pathname === '/login' || pathname === '/register'
+          if (!isAuthRoute && !redirectingToLogin && typeof window !== 'undefined') {
+            redirectingToLogin = true
+            window.location.replace('/login')
+          }
+          throw error
+        }
+        originalConfig.headers = originalConfig.headers || {}
+        originalConfig.headers.Authorization = `Bearer ${nextAccessToken}`
+        return api(originalConfig)
+      })
+    }
+
     if (error.response?.status === 401) {
-      const hadToken = Boolean(localStorage.getItem('finly_access_token'))
-      const pathname = window.location.pathname
+      const hadToken = Boolean(TokenStorage.get() || TokenStorage.getRefreshToken())
+      const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
       const isAuthRoute = pathname === '/login' || pathname === '/register'
 
-      localStorage.removeItem('finly_access_token')
-      localStorage.removeItem('finly_refresh_token')
+      TokenStorage.clear()
+      UserProfileStorage.clear()
 
       if (hadToken && !isAuthRoute && !redirectingToLogin) {
         redirectingToLogin = true

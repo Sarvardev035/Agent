@@ -4,9 +4,8 @@ import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { AxiosError } from 'axios'
 import { Eye, EyeOff, Zap, Loader2, AlertTriangle } from 'lucide-react'
-import { RegisterSchema } from '../../lib/security'
+import { RegisterSchema, TokenStorage, UserProfileStorage } from '../../lib/security'
 import api from '../../lib/api'
-import { TokenStorage } from '../../lib/security'
 import { sounds } from '../../lib/sounds'
 import AuthLinkGrid from '../../components/ui/AuthLinkGrid'
 
@@ -78,11 +77,8 @@ export default function Register() {
       const inner = asRecord(root.data)
       const accessToken = (inner.accessToken || root.accessToken) as string | undefined
       const refreshToken = (inner.refreshToken || root.refreshToken) as string | undefined
-      if (accessToken) TokenStorage.set(accessToken)
-      if (refreshToken) localStorage.setItem('finly_refresh_token', refreshToken)
-      
-      localStorage.setItem('finly_user_name', result.data.fullName)
-      localStorage.setItem('finly_user_email', result.data.email)
+      if (accessToken) TokenStorage.setTokens(accessToken, refreshToken)
+      UserProfileStorage.set({ name: result.data.fullName, email: result.data.email })
       
       sounds.success()
       toast.success('Account created! Welcome to Finly.')

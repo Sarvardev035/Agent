@@ -15,6 +15,7 @@ import {
 import MobileMenuButton from '../ui/MobileMenuButton'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { SoundToggle } from '../ui/SoundToggle'
+import LanguageTranslator from '../ui/LanguageTranslator'
 
 interface BottomNavProps {
   onRequestLogout: () => void
@@ -143,6 +144,20 @@ const BottomNav = ({ onRequestLogout }: BottomNavProps) => {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
                 <ThemeToggle />
                 <SoundToggle />
+              </div>
+              <div
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 14,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', marginBottom: 8 }}>
+                  Live language
+                </div>
+                <LanguageTranslator />
               </div>
               <div style={{ display: 'grid', gap: 10 }}>
                 {moreItems.map(item => (

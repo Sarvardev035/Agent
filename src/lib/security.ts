@@ -4,17 +4,93 @@ import { CARD_TYPE_VALUES } from './constants'
 
 // ── Token Security ──────────────────────────────────────────────
 
+const ACCESS_TOKEN_KEY = 'finly_access_token'
+const REFRESH_TOKEN_KEY = 'finly_refresh_token'
+const USER_NAME_KEY = 'finly_user_name'
+const USER_EMAIL_KEY = 'finly_user_email'
+
+const canUseStorage = () => typeof window !== 'undefined'
+
+const readSessionFirst = (key: string): string | null => {
+  if (!canUseStorage()) return null
+
+  const sessionValue = window.sessionStorage.getItem(key)
+  if (sessionValue) return sessionValue
+
+  const legacyValue = window.localStorage.getItem(key)
+  if (!legacyValue) return null
+
+  window.sessionStorage.setItem(key, legacyValue)
+  window.localStorage.removeItem(key)
+  return legacyValue
+}
+
+const writeSession = (key: string, value: string) => {
+  if (!canUseStorage()) return
+  window.sessionStorage.setItem(key, value)
+  window.localStorage.removeItem(key)
+}
+
+const clearEverywhere = (key: string) => {
+  if (!canUseStorage()) return
+  window.sessionStorage.removeItem(key)
+  window.localStorage.removeItem(key)
+}
+
+const isJwtExpired = (token: string | null): boolean => {
+  try {
+    if (!token) return true
+    const [, payload] = token.split('.')
+    if (!payload) return false
+
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = JSON.parse(atob(normalized))
+    if (typeof decoded?.exp !== 'number') return false
+
+    return Date.now() >= decoded.exp * 1000
+  } catch {
+    return false
+  }
+}
+
 export const TokenStorage = {
-  KEY: 'finly_access_token',
+  KEY: ACCESS_TOKEN_KEY,
   set: (token: string): void => {
-    localStorage.setItem(TokenStorage.KEY, token)
+    writeSession(TokenStorage.KEY, token)
   },
-  get: (): string | null => localStorage.getItem(TokenStorage.KEY),
+  get: (): string | null => readSessionFirst(TokenStorage.KEY),
+  setRefreshToken: (token: string): void => {
+    writeSession(REFRESH_TOKEN_KEY, token)
+  },
+  getRefreshToken: (): string | null => readSessionFirst(REFRESH_TOKEN_KEY),
+  setTokens: (accessToken: string, refreshToken?: string | null): void => {
+    TokenStorage.set(accessToken)
+    if (refreshToken) TokenStorage.setRefreshToken(refreshToken)
+  },
   clear: () => {
-    localStorage.removeItem('finly_access_token')
-    localStorage.removeItem('finly_refresh_token')
+    clearEverywhere(ACCESS_TOKEN_KEY)
+    clearEverywhere(REFRESH_TOKEN_KEY)
   },
-  isValid: () => !!TokenStorage.get(),
+  isValid: () => {
+    const accessToken = TokenStorage.get()
+    if (accessToken && !isJwtExpired(accessToken)) return true
+    return Boolean(TokenStorage.getRefreshToken())
+  },
+}
+
+export const UserProfileStorage = {
+  set: (profile: { name?: string | null; email?: string | null }) => {
+    if (profile.name) writeSession(USER_NAME_KEY, profile.name)
+    if (profile.email) writeSession(USER_EMAIL_KEY, profile.email)
+  },
+  get: () => ({
+    name: readSessionFirst(USER_NAME_KEY) || '',
+    email: readSessionFirst(USER_EMAIL_KEY) || '',
+  }),
+  clear: () => {
+    clearEverywhere(USER_NAME_KEY)
+    clearEverywhere(USER_EMAIL_KEY)
+  },
 }
 
 // ── XSS Prevention ──────────────────────────────────────────────

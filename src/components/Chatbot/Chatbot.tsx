@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare } from 'lucide-react'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 
 interface ChatMessage {
   id: string
@@ -91,7 +92,7 @@ Your account balance updates automatically! 💸`,
 1. Go to "Statistics" page
 2. Select period: Daily/Weekly/Monthly/Yearly
 3. See: Income vs Expenses chart
-4. Category breakdown pie chart
+4. Category ranking bars and balance trends
 5. Balance trend over time 📊`,
     action: { label: 'Go to Statistics', path: '/statistics' },
   },
@@ -143,13 +144,14 @@ const getBotResponse = (input: string): { response: string; action?: { label: st
 
 const Chatbot = () => {
   const navigate = useNavigate()
+  const isCompactLayout = useMediaQuery('(max-width: 1024px)')
   const [isOpen, setIsOpen] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '0',
       role: 'assistant',
-      text: 'Hi! I am your Finly assistant. Ask me anything about expenses, income, budgets, debts, and reports.',
+      text: 'Hi! I am your Finly guide. Ask me how to add expenses, move money, track debts, set budgets, or open any page.',
     },
   ])
   const [inputValue, setInputValue] = useState('')
@@ -215,8 +217,8 @@ const Chatbot = () => {
         type="button"
         style={{
           position: 'fixed',
-          bottom: 24,
-          right: 24,
+          bottom: isCompactLayout ? 86 : 24,
+          right: isCompactLayout ? 16 : 24,
           width: 56,
           height: 56,
           borderRadius: 16,
@@ -250,10 +252,10 @@ const Chatbot = () => {
           className="ledger-enter"
           style={{
             position: 'fixed',
-            bottom: 96,
-            right: 24,
-            width: 'min(410px, calc(100vw - 24px))',
-            height: 'min(620px, calc(100vh - 128px))',
+            bottom: isCompactLayout ? 154 : 96,
+            right: isCompactLayout ? 12 : 24,
+            width: isCompactLayout ? 'calc(100vw - 24px)' : 'min(410px, calc(100vw - 24px))',
+            height: isCompactLayout ? 'min(560px, calc(100vh - 190px))' : 'min(620px, calc(100vh - 128px))',
             background: 'linear-gradient(165deg, rgba(255,255,255,0.84), rgba(225,240,255,0.7))',
             borderRadius: 22,
             boxShadow: '0 28px 65px rgba(15,23,42,0.18), 0 16px 30px rgba(30,64,175,0.16)',
@@ -294,7 +296,7 @@ const Chatbot = () => {
                 <Bot size={18} />
               </span>
               <div>
-                <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.1 }}>Finly AI Agent</div>
+                <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.1 }}>Finly Guide</div>
                 <div style={{ fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Sparkles size={12} />
                   Streaming replies

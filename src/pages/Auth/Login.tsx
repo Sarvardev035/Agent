@@ -7,9 +7,12 @@ import api from '../../lib/api'
 import {
   LoginSchema,
   loginRateLimiter,
+  TokenStorage,
+  UserProfileStorage,
 } from '../../lib/security'
 import { sounds } from '../../lib/sounds'
 import AuthLinkGrid from '../../components/ui/AuthLinkGrid'
+import { API_BASE_URL } from '../../lib/config'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -53,12 +56,11 @@ export default function Login() {
 
       if (!accessToken) throw new Error('No token received')
 
-      localStorage.setItem('finly_access_token', accessToken)
-      localStorage.setItem('finly_refresh_token', refreshToken || '')
-      
-      if (user?.name) localStorage.setItem('finly_user_name', user.name)
-      if (user?.email) localStorage.setItem('finly_user_email', user.email)
-      if (!user?.name) localStorage.setItem('finly_user_email', result.data.email)
+      TokenStorage.setTokens(accessToken, refreshToken || null)
+      UserProfileStorage.set({
+        name: user?.name || user?.fullName || result.data.email.split('@')[0],
+        email: user?.email || result.data.email,
+      })
       
       sounds.success()
       toast.success('Welcome back!')
@@ -308,7 +310,7 @@ export default function Login() {
             </Link>
           </p>
           <div style={{ textAlign: 'center', marginTop: 10, fontSize: 10, color: '#ccc' }}>
-            Backend: https://finly.uyqidir.uz
+            Backend: {API_BASE_URL}
           </div>
         </form>
 

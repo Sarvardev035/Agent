@@ -24,7 +24,7 @@ import './index.css'
 export default function App() {
   const initAuth = useAuthStore(s => s.initAuth)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
-  useEffect(() => { initAuth() }, [initAuth])
+  useEffect(() => { void initAuth() }, [initAuth])
   useEffect(() => {
     if (isAuthenticated) seedDefaultCategories()
   }, [isAuthenticated])

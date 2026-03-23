@@ -7,6 +7,8 @@ type DashboardStats = {
   monthlyIncome: number
   monthlyExpenses: number
   netSavings: number
+  budgetUsedPct: number
+  openDebts: any[]
   accounts: any[]
   expenses: any[]
   income: any[]
@@ -22,10 +24,19 @@ export const useDashboardStats = () => {
     const fetchAll = async () => {
       try {
         setLoading(true)
-        const [accounts, expenses, income] = await Promise.allSettled([
+        const now = new Date()
+        const [accounts, expenses, income, summary, debts, budgets] = await Promise.allSettled([
           api.get('/api/accounts'),
           api.get('/api/expenses'),
           api.get('/api/incomes'),
+          api.get('/api/analytics/summary'),
+          api.get('/api/debts'),
+          api.get('/api/budgets', {
+            params: {
+              year: now.getFullYear(),
+              month: now.getMonth() + 1,
+            },
+          }),
         ])
 
         const accountsData =
@@ -45,22 +56,48 @@ export const useDashboardStats = () => {
               }))
             : []
 
-        const now = new Date()
         const thisMonth = (items: any[]) =>
           items.filter(i => {
             const d = new Date(i.date)
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
           })
 
-        const totalBalance = accountsData.reduce((s: number, a: any) => s + (a.balance || 0), 0)
-        const monthlyIncome = thisMonth(incomeData).reduce((s: number, i: any) => s + (i.amount || 0), 0)
-        const monthlyExpenses = thisMonth(expensesData).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+        const summaryData =
+          summary.status === 'fulfilled'
+            ? unwrap<Record<string, any>>(summary.value) || {}
+            : {}
+        const debtsData =
+          debts.status === 'fulfilled'
+            ? safeArray<any>(unwrap(debts.value))
+            : []
+        const budgetData =
+          budgets.status === 'fulfilled'
+            ? safeArray<any>(unwrap(budgets.value))
+            : []
+
+        const computedTotalBalance = accountsData.reduce((s: number, a: any) => s + (a.balance || 0), 0)
+        const computedMonthlyIncome = thisMonth(incomeData).reduce((s: number, i: any) => s + (i.amount || 0), 0)
+        const computedMonthlyExpenses = thisMonth(expensesData).reduce((s: number, e: any) => s + (e.amount || 0), 0)
+        const overallBudget = budgetData.find((item: any) => item.type === 'OVERALL')
+        const openDebts = debtsData.filter((item: any) => (item.status || 'OPEN') !== 'CLOSED')
+
+        const totalBalance = Number(summaryData.totalBalance ?? computedTotalBalance)
+        const monthlyIncome = Number(summaryData.totalIncome ?? summaryData.monthlyIncome ?? computedMonthlyIncome)
+        const monthlyExpenses = Number(summaryData.totalExpense ?? summaryData.monthlyExpense ?? summaryData.monthlyExpenses ?? computedMonthlyExpenses)
+        const budgetUsedPct = Number(
+          overallBudget?.percentageUsed
+          ?? (overallBudget?.monthlyLimit
+            ? ((overallBudget?.spentAmount ?? overallBudget?.spent ?? 0) / overallBudget.monthlyLimit) * 100
+            : 0)
+        )
 
         setStats({
           totalBalance,
           monthlyIncome,
           monthlyExpenses,
           netSavings: monthlyIncome - monthlyExpenses,
+          budgetUsedPct,
+          openDebts,
           accounts: accountsData,
           expenses: expensesData,
           income: incomeData,

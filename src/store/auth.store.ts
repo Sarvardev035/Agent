@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { AxiosError } from 'axios'
-import { TokenStorage } from '../lib/security'
+import { TokenStorage, UserProfileStorage } from '../lib/security'
 import { authService } from '../services/auth.service'
+import { unwrap } from '../lib/api'
 
 interface User {
   id: string
@@ -15,7 +16,7 @@ interface AuthState {
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
-  initAuth: () => void
+  initAuth: () => Promise<void>
 }
 
 type UnknownRecord = Record<string, unknown>
@@ -23,28 +24,47 @@ type UnknownRecord = Record<string, unknown>
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' ? (value as UnknownRecord) : {}
 
-const extractToken = (value: unknown): string | null => {
-  const record = asRecord(value)
-  const candidates = [
-    record.token,
-    record.accessToken,
-    record.access_token,
-    record.jwt,
-  ]
-  const found = candidates.find((v): v is string => typeof v === 'string' && v.length > 0)
-  return found ?? null
-}
-
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: TokenStorage.isValid(),
   isLoading: false,
 
-  initAuth: () => {
+  initAuth: async () => {
     const valid = TokenStorage.isValid()
     if (!valid) {
       TokenStorage.clear()
+      UserProfileStorage.clear()
       set({ isAuthenticated: false, user: null })
+      return
+    }
+
+    const cachedProfile = UserProfileStorage.get()
+    if (cachedProfile.name || cachedProfile.email) {
+      set({
+        isAuthenticated: true,
+        user: {
+          id: '',
+          name: cachedProfile.name || cachedProfile.email.split('@')[0] || 'User',
+          email: cachedProfile.email,
+        },
+      })
+    }
+
+    try {
+      const response = await authService.me()
+      const profile = asRecord(unwrap<Record<string, unknown>>(response))
+      const user = {
+        id: String(profile.id || ''),
+        name: String(profile.fullName || profile.name || cachedProfile.name || 'User'),
+        email: String(profile.email || cachedProfile.email || ''),
+      }
+
+      UserProfileStorage.set({ name: user.name, email: user.email })
+      set({ isAuthenticated: true, user })
+    } catch {
+      if (!cachedProfile.name && !cachedProfile.email) {
+        set({ isAuthenticated: true, user: null })
+      }
     }
   },
 
@@ -57,12 +77,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       const accessToken = (inner.accessToken || payload.accessToken) as string | undefined
       const refreshToken = (inner.refreshToken || payload.refreshToken) as string | undefined
       if (!accessToken) throw new Error('No token in response')
-      TokenStorage.set(accessToken)
-      if (refreshToken) localStorage.setItem('finly_refresh_token', refreshToken)
+      TokenStorage.setTokens(accessToken, refreshToken)
       const userFromResponse = (inner.user || payload.user) as User | undefined
+      const nextUser = userFromResponse || { id: '', name: email.split('@')[0], email }
+      UserProfileStorage.set({ name: nextUser.name, email: nextUser.email })
       set({
         isAuthenticated: true,
-        user: userFromResponse || { id: '', name: email.split('@')[0], email },
+        user: nextUser,
         isLoading: false,
       })
     } catch (err: unknown) {
@@ -100,13 +121,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem('finly_access_token')
-    localStorage.removeItem('finly_refresh_token')
-    localStorage.removeItem('finly_user_name')
-    localStorage.removeItem('finly_user_email')
     localStorage.removeItem('finly_theme')
     sessionStorage.clear()
     TokenStorage.clear()
+    UserProfileStorage.clear()
     set({ user: null, isAuthenticated: false })
     window.location.href = '/login'
   },
