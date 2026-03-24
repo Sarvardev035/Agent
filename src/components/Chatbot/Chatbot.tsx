@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
+import { aiChatService, type ChatAction } from '../../services/ai-chat.service'
+import { accountsApi } from '../../api/accountsApi'
+import { categoriesService } from '../../services/categories.service'
+import { expensesApi } from '../../api/expensesApi'
+import { debtsApi } from '../../api/debtsApi'
+import { sounds } from '../../lib/sounds'
+import { safeArray } from '../../lib/helpers'
 
 interface ChatMessage {
   id: string
@@ -166,6 +174,98 @@ const Chatbot = () => {
     scrollToBottom()
   }, [messages])
 
+  const resolveAccountId = async (accountHint?: string): Promise<string | null> => {
+    const response = await accountsApi.getAll()
+    const accounts = safeArray<any>(response.data)
+    if (!accounts.length) return null
+    if (!accountHint) return String(accounts[0]?.id ?? '')
+    const hint = accountHint.toLowerCase().trim()
+    const exact = accounts.find((acc: any) => String(acc.name || '').toLowerCase() === hint)
+    if (exact?.id) return String(exact.id)
+    const fuzzy = accounts.find((acc: any) => String(acc.name || '').toLowerCase().includes(hint))
+    return fuzzy?.id ? String(fuzzy.id) : String(accounts[0]?.id ?? '')
+  }
+
+  const resolveExpenseCategoryId = async (categoryHint?: string): Promise<string | null> => {
+    const response = await categoriesService.getByType('EXPENSE')
+    const categories = safeArray<any>(response.data)
+    if (!categories.length) return null
+    if (!categoryHint) {
+      const fallback = categories.find((c: any) => String(c.name || '').toLowerCase() === 'other')
+      return String((fallback || categories[0])?.id ?? '')
+    }
+    const hint = categoryHint.toLowerCase().trim()
+    const exact = categories.find((cat: any) => String(cat.name || '').toLowerCase() === hint)
+    if (exact?.id) return String(exact.id)
+    const fuzzy = categories.find((cat: any) => String(cat.name || '').toLowerCase().includes(hint))
+    if (fuzzy?.id) return String(fuzzy.id)
+    const fallback = categories.find((c: any) => String(c.name || '').toLowerCase() === 'other')
+    return String((fallback || categories[0])?.id ?? '')
+  }
+
+  const runAction = async (action: ChatAction): Promise<string | null> => {
+    if (action.type === 'NONE') return null
+
+    if (action.type === 'NAVIGATE' && action.path) {
+      navigate(action.path)
+      sounds.click()
+      toast.success(`Opened ${action.path}`)
+      return `Opened ${action.path}`
+    }
+
+    if (action.type === 'ADD_EXPENSE') {
+      const data = action.data || {}
+      const amount = Number(data.amount)
+      const expenseDate = data.expenseDate || new Date().toISOString().slice(0, 10)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error('AI could not detect a valid expense amount.')
+      }
+      const accountId = await resolveAccountId(data.accountHint)
+      if (!accountId) throw new Error('No account found. Please create an account first.')
+      const categoryId = await resolveExpenseCategoryId(data.categoryHint)
+      if (!categoryId) throw new Error('No expense category found.')
+
+      await expensesApi.create({
+        amount,
+        expenseDate,
+        description: data.description || 'Added via Finly AI Assistant',
+        categoryId,
+        accountId,
+        currency: data.currency || 'USD',
+      })
+      sounds.expense()
+      toast.success('Expense added successfully')
+      return 'Expense recorded successfully.'
+    }
+
+    if (action.type === 'ADD_DEBT') {
+      const data = action.data || {}
+      const amount = Number(data.amount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error('AI could not detect a valid debt amount.')
+      }
+      const accountId = await resolveAccountId(data.accountHint)
+      if (!accountId) throw new Error('No account found. Please create an account first.')
+
+      const dueDate = data.dueDate || new Date().toISOString().slice(0, 10)
+      await debtsApi.create({
+        personName: data.personName || 'Unknown person',
+        amount,
+        currency: data.currency || 'USD',
+        accountId,
+        description: data.description || 'Added via Finly AI Assistant',
+        dueDate,
+        type: data.debtType || 'DEBT',
+      })
+      const daysLeft = Math.ceil((new Date(dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      sounds.notification()
+      toast.success(`Debt added successfully (${daysLeft} day(s) left)`)
+      return `Debt recorded. Deadline in ${daysLeft} day(s).`
+    }
+
+    return null
+  }
+
   const handleSendMessage = (text?: string) => {
     const messageText = (text || inputValue).trim()
     if (!messageText || isTyping) return
@@ -181,26 +281,47 @@ const Chatbot = () => {
     setShowSuggestions(false)
     setIsTyping(true)
 
-    setTimeout(() => {
-      const { response, action } = getBotResponse(messageText)
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        text: response,
-        action,
+    setTimeout(async () => {
+      try {
+        const aiResult = await aiChatService.respond(messageText)
+        const fallback = getBotResponse(messageText)
+        const displayText = aiResult.reply || fallback.response
+
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          text: displayText,
+          action: aiResult.action.type === 'NAVIGATE' && aiResult.action.path
+            ? { label: 'Open screen', path: aiResult.action.path }
+            : fallback.action,
+        }
+
+        const actionOutcome = await runAction(aiResult.action)
+        const toolCallMessage: ChatMessage | null = aiResult.action.type !== 'NONE'
+          ? {
+              id: (Date.now() + 2).toString(),
+              role: 'tool',
+              text: actionOutcome || `Executed ${aiResult.action.type}`,
+              toolName: 'ai-action',
+            }
+          : null
+
+        setMessages(prev => [...prev, assistantMessage, ...(toolCallMessage ? [toolCallMessage] : [])])
+      } catch (error) {
+        sounds.error()
+        toast.error('Action failed. Please review details and try again.')
+        const message = error instanceof Error ? error.message : 'Unexpected AI error'
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            text: `I couldn't complete that automatically. ${message}`,
+          },
+        ])
+      } finally {
+        setIsTyping(false)
       }
-
-      const toolCallMessage: ChatMessage | null = action
-        ? {
-            id: (Date.now() + 2).toString(),
-            role: 'tool',
-            text: `Ready action: navigate to ${action.path}`,
-            toolName: 'navigate',
-          }
-        : null
-
-      setMessages(prev => [...prev, assistantMessage, ...(toolCallMessage ? [toolCallMessage] : [])])
-      setIsTyping(false)
     }, 520)
   }
 

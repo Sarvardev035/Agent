@@ -34,6 +34,9 @@ npm run build
 - `VITE_API_URL` — Backend API base URL (optional)
 - `VITE_API_BASE_URL` — Backend API base URL override (preferred when both exist)
 - `VITE_USE_API_CREDENTIALS` — Set `true` for cookie-based auth/CORS credentials mode, `false` for Bearer token mode (default)
+- `VITE_AI_API_KEY` — AI assistant API key (keep in `.env.local`, do not commit)
+- `VITE_AI_API_BASE_URL` — OpenAI-compatible base URL (default: `https://api.groq.com/openai/v1`)
+- `VITE_AI_MODEL` — AI model name (default: `llama-3.1-8b-instant`)
 
 ### Build & Deploy
 
