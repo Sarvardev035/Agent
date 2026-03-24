@@ -5,7 +5,7 @@ export interface Debt {
   personName: string
   type: 'DEBT' | 'RECEIVABLE'
   currency: string
-  accountId?: string
+  accountId: string
   amount: number
   description?: string
   dueDate: string
@@ -20,13 +20,13 @@ export const debtsService = {
     personName: string
     type: 'DEBT' | 'RECEIVABLE'
     currency: string
-    accountId?: string
+    accountId: string
     amount: number
     description: string
     dueDate: string
   }) => api.post('/api/debts', d),
 
-  repay: (id: string, d: { paymentAmount: number; accountId?: string }) =>
+  repay: (id: string, d: { paymentAmount: number; accountId: string }) =>
     api.post(`/api/debts/${id}/repay`, d),
 
   delete: (id: string) => api.delete(`/api/debts/${id}`),

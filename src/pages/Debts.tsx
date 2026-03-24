@@ -27,13 +27,20 @@ interface DebtForm {
   accountId: string
 }
 
+interface RepayModalState {
+  id: string
+  amount: string
+  accountId: string
+  maxDebtAmount: number
+}
+
 const Debts = () => {
   const { refreshAccounts, accounts } = useFinance()
   const [debts, setDebts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<DebtType>('DEBT')
   const [modalOpen, setModalOpen] = useState(false)
-  const [repayModal, setRepayModal] = useState<{ id: string; amount: string; accountId?: string } | null>(null)
+  const [repayModal, setRepayModal] = useState<RepayModalState | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [isSavingDebt, setIsSavingDebt] = useState(false)
   const [isRepayingDebt, setIsRepayingDebt] = useState(false)
@@ -81,6 +88,77 @@ const Debts = () => {
     return { borrowed, lent }
   }, [debts])
 
+  const accountChoices = useMemo(
+    () =>
+      accounts.filter(acc => {
+        const archived = Boolean(acc?.isArchived || acc?.archived || acc?.isDeleted || acc?.deletedAt)
+        const inactive = acc?.isActive === false || acc?.status === 'INACTIVE' || acc?.status === 'CLOSED'
+        return !archived && !inactive
+      }),
+    [accounts]
+  )
+
+  const getDebtRemainingAmount = (debt: any) => {
+    const directRemaining = [
+      debt?.remainingDebtAmount,
+      debt?.remainingAmount,
+      debt?.remaining,
+      debt?.outstandingAmount,
+      debt?.balanceDue,
+    ]
+      .map(value => Number(value))
+      .find(value => Number.isFinite(value) && value >= 0)
+
+    if (directRemaining !== undefined) return directRemaining
+
+    const repayments = safeArray<any>(debt?.repayments)
+    const totalRepaid = repayments.reduce((sum, repayment) => {
+      const amount = Number(repayment?.paymentAmount ?? repayment?.amount ?? repayment?.paidAmount ?? 0)
+      return sum + (Number.isFinite(amount) ? amount : 0)
+    }, 0)
+
+    const amountPaid = Number(debt?.amountPaid ?? debt?.paidAmount ?? debt?.totalRepaid ?? 0)
+    const paid = Number.isFinite(amountPaid) ? amountPaid : totalRepaid
+    const original = Number(debt?.amount ?? 0)
+    if (!Number.isFinite(original) || original <= 0) return 0
+    return Math.max(original - paid, 0)
+  }
+
+  const hasRepaymentHistory = (debt: any) => {
+    const repayments = safeArray<any>(debt?.repayments)
+    if (repayments.length > 0) return true
+
+    const trackedRepaymentCount = Number(debt?.repaymentsCount ?? debt?.repaymentCount ?? 0)
+    if (Number.isFinite(trackedRepaymentCount) && trackedRepaymentCount > 0) return true
+
+    const trackedPaidAmount = Number(debt?.amountPaid ?? debt?.paidAmount ?? debt?.totalRepaid ?? 0)
+    return Number.isFinite(trackedPaidAmount) && trackedPaidAmount > 0
+  }
+
+  const selectedRepayAccount = useMemo(
+    () => accountChoices.find(acc => String(acc.id) === String(repayModal?.accountId || '')),
+    [accountChoices, repayModal?.accountId]
+  )
+
+  const selectedRepayAccountBalance = Number(selectedRepayAccount?.balance ?? 0)
+  const remainingDebtAmount = Number(repayModal?.maxDebtAmount ?? 0)
+  const repayAmountValue = Number(repayModal?.amount ?? 0)
+
+  const repayValidationMessage = useMemo(() => {
+    if (!repayModal) return ''
+    if (!repayModal.accountId) return 'Please choose the account/card to fund this repayment.'
+    if (!Number.isFinite(repayAmountValue) || repayAmountValue <= 0) return 'Enter a valid repayment amount.'
+    if (repayAmountValue > remainingDebtAmount) {
+      return `Payment amount cannot exceed the remaining debt (${formatCurrency(remainingDebtAmount)}).`
+    }
+    if (repayAmountValue > selectedRepayAccountBalance) {
+      return `Insufficient balance. Selected account has ${formatCurrency(selectedRepayAccountBalance)} available.`
+    }
+    return ''
+  }, [repayAmountValue, remainingDebtAmount, repayModal, selectedRepayAccountBalance])
+
+  const isRepayActionDisabled = isRepayingDebt || Boolean(repayValidationMessage)
+
   const getErrorMessage = (err: unknown, fallback: string) => {
     if (err instanceof Error && err.message) return err.message
     return fallback
@@ -98,6 +176,25 @@ const Debts = () => {
       toast.error('Please choose a due date')
       return
     }
+    if (!form.accountId) {
+      sounds.error()
+      const message = form.type === 'DEBT' 
+        ? 'Please select which account to withdraw money from'
+        : 'Please select which account to deposit money into'
+      toast.error(message)
+      return
+    }
+
+    const selectedAccount = accountChoices.find(acc => String(acc.id) === String(form.accountId))
+    if (form.type === 'DEBT' && selectedAccount) {
+      const balance = Number(selectedAccount.balance || 0)
+      if (amount > balance) {
+        sounds.error()
+        toast.error(`Insufficient balance. ${selectedAccount.name} has ${formatCurrency(balance, selectedAccount.currency || 'UZS')} available.`)
+        return
+      }
+    }
+
     try {
       setIsSavingDebt(true)
       await debtsApi.create({
@@ -107,12 +204,15 @@ const Debts = () => {
         dueDate: form.dueDate,
         type: form.type,
         description: form.description.trim() || undefined,
-        accountId: form.accountId || undefined,
+        accountId: form.accountId,
       })
       sounds.notification()
-      toast.success('Debt recorded!')
+      const message = form.type === 'DEBT' 
+        ? 'Debt recorded and money withdrawn! ✅'
+        : 'Loan recorded and money added! ✅'
+      toast.success(message)
       setModalOpen(false)
-      setForm(prev => ({ ...prev, amount: '', description: '', personName: '' }))
+      setForm(prev => ({ ...prev, amount: '', description: '', personName: '', accountId: '' }))
       await Promise.allSettled([loadDebts(), refreshAccounts()])
     } catch (err) {
       console.error('Failed to save debt:', err)
@@ -125,6 +225,13 @@ const Debts = () => {
 
   const handleDelete = async () => {
     if (!confirmId) return
+    const debtToDelete = debts.find(item => String(item.id) === String(confirmId))
+    if (debtToDelete && hasRepaymentHistory(debtToDelete)) {
+      sounds.error()
+      toast.error('Cannot delete debts with payment history.')
+      setConfirmId(null)
+      return
+    }
     try {
       setIsDeletingDebt(true)
       await debtsApi.delete(confirmId)
@@ -144,16 +251,31 @@ const Debts = () => {
   const handleRepay = async () => {
     if (!repayModal) return
     const paymentAmount = Number(repayModal.amount)
+    if (!repayModal.accountId) {
+      sounds.error()
+      toast.error('Please choose the account/card for this repayment')
+      return
+    }
     if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
       sounds.error()
       toast.error('Enter repayment amount')
+      return
+    }
+    if (paymentAmount > remainingDebtAmount) {
+      sounds.error()
+      toast.error(`Payment amount cannot exceed ${formatCurrency(remainingDebtAmount)}`)
+      return
+    }
+    if (paymentAmount > selectedRepayAccountBalance) {
+      sounds.error()
+      toast.error(`Insufficient balance in selected account (${formatCurrency(selectedRepayAccountBalance)})`)
       return
     }
     try {
       setIsRepayingDebt(true)
       await debtsApi.repay(repayModal.id, {
         paymentAmount,
-        accountId: repayModal.accountId || undefined,
+        accountId: repayModal.accountId,
       })
       sounds.success()
       toast.success('Repayment recorded! ✅')
@@ -380,7 +502,14 @@ const Debts = () => {
                     <div style={{ display: 'flex', gap: 8 }}>
                       {item.status !== 'CLOSED' && (
                         <button
-                          onClick={() => setRepayModal({ id: item.id, amount: String(item.amount || ''), accountId: item.accountId })}
+                          onClick={() =>
+                            setRepayModal({
+                              id: String(item.id),
+                              amount: String(getDebtRemainingAmount(item) || ''),
+                              accountId: '',
+                              maxDebtAmount: getDebtRemainingAmount(item),
+                            })
+                          }
                           type="button"
                           style={{
                             padding: '8px 10px',
@@ -401,6 +530,8 @@ const Debts = () => {
                       <button
                         onClick={() => setConfirmId(item.id)}
                         type="button"
+                        disabled={hasRepaymentHistory(item)}
+                        title={hasRepaymentHistory(item) ? 'Cannot delete debts with payment history.' : 'Delete debt'}
                         style={{
                           padding: '8px 10px',
                           borderRadius: 10,
@@ -411,7 +542,8 @@ const Debts = () => {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 6,
-                          cursor: 'pointer',
+                          cursor: hasRepaymentHistory(item) ? 'not-allowed' : 'pointer',
+                          opacity: hasRepaymentHistory(item) ? 0.6 : 1,
                         }}
                       >
                         <Trash2 size={16} /> Delete
@@ -476,19 +608,35 @@ const Debts = () => {
             </div>
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Account (optional)</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Account (required)</label>
             <select
               value={form.accountId}
               onChange={e => setForm(prev => ({ ...prev, accountId: e.target.value }))}
               style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             >
-              <option value="">Select account</option>
-              {accounts.map(acc => (
+              <option value="">
+                {form.type === 'DEBT' 
+                  ? 'Select account to withdraw from...' 
+                  : 'Select account to deposit into...'}
+              </option>
+              {accountChoices.map(acc => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.currency})
+                  {acc.name} ({acc.currency}) - {formatCurrency(Number(acc.balance || 0), acc.currency || 'UZS')}
                 </option>
               ))}
             </select>
+            {accountChoices.length === 0 && (
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--red)', fontWeight: 700 }}>
+                ⚠️ Add an active account/card first to create a debt.
+              </div>
+            )}
+            {form.accountId && (
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)', fontWeight: 700 }}>
+                {form.type === 'DEBT' 
+                  ? '💸 Money will be withdrawn from this account' 
+                  : '💰 Money will be added to this account'}
+              </div>
+            )}
           </div>
           <div>
             <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Type</label>
@@ -530,7 +678,7 @@ const Debts = () => {
           <button
             onClick={handleSubmit}
             type="button"
-            disabled={isSavingDebt}
+            disabled={isSavingDebt || !form.accountId}
             style={{
               width: '100%',
               height: 48,
@@ -540,8 +688,8 @@ const Debts = () => {
               color: '#fff',
               fontWeight: 800,
               boxShadow: '0 12px 30px rgba(37,99,235,0.35)',
-              cursor: isSavingDebt ? 'not-allowed' : 'pointer',
-              opacity: isSavingDebt ? 0.7 : 1,
+              cursor: isSavingDebt || !form.accountId ? 'not-allowed' : 'pointer',
+              opacity: isSavingDebt || !form.accountId ? 0.7 : 1,
             }}
           >
             {isSavingDebt ? 'Saving...' : 'Save debt'}
@@ -560,12 +708,20 @@ const Debts = () => {
                 setRepayModal(prev => (prev ? { ...prev, amount: e.target.value } : prev))
               }
               min="0"
+              max={
+                repayModal?.accountId
+                  ? String(Math.max(Math.min(remainingDebtAmount, selectedRepayAccountBalance), 0))
+                  : String(Math.max(remainingDebtAmount, 0))
+              }
               step="any"
               style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             />
+            <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)' }}>
+              Remaining debt: {formatCurrency(remainingDebtAmount)}
+            </div>
           </div>
           <div>
-            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Account (optional)</label>
+            <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }}>Pay from account/card</label>
             <select
               value={repayModal?.accountId || ''}
               onChange={e =>
@@ -574,17 +730,32 @@ const Debts = () => {
               style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10 }}
             >
               <option value="">Select account</option>
-              {accounts.map(acc => (
+              {accountChoices.map(acc => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.currency})
+                  {acc.name} ({acc.currency}) - {formatCurrency(Number(acc.balance || 0), acc.currency || 'UZS')}
                 </option>
               ))}
             </select>
+            {!!repayModal?.accountId && (
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)' }}>
+                Available: {formatCurrency(selectedRepayAccountBalance, selectedRepayAccount?.currency || 'UZS')}
+              </div>
+            )}
           </div>
+          {!!repayValidationMessage && (
+            <div style={{ fontSize: 12, color: 'var(--red)', fontWeight: 700 }}>
+              {repayValidationMessage}
+            </div>
+          )}
+          {accountChoices.length === 0 && (
+            <div style={{ fontSize: 12, color: 'var(--red)', fontWeight: 700 }}>
+              Add an active account/card first to make a repayment.
+            </div>
+          )}
           <button
             onClick={handleRepay}
             type="button"
-            disabled={isRepayingDebt}
+            disabled={isRepayActionDisabled}
             style={{
               width: '100%',
               height: 48,
@@ -593,12 +764,12 @@ const Debts = () => {
               background: 'linear-gradient(135deg,#16a34a,#15803d)',
               color: '#fff',
               fontWeight: 800,
-              cursor: isRepayingDebt ? 'not-allowed' : 'pointer',
-              opacity: isRepayingDebt ? 0.7 : 1,
+              cursor: isRepayActionDisabled ? 'not-allowed' : 'pointer',
+              opacity: isRepayActionDisabled ? 0.7 : 1,
               boxShadow: '0 12px 30px rgba(22,163,74,0.25)',
             }}
           >
-            {isRepayingDebt ? 'Saving...' : 'Save repayment'}
+            {isRepayingDebt ? 'Saving...' : 'Confirm repayment'}
           </button>
         </div>
       </Modal>
