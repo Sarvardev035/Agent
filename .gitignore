@@ -1,4 +1,12 @@
-
+# Secrets and Environment Variables
+.env
 .env.local
+.env.*.local
 
-node_modules
+# Build and Production folders
+dist/
+build/
+out/
+
+# Dependencies
+node_modules/

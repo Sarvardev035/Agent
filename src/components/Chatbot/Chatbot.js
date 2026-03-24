@@ -9,6 +9,9 @@ import { accountsApi } from '../../api/accountsApi';
 import { categoriesService } from '../../services/categories.service';
 import { expensesApi } from '../../api/expensesApi';
 import { debtsApi } from '../../api/debtsApi';
+import { statsApi } from '../../api/statsApi';
+import { unwrap } from '../../api/axios';
+import { budgetService } from '../../services/budget.service';
 import { sounds } from '../../lib/sounds';
 import { safeArray } from '../../lib/helpers';
 const BOT_RULES = [
@@ -147,6 +150,7 @@ const Chatbot = () => {
     ]);
     const [inputValue, setInputValue] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(true);
+    const [userSummary, setUserSummary] = useState('');
     const messagesEndRef = useRef(null);
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -154,6 +158,40 @@ const Chatbot = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+    useEffect(() => {
+        let cancelled = false;
+        const numeric = (val) => (Number.isFinite(val) ? val : 0);
+        const loadSummary = async () => {
+            try {
+                const [summaryRes, debtsRes] = await Promise.allSettled([statsApi.summary(), debtsApi.getAll()]);
+                const summaryData = summaryRes.status === 'fulfilled' ? unwrap(summaryRes.value) || {} : {};
+                const debts = debtsRes.status === 'fulfilled' ? safeArray(unwrap(debtsRes.value)) : [];
+                const openDebts = debts.filter(d => String(d.status || 'OPEN').toUpperCase() !== 'CLOSED');
+                const debtTotal = openDebts.reduce((sum, debt) => sum + Number(debt.amount || 0), 0);
+                const balance = numeric(Number(summaryData.totalBalance ?? summaryData.balance ?? 0));
+                const income = numeric(Number(summaryData.totalIncome ?? summaryData.monthlyIncome ?? 0));
+                const expenses = numeric(Number(summaryData.totalExpense ?? summaryData.monthlyExpense ?? 0));
+                const summaryText = [
+                    `Balance ${balance.toFixed(2)}`,
+                    `Income ${income.toFixed(2)}`,
+                    `Expenses ${expenses.toFixed(2)}`,
+                    openDebts.length ? `Open debts ${openDebts.length} totaling ${debtTotal.toFixed(2)}` : null,
+                ]
+                    .filter(Boolean)
+                    .join('; ');
+                if (!cancelled)
+                    setUserSummary(summaryText);
+            }
+            catch {
+                if (!cancelled)
+                    setUserSummary('');
+            }
+        };
+        loadSummary();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
     const resolveAccountId = async (accountHint) => {
         const response = await accountsApi.getAll();
         const accounts = safeArray(response.data);
@@ -190,6 +228,7 @@ const Chatbot = () => {
     const runAction = async (action) => {
         if (action.type === 'NONE')
             return null;
+        const data = action.data || action.payload || {};
         if (action.type === 'NAVIGATE' && action.path) {
             navigate(action.path);
             sounds.click();
@@ -197,7 +236,6 @@ const Chatbot = () => {
             return `Opened ${action.path}`;
         }
         if (action.type === 'ADD_EXPENSE') {
-            const data = action.data || {};
             const amount = Number(data.amount);
             const expenseDate = data.expenseDate || new Date().toISOString().slice(0, 10);
             if (!Number.isFinite(amount) || amount <= 0) {
@@ -222,8 +260,7 @@ const Chatbot = () => {
             return 'Expense recorded successfully.';
         }
         if (action.type === 'ADD_DEBT') {
-            const data = action.data || {};
-            const amount = Number(data.amount);
+            const amount = Number(data.amount ?? data.depositAmount);
             if (!Number.isFinite(amount) || amount <= 0) {
                 throw new Error('AI could not detect a valid debt amount.');
             }
@@ -245,6 +282,42 @@ const Chatbot = () => {
             toast.success(`Debt added successfully (${daysLeft} day(s) left)`);
             return `Debt recorded. Deadline in ${daysLeft} day(s).`;
         }
+        if (action.type === 'UPDATE_SAVINGS') {
+            const deposit = Number(data.depositAmount ?? data.amount);
+            if (!Number.isFinite(deposit) || deposit <= 0) {
+                throw new Error('AI could not detect a valid savings amount.');
+            }
+            toast.success(`Savings update noted for ${data.goalName || 'your goal'}: ${deposit}`);
+            return 'Savings update recorded.';
+        }
+        if (action.type === 'SET_BUDGET') {
+            const limit = Number(data.budgetLimit ?? data.amount ?? data.depositAmount);
+            if (!Number.isFinite(limit) || limit <= 0) {
+                throw new Error('AI could not detect a valid budget limit.');
+            }
+            const categoryId = await resolveExpenseCategoryId(data.budgetCategory || data.categoryHint);
+            if (!categoryId)
+                throw new Error('No budget category found.');
+            const today = new Date();
+            await budgetService.create({
+                categoryId,
+                type: 'MONTHLY',
+                monthlyLimit: limit,
+                year: today.getFullYear(),
+                month: today.getMonth() + 1,
+            });
+            sounds.notification();
+            toast.success('Budget updated successfully');
+            return 'Budget limit saved.';
+        }
+        if (action.type === 'ANALYZE_STATS') {
+            const query = data.statsQuery || 'spending_habits';
+            window.dispatchEvent(new CustomEvent('show-stats', { detail: query }));
+            navigate('/statistics');
+            sounds.notification();
+            toast.success('Showing statistics insights');
+            return `Statistics analysis requested for ${query.replace('_', ' ')}.`;
+        }
         return null;
     };
     const handleSendMessage = (text) => {
@@ -262,7 +335,7 @@ const Chatbot = () => {
         setIsTyping(true);
         setTimeout(async () => {
             try {
-                const aiResult = await aiChatService.respond(messageText);
+                const aiResult = await aiChatService.respond(messageText, userSummary);
                 const fallback = getBotResponse(messageText);
                 const displayText = aiResult.reply || fallback.response;
                 const assistantMessage = {

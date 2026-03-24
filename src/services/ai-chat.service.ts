@@ -1,21 +1,40 @@
 import { AI_API_BASE_URL, AI_API_KEY, AI_MODEL } from '../lib/config'
+import { telegramService } from './telegram.service'
 
-export type ChatActionType = 'NAVIGATE' | 'ADD_EXPENSE' | 'ADD_DEBT' | 'NONE'
+export type StatsQuery = 'spending_habits' | 'debt_risk' | 'savings_progress'
+export type ChatActionType =
+  | 'NAVIGATE'
+  | 'ADD_EXPENSE'
+  | 'ADD_DEBT'
+  | 'UPDATE_SAVINGS'
+  | 'SET_BUDGET'
+  | 'ANALYZE_STATS'
+  | 'NONE'
+
+export type ChatActionPayload = {
+  title?: string
+  amount?: number
+  currency?: 'USD' | 'EUR' | 'UZS'
+  description?: string
+  expenseDate?: string
+  categoryHint?: string
+  accountHint?: string
+  personName?: string
+  debtType?: 'DEBT' | 'RECEIVABLE'
+  dueDate?: string
+  goalName?: string
+  depositAmount?: number
+  budgetCategory?: string
+  budgetLimit?: number
+  budgetPeriod?: 'MONTHLY'
+  statsQuery?: StatsQuery
+}
 
 export type ChatAction = {
   type: ChatActionType
   path?: string
-  data?: {
-    amount?: number
-    currency?: 'USD' | 'EUR' | 'UZS'
-    description?: string
-    expenseDate?: string
-    categoryHint?: string
-    accountHint?: string
-    personName?: string
-    debtType?: 'DEBT' | 'RECEIVABLE'
-    dueDate?: string
-  }
+  data?: ChatActionPayload
+  payload?: ChatActionPayload
 }
 
 export type ChatAssistantResult = {
@@ -24,36 +43,31 @@ export type ChatAssistantResult = {
 }
 
 const SYSTEM_PROMPT = `
-You are Finly assistant for personal finance.
-You must output strict JSON only with shape:
-{
-  "reply": string,
-  "action": {
-    "type": "NAVIGATE" | "ADD_EXPENSE" | "ADD_DEBT" | "NONE",
-    "path"?: string,
-    "data"?: {
-      "amount"?: number,
-      "currency"?: "USD" | "EUR" | "UZS",
-      "description"?: string,
-      "expenseDate"?: "YYYY-MM-DD",
-      "categoryHint"?: string,
-      "accountHint"?: string,
-      "personName"?: string,
-      "debtType"?: "DEBT" | "RECEIVABLE",
-      "dueDate"?: "YYYY-MM-DD"
-    }
-  }
-}
+You are the Finly AI Executive. You have full control to manage:
+- TRANSACTIONS (Income/Expense)
+- DEBTS (Lending/Borrowing)
+- SAVINGS (Goals/Targets)
+- BUDGETS (Limits/Analysis)
 
-Rules:
-- If user asks to open page/screen, use NAVIGATE with one of:
-  /dashboard /expenses /income /transfers /debts /budget /statistics /calendar /accounts /categories /notes /community
-- If user describes spending (buy, spent, paid for), use ADD_EXPENSE.
-- If user says borrowed/took money and will return, use ADD_DEBT debtType=DEBT.
-- If user says gave/lent money and expects return, use ADD_DEBT debtType=RECEIVABLE.
-- For relative dates (today/tomorrow/next monday), convert to YYYY-MM-DD using current local date context.
-- Keep reply friendly and concise like a normal person.
-- Never include markdown fences or extra text; JSON only.
+DATE LOGIC:
+- Today is ${new Date().toLocaleDateString()}. 
+- If the user says "Next Monday", calculate that date in YYYY-MM-DD format.
+
+TOOLS:
+1. ADD_DEBT: Use this for "I gave money to X" (LOAN) or "I took money from X" (DEBT).
+   Payload: { "title": string, "amount": number, "type": "LOAN" | "DEBT", "person": string, "dueDate": "YYYY-MM-DD" }
+
+2. UPDATE_SAVINGS: { "goalName": string, "depositAmount": number }
+
+3. SET_BUDGET: { "category": string, "limit": number, "period": "MONTHLY" }
+
+4. ANALYZE_STATS: { "query": "spending_habits" | "debt_risk" | "savings_progress" }
+
+RESPONSE:
+{
+  "reply": "I've noted that Sardor owes you 50,000. I'll remind you next Monday.",
+  "action": { "type": "ADD_DEBT", "payload": { ... } }
+}
 `.trim()
 
 const extractJson = (text: string): string => {
@@ -63,10 +77,173 @@ const extractJson = (text: string): string => {
   return text.slice(first, last + 1)
 }
 
+const toNumber = (value: unknown): number | undefined => {
+  const num = typeof value === 'string' ? Number(value.trim()) : typeof value === 'number' ? value : NaN
+  return Number.isFinite(num) ? num : undefined
+}
+
+const formatIsoDate = (date: Date) => date.toISOString().slice(0, 10)
+
+const normalizeRelativeDate = (input?: string): string | undefined => {
+  if (!input) return undefined
+  const raw = input.trim()
+  if (!raw) return undefined
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+
+  const lower = raw.toLowerCase()
+  const today = new Date()
+
+  if (lower === 'today') return formatIsoDate(today)
+  if (lower === 'tomorrow') {
+    const d = new Date(today)
+    d.setDate(d.getDate() + 1)
+    return formatIsoDate(d)
+  }
+
+  const nextMatch = lower.match(/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/)
+  if (nextMatch) {
+    const targetDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(
+      nextMatch[1]
+    )
+    const currentDay = today.getDay()
+    const daysAhead = (7 - currentDay + targetDay) % 7 || 7
+    const d = new Date(today)
+    d.setDate(d.getDate() + daysAhead)
+    return formatIsoDate(d)
+  }
+
+  const parsed = new Date(raw)
+  if (!Number.isNaN(parsed.getTime())) return formatIsoDate(parsed)
+  return undefined
+}
+
+const normalizeDebtType = (value?: string): 'DEBT' | 'RECEIVABLE' | undefined => {
+  if (!value) return undefined
+  const v = value.toString().toUpperCase()
+  if (v === 'RECEIVABLE' || v === 'LOAN') return 'RECEIVABLE'
+  if (v === 'DEBT') return 'DEBT'
+  return undefined
+}
+
+const normalizeAction = (action: any): ChatAction => {
+  if (!action || typeof action !== 'object') return { type: 'NONE' }
+  const payload = (action.payload || action.data || {}) as Record<string, any>
+  const data: ChatActionPayload = {
+    title: payload.title,
+    amount: toNumber(payload.amount),
+    currency: payload.currency,
+    description: payload.description || payload.title,
+    expenseDate: normalizeRelativeDate(payload.expenseDate || payload.date),
+    categoryHint: payload.categoryHint || payload.category,
+    accountHint: payload.accountHint || payload.account,
+    personName: payload.personName || payload.person,
+    debtType: normalizeDebtType(payload.type || payload.debtType),
+    dueDate: normalizeRelativeDate(payload.dueDate || payload.due_date),
+    goalName: payload.goalName || payload.goal,
+    depositAmount: toNumber(payload.depositAmount ?? payload.amount),
+    budgetCategory: payload.category || payload.categoryHint,
+    budgetLimit: toNumber(payload.limit ?? payload.monthlyLimit),
+    budgetPeriod: payload.period,
+    statsQuery: payload.query,
+  }
+
+  return {
+    type: (action.type as ChatActionType) || 'NONE',
+    path: action.path,
+    data,
+    payload: data,
+  }
+}
+
+const formatMoney = (amount?: number, currency?: string) => {
+  if (!Number.isFinite(amount || NaN)) return 'N/A'
+  return `${amount} ${currency || 'USD'}`
+}
+
+const buildAddDebtTelegramMessage = (action: ChatAction): string | null => {
+  const data = action.data || action.payload || {}
+  if (action.type !== 'ADD_DEBT') return null
+  const person = data.personName || 'Unknown person'
+  const amount = formatMoney(data.amount, data.currency)
+  const date = data.dueDate || normalizeRelativeDate('today') || 'N/A'
+  return ['<b>New Debt Recorded</b>', `<b>Person:</b> ${person}`, `<b>Amount:</b> ${amount}`, `<b>Date:</b> ${date}`].join('\n')
+}
+
+export const handleAIAction = async (action: any): Promise<string | null> => {
+  if (!action || typeof action !== 'object') return null
+  const payload = (action.payload || action.data || {}) as Record<string, any>
+
+  if (payload.amount !== undefined) payload.amount = Number(payload.amount)
+  if (payload.limit !== undefined) payload.limit = Number(payload.limit)
+  if (payload.depositAmount !== undefined) payload.depositAmount = Number(payload.depositAmount)
+
+  switch (action.type) {
+    case 'ADD_DEBT': {
+      const res = await fetch('/api/debts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: payload.title || `Loan to ${payload.person || payload.personName || 'Unknown person'}`,
+          amount: payload.amount,
+          type: payload.type || 'LOAN',
+          person: payload.person || payload.personName,
+          dueDate: normalizeRelativeDate(payload.dueDate || payload.date),
+          status: 'PENDING',
+        }),
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`ADD_DEBT failed: ${res.status} ${text}`)
+      }
+      return 'Debt recorded.'
+    }
+
+    case 'ANALYZE_STATS':
+      window.dispatchEvent(new CustomEvent('show-stats', { detail: payload.query }))
+      return 'Statistics analysis requested.'
+
+    case 'SET_BUDGET': {
+      const res = await fetch('/api/budgets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category: payload.category || payload.categoryHint,
+          limit: payload.limit,
+          period: payload.period || 'MONTHLY',
+        }),
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`SET_BUDGET failed: ${res.status} ${text}`)
+      }
+      return 'Budget updated.'
+    }
+
+    case 'UPDATE_SAVINGS': {
+      const res = await fetch('/api/savings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          goalName: payload.goalName,
+          depositAmount: payload.depositAmount ?? payload.amount,
+        }),
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`UPDATE_SAVINGS failed: ${res.status} ${text}`)
+      }
+      return 'Savings updated.'
+    }
+
+    default:
+      return null
+  }
+}
+
 export const aiChatService = {
   isConfigured: (): boolean => AI_API_KEY.trim().length > 0,
 
-  async respond(userText: string): Promise<ChatAssistantResult> {
+  async respond(userText: string, userSummary?: string): Promise<ChatAssistantResult> {
     if (!this.isConfigured()) {
       return {
         reply: 'AI key is not configured yet. Add VITE_AI_API_KEY in .env.local and restart the app.',
@@ -86,6 +263,7 @@ export const aiChatService = {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: `CURRENT_USER_DATA: ${userSummary?.trim() || 'Not provided'}` },
           { role: 'user', content: userText },
         ],
       }),
@@ -99,11 +277,22 @@ export const aiChatService = {
     const payload = await res.json()
     const content = String(payload?.choices?.[0]?.message?.content ?? '')
     const parsed = JSON.parse(extractJson(content) || '{}') as ChatAssistantResult
+    const action = normalizeAction(parsed?.action)
+
+    if (action.type === 'ADD_DEBT') {
+      const message = buildAddDebtTelegramMessage(action)
+      if (message) {
+        telegramService.sendMessage(message).catch(err => {
+          console.error('[ai-chat] telegram notification failed', err)
+        })
+      }
+    }
 
     return {
       reply: parsed?.reply || 'Done. Tell me what you want to do next.',
-      action: parsed?.action || { type: 'NONE' },
+      action: action || { type: 'NONE' },
     }
   },
-}
 
+  handleAction: handleAIAction,
+}
