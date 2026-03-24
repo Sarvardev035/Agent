@@ -488,7 +488,6 @@ button:disabled {
   pointer-events: none;
 }
 
-.ui-stat-card:hover,
 .card:hover,
 .glass-card:hover {
   transform: translateY(-4px);
