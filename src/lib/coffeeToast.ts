@@ -96,7 +96,7 @@ export const showCoffeeToast = () => {
         </div>
       </div>
 
-      <button onclick="this.closest('#coffee-toast')?.remove()"
+      <button
         style="
           position: absolute; top: 8px; right: 8px;
           background: none; border: none;

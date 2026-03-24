@@ -240,12 +240,11 @@ export const FamilyShareModal = ({ isOpen, onClose }: FamilyShareModalProps) => 
                       background: 'rgba(15,23,42,0.5)',
                       padding: 12,
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      justifyContent: 'space-between',
+                      flexDirection: 'column',
+                      gap: 10,
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
                         {member.name}
                       </div>
@@ -262,45 +261,56 @@ export const FamilyShareModal = ({ isOpen, onClose }: FamilyShareModalProps) => 
                       </div>
                     </div>
 
-                    <select
-                      value={member.role}
-                      onChange={e =>
-                        handleRoleChange(member.id, e.target.value === 'VIEWER' ? 'VIEWER' : 'EDITOR')
-                      }
+                    <div
                       style={{
-                        padding: '6px 8px',
-                        borderRadius: 6,
-                        border: '1px solid rgba(148,163,184,0.3)',
-                        background: 'rgba(15,23,42,0.8)',
-                        color: '#e2e8f0',
-                        fontSize: 11,
-                        outline: 'none',
-                        minWidth: 100,
-                      }}
-                    >
-                      <option value="EDITOR">Editor</option>
-                      <option value="VIEWER">Viewer</option>
-                    </select>
-
-                    <button
-                      type="button"
-                      data-button-reset="true"
-                      onClick={() => handleRemove(member.id)}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 6,
-                        border: '1px solid rgba(252,93,93,0.3)',
-                        background: 'rgba(252,165,165,0.08)',
-                        color: '#fca5a5',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
+                        justifyContent: 'flex-end',
+                        gap: 8,
+                        flexWrap: 'wrap',
+                        width: '100%',
                       }}
                     >
-                      <Trash2 size={16} />
-                    </button>
+                      <select
+                        value={member.role}
+                        onChange={e =>
+                          handleRoleChange(member.id, e.target.value === 'VIEWER' ? 'VIEWER' : 'EDITOR')
+                        }
+                        style={{
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          border: '1px solid rgba(148,163,184,0.3)',
+                          background: 'rgba(15,23,42,0.8)',
+                          color: '#e2e8f0',
+                          fontSize: 11,
+                          outline: 'none',
+                          minWidth: 100,
+                        }}
+                      >
+                        <option value="EDITOR">Editor</option>
+                        <option value="VIEWER">Viewer</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        data-button-reset="true"
+                        onClick={() => handleRemove(member.id)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 6,
+                          border: '1px solid rgba(252,93,93,0.3)',
+                          background: 'rgba(252,165,165,0.08)',
+                          color: '#fca5a5',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

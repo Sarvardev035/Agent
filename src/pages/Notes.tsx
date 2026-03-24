@@ -52,6 +52,7 @@ const Notes = () => {
   const [active, setActive] = useState<Note | null>(null)
   const [search, setSearch] = useState('')
   const [isPhone, setIsPhone] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -65,22 +66,30 @@ const Notes = () => {
     return () => media.removeListener(onChange)
   }, [])
 
+  const persistNote = (noteToPersist: Note, announce = false) => {
+    const persisted = {
+      ...noteToPersist,
+      updatedAt: new Date().toISOString(),
+    }
+
+    setSaveStatus('saving')
+    setNotes(prev => {
+      const updated = prev.map(n => (n.id === persisted.id ? persisted : n))
+      saveNotes(updated)
+      return updated
+    })
+    setActive(prev => (prev && prev.id === persisted.id ? persisted : prev))
+    setSaveStatus('saved')
+
+    if (announce) screenReader.speak('Note saved', true)
+    window.setTimeout(() => setSaveStatus('idle'), 1000)
+  }
+
   useEffect(() => {
     if (!active) return
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
     autoSaveRef.current = setTimeout(() => {
-      setNotes(prev => {
-        const updated = prev.map(n =>
-          n.id === active.id
-            ? {
-                ...active,
-                updatedAt: new Date().toISOString(),
-              }
-            : n
-        )
-        saveNotes(updated)
-        return updated
-      })
+      persistNote(active)
     }, 500)
     return () => {
       if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
@@ -335,7 +344,7 @@ const Notes = () => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                Auto-saving...
+                {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : 'Auto-save ready'}
                 <span style={{ marginLeft: 6 }}>💾</span>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -417,6 +426,11 @@ const Notes = () => {
             <input
               value={active.title}
               onChange={e => setActive(p => (p ? { ...p, title: e.target.value } : p))}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  persistNote(active, true)
+                }
+              }}
               placeholder="Note title..."
               style={{
                 border: 'none',
@@ -434,13 +448,21 @@ const Notes = () => {
             <textarea
               value={active.body}
               onChange={e => setActive(p => (p ? { ...p, body: e.target.value } : p))}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault()
+                  persistNote(active, true)
+                }
+              }}
               placeholder={`Start writing your note...
 
 💡 Ideas:
 - Monthly savings goals
 - Budget planning notes
 - Expense review reminders
-- Financial targets`}
+- Financial targets
+
+⌨️ Save shortcut: Ctrl/Cmd + Enter`}
               style={{
                 flex: 1,
                 border: 'none',
@@ -458,6 +480,28 @@ const Notes = () => {
             <div style={{ fontSize: 11, color: 'var(--text-3)', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 10 }}>
               {active.body.split(' ').filter(Boolean).length} words · {active.body.length} characters · Saved locally on your device
             </div>
+
+            <button
+              type="button"
+              onClick={() => persistNote(active, true)}
+              style={{
+                position: 'sticky',
+                alignSelf: 'flex-end',
+                bottom: 12,
+                marginTop: 12,
+                padding: '10px 16px',
+                border: 'none',
+                borderRadius: 12,
+                background: 'linear-gradient(135deg,#2563eb,#14b8a6)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 10px 24px rgba(37,99,235,0.28)',
+              }}
+            >
+              Save Note
+            </button>
           </div>
         )}
       </div>
