@@ -38,7 +38,6 @@ const BOT_RULES: BotRule[] = [
 3. Fill in: Amount, Date, Category, Account
 4. Click "Save expense"
 Your account balance updates automatically! 💸`,
-    action: { label: 'Go to Expenses', path: '/expenses' },
   },
   {
     keywords: ['add income', 'got paid', 'salary', 'received'],
@@ -47,7 +46,6 @@ Your account balance updates automatically! 💸`,
 2. Click "+ Add Income"
 3. Fill in: Amount, Date, Category, Account
 4. Save — your balance increases automatically! 💰`,
-    action: { label: 'Go to Income', path: '/income' },
   },
   {
     keywords: ['transfer', 'move money', 'send money'],
@@ -57,7 +55,6 @@ Your account balance updates automatically! 💸`,
 3. Select From Account and To Account
 4. Enter amount and date
 5. Save — both balances update instantly! ↔️`,
-    action: { label: 'Go to Transfers', path: '/transfers' },
   },
   {
     keywords: ['debt', 'loan', 'borrow', 'lend', 'owe'],
@@ -68,7 +65,6 @@ Your account balance updates automatically! 💸`,
    • "I Owe" (DEBT) = you borrowed from someone
    • "Owed to Me" (RECEIVABLE) = you lent to someone
 4. When paid, click "Repay" to mark it settled 🤝`,
-    action: { label: 'Go to Debts', path: '/debts' },
   },
   {
     keywords: ['budget', 'limit', 'plan', 'spending limit'],
@@ -77,7 +73,6 @@ Your account balance updates automatically! 💸`,
 2. Set your monthly income goal
 3. Set spending limits per category
 4. System warns you when approaching limits 🎯`,
-    action: { label: 'Go to Budget', path: '/budget' },
   },
   {
     keywords: ['account', 'card', 'wallet', 'cash'],
@@ -87,7 +82,6 @@ Your account balance updates automatically! 💸`,
 3. Choose type: Cash or Bank Card
 4. Set currency (UZS, USD, EUR)
 5. Enter initial balance 💳`,
-    action: { label: 'Go to Accounts', path: '/accounts' },
   },
   {
     keywords: ['category', 'categories'],
@@ -96,7 +90,6 @@ Your account balance updates automatically! 💸`,
 2. Switch between Expense/Income tabs
 3. Default categories are auto-created
 4. Add custom categories anytime 📂`,
-    action: { label: 'Go to Categories', path: '/categories' },
   },
   {
     keywords: ['statistics', 'stats', 'chart', 'analytics', 'report'],
@@ -106,7 +99,6 @@ Your account balance updates automatically! 💸`,
 3. See: Income vs Expenses chart
 4. Category ranking bars and balance trends
 5. Balance trend over time 📊`,
-    action: { label: 'Go to Statistics', path: '/statistics' },
   },
   {
     keywords: ['calendar', 'history', 'transactions by date'],
@@ -115,7 +107,6 @@ Your account balance updates automatically! 💸`,
 2. Click any date to see transactions
 3. Green dot = income that day
 4. Red dot = expense that day 📅`,
-    action: { label: 'Go to Calendar', path: '/calendar' },
   },
   {
     keywords: ['help', 'what can you do', 'features', 'how'],
