@@ -8,6 +8,7 @@ import { aiChatService } from '../../services/ai-chat.service';
 import { accountsApi } from '../../api/accountsApi';
 import { categoriesService } from '../../services/categories.service';
 import { expensesApi } from '../../api/expensesApi';
+import { incomeApi } from '../../api/incomeApi';
 import { debtsApi } from '../../api/debtsApi';
 import { statsApi } from '../../api/statsApi';
 import { unwrap } from '../../api/axios';
@@ -127,14 +128,42 @@ const getBotResponse = (input) => {
     const lower = input.toLowerCase();
     const rule = BOT_RULES.find(r => r.keywords.some(k => lower.includes(k)));
     return rule
-        ? { response: rule.response, action: rule.action }
-        : {
-            response: `I'm not sure about that. Try asking:
+        ? rule.response
+        : `I'm not sure about that. Try asking:
 - "How do I add an expense?"
 - "How do I track a debt?"
 - "How do I set a budget?"
-- "What features do you have?"`,
-        };
+- "What features do you have?"`;
+};
+const WEATHER_CODE_LABELS = {
+    0: 'Clear sky',
+    1: 'Mainly clear',
+    2: 'Partly cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Depositing rime fog',
+    51: 'Light drizzle',
+    53: 'Moderate drizzle',
+    55: 'Dense drizzle',
+    56: 'Light freezing drizzle',
+    57: 'Dense freezing drizzle',
+    61: 'Slight rain',
+    63: 'Moderate rain',
+    65: 'Heavy rain',
+    66: 'Light freezing rain',
+    67: 'Heavy freezing rain',
+    71: 'Slight snow',
+    73: 'Moderate snow',
+    75: 'Heavy snow',
+    77: 'Snow grains',
+    80: 'Slight rain showers',
+    81: 'Moderate rain showers',
+    82: 'Violent rain showers',
+    85: 'Slight snow showers',
+    86: 'Heavy snow showers',
+    95: 'Thunderstorm',
+    96: 'Thunderstorm with slight hail',
+    99: 'Thunderstorm with heavy hail',
 };
 const Chatbot = () => {
     const navigate = useNavigate();
@@ -145,7 +174,8 @@ const Chatbot = () => {
         {
             id: '0',
             role: 'assistant',
-            text: 'Hi! I am your Finly guide. Ask me how to add expenses, move money, track debts, set budgets, or open any page.',
+            text: 'Hi! I am your Finly guide. Ask me how to add expenses, move money, track debts, set budgets, or check your statistics. Or continue using the powerful Telegram bot for even faster access! 🤖',
+            showTelegramButton: true,
         },
     ]);
     const [inputValue, setInputValue] = useState('');
@@ -198,13 +228,18 @@ const Chatbot = () => {
         if (!accounts.length)
             return null;
         if (!accountHint)
-            return String(accounts[0]?.id ?? '');
+            return accounts.length === 1 ? String(accounts[0]?.id ?? '') : null;
         const hint = accountHint.toLowerCase().trim();
+        if (hint === 'cash' || hint.includes('wallet')) {
+            const cash = accounts.find((acc) => String(acc.type || '').toUpperCase() === 'CASH');
+            if (cash?.id)
+                return String(cash.id);
+        }
         const exact = accounts.find((acc) => String(acc.name || '').toLowerCase() === hint);
         if (exact?.id)
             return String(exact.id);
         const fuzzy = accounts.find((acc) => String(acc.name || '').toLowerCase().includes(hint));
-        return fuzzy?.id ? String(fuzzy.id) : String(accounts[0]?.id ?? '');
+        return fuzzy?.id ? String(fuzzy.id) : null;
     };
     const resolveExpenseCategoryId = async (categoryHint) => {
         const response = await categoriesService.getByType('EXPENSE');
@@ -225,6 +260,86 @@ const Chatbot = () => {
         const fallback = categories.find((c) => String(c.name || '').toLowerCase() === 'other');
         return String((fallback || categories[0])?.id ?? '');
     };
+    const resolveIncomeCategoryId = async (categoryHint) => {
+        const response = await categoriesService.getByType('INCOME');
+        const categories = safeArray(response.data);
+        if (!categories.length)
+            return null;
+        if (!categoryHint) {
+            const fallback = categories.find((c) => String(c.name || '').toLowerCase() === 'other');
+            return String((fallback || categories[0])?.id ?? '');
+        }
+        const hint = categoryHint.toLowerCase().trim();
+        const exact = categories.find((cat) => String(cat.name || '').toLowerCase() === hint);
+        if (exact?.id)
+            return String(exact.id);
+        const fuzzy = categories.find((cat) => String(cat.name || '').toLowerCase().includes(hint));
+        if (fuzzy?.id)
+            return String(fuzzy.id);
+        const fallback = categories.find((c) => String(c.name || '').toLowerCase() === 'other');
+        return String((fallback || categories[0])?.id ?? '');
+    };
+    const handleUtilityQuery = async (messageText) => {
+        const lower = messageText.toLowerCase().trim();
+        const lastDaysMatch = lower.match(/last\s+(\d{1,3})\s+day/);
+        const wantsExpenseHistory = /(expense|spent|spending)/.test(lower)
+            && (Boolean(lastDaysMatch) || /recent|today|yesterday/.test(lower));
+        if (wantsExpenseHistory) {
+            const days = Math.max(1, Math.min(365, Number(lastDaysMatch?.[1] || 5)));
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - (days - 1));
+            const toIso = (d) => d.toISOString().slice(0, 10);
+            const [expensesRes, accountsRes] = await Promise.all([
+                expensesApi.getAll({ startDate: toIso(start), endDate: toIso(end) }),
+                accountsApi.getAll(),
+            ]);
+            const expenses = safeArray(unwrap(expensesRes));
+            const accounts = safeArray(accountsRes.data);
+            const accountMap = new Map(accounts.map((a) => [String(a.id), String(a.name || 'Unknown account')]));
+            if (!expenses.length) {
+                return `No expenses found in the last ${days} day(s).`;
+            }
+            const ordered = [...expenses].sort((a, b) => {
+                const aDate = new Date(a.expenseDate || a.date || 0).getTime();
+                const bDate = new Date(b.expenseDate || b.date || 0).getTime();
+                return bDate - aDate;
+            });
+            const total = ordered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+            const lines = ordered.slice(0, 12).map((item) => {
+                const date = String(item.expenseDate || item.date || '').slice(0, 10) || 'N/A';
+                const accountName = accountMap.get(String(item.accountId || '')) || 'Unknown account';
+                const amount = Number(item.amount || 0);
+                const currency = String(item.currency || 'USD');
+                const description = String(item.description || 'Expense');
+                return `- ${date} | ${description} | ${amount} ${currency} | ${accountName}`;
+            });
+            return [
+                `Expenses for the last ${days} day(s):`,
+                ...lines,
+                `Total: ${total.toFixed(2)}`,
+            ].join('\n');
+        }
+        if (/weather|temperature|forecast/.test(lower)) {
+            const cityMatch = lower.match(/(?:in|for)\s+([a-z\s\-]{2,40})/i);
+            const city = (cityMatch?.[1] || 'Tashkent').trim();
+            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+            const geoJson = await geoRes.json().catch(() => ({}));
+            const place = safeArray(geoJson?.results)?.[0];
+            if (!place) {
+                return `I could not find weather location for "${city}".`;
+            }
+            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code,wind_speed_10m`);
+            const weatherJson = await weatherRes.json().catch(() => ({}));
+            const current = weatherJson?.current || {};
+            const temp = Number(current.temperature_2m);
+            const code = Number(current.weather_code);
+            const wind = Number(current.wind_speed_10m);
+            const label = WEATHER_CODE_LABELS[code] || 'Unknown conditions';
+            return `Weather in ${place.name}: ${label}, ${Number.isFinite(temp) ? `${temp}°C` : 'N/A'}, wind ${Number.isFinite(wind) ? `${wind} km/h` : 'N/A'}.`;
+        }
+        return null;
+    };
     const runAction = async (action) => {
         if (action.type === 'NONE')
             return null;
@@ -239,11 +354,11 @@ const Chatbot = () => {
             const amount = Number(data.amount);
             const expenseDate = data.expenseDate || new Date().toISOString().slice(0, 10);
             if (!Number.isFinite(amount) || amount <= 0) {
-                throw new Error('AI could not detect a valid expense amount.');
+                throw new Error('Please tell the expense amount (for example: 12000 UZS).');
             }
             const accountId = await resolveAccountId(data.accountHint);
             if (!accountId)
-                throw new Error('No account found. Please create an account first.');
+                throw new Error('Please tell me which account/card you used for this expense.');
             const categoryId = await resolveExpenseCategoryId(data.categoryHint);
             if (!categoryId)
                 throw new Error('No expense category found.');
@@ -259,15 +374,45 @@ const Chatbot = () => {
             toast.success('Expense added successfully');
             return 'Expense recorded successfully.';
         }
-        if (action.type === 'ADD_DEBT') {
-            const amount = Number(data.amount ?? data.depositAmount);
+        if (action.type === 'ADD_INCOME') {
+            const amount = Number(data.amount);
+            const incomeDate = data.incomeDate || data.expenseDate || new Date().toISOString().slice(0, 10);
             if (!Number.isFinite(amount) || amount <= 0) {
-                throw new Error('AI could not detect a valid debt amount.');
+                throw new Error('Please tell the income amount (for example: 250000 UZS).');
             }
             const accountId = await resolveAccountId(data.accountHint);
             if (!accountId)
-                throw new Error('No account found. Please create an account first.');
-            const dueDate = data.dueDate || new Date().toISOString().slice(0, 10);
+                throw new Error('Please tell me which account/card should receive this income.');
+            const categoryId = await resolveIncomeCategoryId(data.categoryHint);
+            if (!categoryId)
+                throw new Error('No income category found.');
+            await incomeApi.create({
+                amount,
+                incomeDate,
+                description: data.description || 'Added via Finly AI Assistant',
+                categoryId,
+                accountId,
+                currency: data.currency || 'USD',
+            });
+            sounds.notification();
+            toast.success('Income added successfully');
+            return 'Income recorded successfully.';
+        }
+        if (action.type === 'ADD_DEBT') {
+            const amount = Number(data.amount ?? data.depositAmount);
+            if (!Number.isFinite(amount) || amount <= 0) {
+                throw new Error('Please tell the debt amount.');
+            }
+            if (!String(data.personName || '').trim()) {
+                throw new Error('Whom is this debt with? Please share the person name.');
+            }
+            const accountId = await resolveAccountId(data.accountHint);
+            if (!accountId)
+                throw new Error('Please tell me which account/card this debt used.');
+            const dueDate = data.dueDate;
+            if (!dueDate) {
+                throw new Error('Please provide a deadline for this debt (for example: next Monday or 2026-03-30).');
+            }
             await debtsApi.create({
                 personName: data.personName || 'Unknown person',
                 amount,
@@ -335,23 +480,34 @@ const Chatbot = () => {
         setIsTyping(true);
         setTimeout(async () => {
             try {
+                const utilityReply = await handleUtilityQuery(messageText);
+                if (utilityReply) {
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            id: (Date.now() + 1).toString(),
+                            role: 'assistant',
+                            text: utilityReply,
+                        },
+                    ]);
+                    return;
+                }
                 const aiResult = await aiChatService.respond(messageText, userSummary);
                 const fallback = getBotResponse(messageText);
-                const displayText = aiResult.reply || fallback.response;
+                const displayText = (aiResult?.reply && aiResult.reply.trim()) ? aiResult.reply : fallback;
                 const assistantMessage = {
                     id: (Date.now() + 1).toString(),
                     role: 'assistant',
                     text: displayText,
-                    action: aiResult.action.type === 'NAVIGATE' && aiResult.action.path
-                        ? { label: 'Open screen', path: aiResult.action.path }
-                        : fallback.action,
+                    // Suggest Telegram on second interaction
+                    showTelegramButton: messages.length <= 2,
                 };
                 const actionOutcome = await runAction(aiResult.action);
-                const toolCallMessage = aiResult.action.type !== 'NONE'
+                const toolCallMessage = aiResult.action.type !== 'NONE' && actionOutcome
                     ? {
                         id: (Date.now() + 2).toString(),
                         role: 'tool',
-                        text: actionOutcome || `Executed ${aiResult.action.type}`,
+                        text: actionOutcome,
                         toolName: 'ai-action',
                     }
                     : null;
@@ -359,7 +515,7 @@ const Chatbot = () => {
             }
             catch (error) {
                 sounds.error();
-                toast.error('Action failed. Please review details and try again.');
+                toast.error('I need a bit more detail before I can execute that.');
                 const message = error instanceof Error ? error.message : 'Unexpected AI error';
                 setMessages(prev => [
                     ...prev,
@@ -375,9 +531,8 @@ const Chatbot = () => {
             }
         }, 520);
     };
-    const handleActionClick = (path) => {
-        setIsOpen(false);
-        navigate(path);
+    const openTelegramBot = () => {
+        window.open('https://t.me/Finly_smart_bot', '_blank');
     };
     return (_jsxs(_Fragment, { children: [_jsx("button", { onClick: () => setIsOpen(!isOpen), type: "button", style: {
                     position: 'fixed',
@@ -486,17 +641,20 @@ const Chatbot = () => {
                                                         border: '1px solid rgba(214,227,255,0.88)',
                                                         backdropFilter: 'blur(8px)',
                                                         WebkitBackdropFilter: 'blur(8px)',
-                                                    }, children: msg.text }), msg.action && (_jsx("button", { onClick: () => handleActionClick(msg.action.path), type: "button", className: "banking-pulse", style: {
-                                                        marginTop: 8,
-                                                        background: 'linear-gradient(135deg, #1e3a8a, #0369a1)',
+                                                    }, children: msg.text }), msg.showTelegramButton && (_jsxs("button", { onClick: openTelegramBot, type: "button", className: "banking-pulse", style: {
+                                                        marginTop: 10,
+                                                        background: 'linear-gradient(135deg, #0088cc, #00a8e8)',
                                                         color: '#fff',
                                                         border: 'none',
                                                         borderRadius: 10,
-                                                        padding: '8px 11px',
+                                                        padding: '10px 14px',
                                                         fontSize: 12,
                                                         fontWeight: 700,
                                                         cursor: 'pointer',
-                                                    }, children: msg.action.label }))] })] })) : (_jsx("div", { style: {
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                    }, children: [_jsx("span", { children: "\uD83D\uDCAC" }), " Join Telegram Bot (@Finly_smart_bot)"] }))] })] })) : (_jsx("div", { style: {
                                         display: 'flex',
                                         justifyContent: 'flex-start',
                                         paddingLeft: 36,

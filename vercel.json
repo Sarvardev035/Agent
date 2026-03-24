@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/webhook", "destination": "/api/webhook" },
     { "source": "/api/(.*)", "destination": "https://finly.uyqidir.uz/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

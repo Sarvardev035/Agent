@@ -12,11 +12,14 @@ import { useFinanceStore } from '../store/finance.store';
 import { AccountSchema, getCardNumberError } from '../lib/security';
 import { formatCurrency, useExchangeRates } from '../lib/currency';
 import api from '../lib/api';
-import { mapAccountType } from '../lib/helpers';
+import { safeArray, mapAccountType } from '../lib/helpers';
 import { ACCOUNT_TYPES, CARD_TYPES, CURRENCIES } from '../lib/constants';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { sounds } from '../lib/sounds';
 import { ActivityLog } from '../components/ui/ActivityLog';
+import { expensesApi } from '../api/expensesApi';
+import { incomeApi } from '../api/incomeApi';
+import { debtsApi } from '../api/debtsApi';
 const getDefaultAccountForm = () => ({
     name: '',
     type: 'CASH',
@@ -115,6 +118,7 @@ const Accounts = () => {
     const handleDeleteAccount = async (account) => {
         setDeletingId(account.id);
         try {
+            await removeLinkedRecords(account.id);
             await api.delete(`/api/accounts/${account.id}`);
             sounds.expense();
             const log = {
@@ -147,9 +151,30 @@ const Accounts = () => {
         navigate(`${path}?accountId=${encodeURIComponent(accountId)}`);
         setActiveQuickActionsFor(null);
     };
+    const removeLinkedRecords = async (accountId) => {
+        const [expensesRes, incomesRes, debtsRes, transfersRes] = await Promise.allSettled([
+            expensesApi.getAll({ accountId }),
+            incomeApi.getAll({ accountId }),
+            debtsApi.getAll(),
+            api.get('/api/transfers', { params: { accountId } }),
+        ]);
+        const expenses = expensesRes.status === 'fulfilled' ? safeArray(expensesRes.value.data) : [];
+        const incomes = incomesRes.status === 'fulfilled' ? safeArray(incomesRes.value.data) : [];
+        const debts = debtsRes.status === 'fulfilled'
+            ? safeArray(debtsRes.value.data).filter((d) => String(d.accountId) === String(accountId))
+            : [];
+        const transfers = transfersRes.status === 'fulfilled'
+            ? safeArray(transfersRes.value.data).filter((t) => String(t.fromAccountId) === String(accountId) || String(t.toAccountId) === String(accountId))
+            : [];
+        await Promise.allSettled(expenses.map((item) => expensesApi.delete(item.id)));
+        await Promise.allSettled(incomes.map((item) => incomeApi.delete(item.id)));
+        await Promise.allSettled(debts.map((item) => debtsApi.delete(item.id)));
+        await Promise.allSettled(transfers.map((item) => api.delete(`/api/transfers/${item.id}`)));
+    };
     const handleDeleteCard = async (account) => {
         try {
             setDeletingId(account.id);
+            await removeLinkedRecords(account.id);
             await api.delete(`/api/accounts/${account.id}`);
             sounds.expense();
             // Log the card deletion to activity log

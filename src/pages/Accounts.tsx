@@ -18,6 +18,9 @@ import { ACCOUNT_TYPES, CARD_TYPES, CURRENCIES } from '../lib/constants'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { sounds } from '../lib/sounds'
 import { ActivityLog } from '../components/ui/ActivityLog'
+import { expensesApi } from '../api/expensesApi'
+import { incomeApi } from '../api/incomeApi'
+import { debtsApi } from '../api/debtsApi'
 
 type AccountType = (typeof ACCOUNT_TYPES)[number]['value']
 type CurrencyCode = (typeof CURRENCIES)[number]
@@ -136,6 +139,7 @@ const Accounts = () => {
   const handleDeleteAccount = async (account: Account) => {
     setDeletingId(account.id)
     try {
+      await removeLinkedRecords(account.id)
       await api.delete(`/api/accounts/${account.id}`)
 
       sounds.expense()
@@ -171,9 +175,35 @@ const Accounts = () => {
     setActiveQuickActionsFor(null)
   }
 
+  const removeLinkedRecords = async (accountId: string) => {
+    const [expensesRes, incomesRes, debtsRes, transfersRes] = await Promise.allSettled([
+      expensesApi.getAll({ accountId }),
+      incomeApi.getAll({ accountId }),
+      debtsApi.getAll(),
+      api.get('/api/transfers', { params: { accountId } }),
+    ])
+
+    const expenses = expensesRes.status === 'fulfilled' ? safeArray<any>(expensesRes.value.data) : []
+    const incomes = incomesRes.status === 'fulfilled' ? safeArray<any>(incomesRes.value.data) : []
+    const debts = debtsRes.status === 'fulfilled'
+      ? safeArray<any>(debtsRes.value.data).filter((d: any) => String(d.accountId) === String(accountId))
+      : []
+    const transfers = transfersRes.status === 'fulfilled'
+      ? safeArray<any>(transfersRes.value.data).filter(
+        (t: any) => String(t.fromAccountId) === String(accountId) || String(t.toAccountId) === String(accountId)
+      )
+      : []
+
+    await Promise.allSettled(expenses.map((item: any) => expensesApi.delete(item.id)))
+    await Promise.allSettled(incomes.map((item: any) => incomeApi.delete(item.id)))
+    await Promise.allSettled(debts.map((item: any) => debtsApi.delete(item.id)))
+    await Promise.allSettled(transfers.map((item: any) => api.delete(`/api/transfers/${item.id}`)))
+  }
+
   const handleDeleteCard = async (account: Account) => {
     try {
       setDeletingId(account.id)
+      await removeLinkedRecords(account.id)
       await api.delete(`/api/accounts/${account.id}`)
 
       sounds.expense()

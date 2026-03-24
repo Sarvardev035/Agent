@@ -12,6 +12,12 @@ DATE LOGIC:
 - If the user says "Next Monday", calculate that date in YYYY-MM-DD format.
 
 TOOLS:
+1. ADD_EXPENSE:
+  Payload: { "amount": number, "description": string, "account": string, "category": string, "expenseDate": "YYYY-MM-DD" }
+
+2. ADD_INCOME:
+  Payload: { "amount": number, "description": string, "account": string, "category": string, "incomeDate": "YYYY-MM-DD" }
+
 1. ADD_DEBT: Use this for "I gave money to X" (LOAN) or "I took money from X" (DEBT).
    Payload: { "title": string, "amount": number, "type": "LOAN" | "DEBT", "person": string, "dueDate": "YYYY-MM-DD" }
 
@@ -20,6 +26,10 @@ TOOLS:
 3. SET_BUDGET: { "category": string, "limit": number, "period": "MONTHLY" }
 
 4. ANALYZE_STATS: { "query": "spending_habits" | "debt_risk" | "savings_progress" }
+
+IMPORTANT:
+- If user asks outside finance (e.g. weather/general chat), reply naturally and set action.type to "NONE".
+- If required transaction details are missing, ask a follow-up question and set action.type to "NONE".
 
 RESPONSE FORMAT (json only):
 - Return valid json only.
@@ -83,6 +93,45 @@ const normalizeDebtType = (value) => {
         return 'DEBT';
     return undefined;
 };
+const normalizeActionType = (rawType, payload) => {
+    const type = String(rawType || '').trim().toUpperCase();
+    if (!type)
+        return 'NONE';
+    const explicitMap = {
+        NAVIGATE: 'NAVIGATE',
+        OPEN_PAGE: 'NAVIGATE',
+        GO_TO_PAGE: 'NAVIGATE',
+        ADD_EXPENSE: 'ADD_EXPENSE',
+        CREATE_EXPENSE: 'ADD_EXPENSE',
+        NEW_EXPENSE: 'ADD_EXPENSE',
+        ADD_INCOME: 'ADD_INCOME',
+        CREATE_INCOME: 'ADD_INCOME',
+        NEW_INCOME: 'ADD_INCOME',
+        ADD_DEBT: 'ADD_DEBT',
+        CREATE_DEBT: 'ADD_DEBT',
+        UPDATE_SAVINGS: 'UPDATE_SAVINGS',
+        SET_BUDGET: 'SET_BUDGET',
+        ANALYZE_STATS: 'ANALYZE_STATS',
+        NONE: 'NONE',
+    };
+    if (explicitMap[type])
+        return explicitMap[type];
+    // Some models return generic transaction types such as UPDATE_TRANSACTION.
+    if (type === 'UPDATE_TRANSACTION' || type === 'ADD_TRANSACTION' || type === 'CREATE_TRANSACTION') {
+        const transactionType = String(payload.transactionType || payload.kind || '').toLowerCase();
+        if (transactionType.includes('income'))
+            return 'ADD_INCOME';
+        if (transactionType.includes('expense'))
+            return 'ADD_EXPENSE';
+        if (transactionType.includes('debt') || transactionType.includes('loan'))
+            return 'ADD_DEBT';
+        const signedAmount = toNumber(payload.amount);
+        if (Number.isFinite(signedAmount) && signedAmount < 0)
+            return 'ADD_EXPENSE';
+        return 'ADD_EXPENSE';
+    }
+    return 'NONE';
+};
 const normalizeAction = (action) => {
     if (!action || typeof action !== 'object')
         return { type: 'NONE' };
@@ -93,6 +142,7 @@ const normalizeAction = (action) => {
         currency: payload.currency,
         description: payload.description || payload.title,
         expenseDate: normalizeRelativeDate(payload.expenseDate || payload.date),
+        incomeDate: normalizeRelativeDate(payload.incomeDate || payload.date),
         categoryHint: payload.categoryHint || payload.category,
         accountHint: payload.accountHint || payload.account,
         personName: payload.personName || payload.person,
@@ -106,7 +156,7 @@ const normalizeAction = (action) => {
         statsQuery: payload.query,
     };
     return {
-        type: action.type || 'NONE',
+        type: normalizeActionType(action.type, payload),
         path: action.path,
         data,
         payload: data,
