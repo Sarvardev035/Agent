@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { API_BASE_URL } from '../lib/config'
+import { API_BASE_URL, USE_API_CREDENTIALS } from '../lib/config'
 import { TokenStorage, UserProfileStorage } from '../lib/security'
 import { showCoffeeToast } from '../lib/coffeeToast'
 
@@ -87,6 +87,7 @@ const performTokenRefresh = async (): Promise<string | null> => {
         `${API_BASE_URL}/api/auth/token/refresh`,
         { refreshToken },
         {
+          withCredentials: USE_API_CREDENTIALS,
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
@@ -169,7 +170,7 @@ export const unwrap = <T>(response: { data: any }): T => {
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: false,
+  withCredentials: USE_API_CREDENTIALS,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -199,7 +200,7 @@ api.interceptors.request.use(config => {
   }
 
   const token = TokenStorage.get()
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token && !USE_API_CREDENTIALS) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
@@ -253,7 +254,7 @@ api.interceptors.response.use(
           throw error
         }
         originalConfig.headers = originalConfig.headers || {}
-        originalConfig.headers.Authorization = `Bearer ${nextAccessToken}`
+        if (!USE_API_CREDENTIALS) originalConfig.headers.Authorization = `Bearer ${nextAccessToken}`
         return api(originalConfig)
       })
     }

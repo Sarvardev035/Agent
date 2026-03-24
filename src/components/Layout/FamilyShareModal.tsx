@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Trash2, Users } from 'lucide-react'
 import { familyStorageService, type FamilyMember } from '../../services/family-storage.service'
+import AddFamilyMemberModal, { type AddFamilyMemberPayload } from './AddFamilyMemberModal'
 
 interface FamilyShareModalProps {
   isOpen: boolean
@@ -9,11 +10,7 @@ interface FamilyShareModalProps {
 
 export const FamilyShareModal = ({ isOpen, onClose }: FamilyShareModalProps) => {
   const [members, setMembers] = useState<FamilyMember[]>([])
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    role: 'EDITOR' as 'EDITOR' | 'VIEWER',
-  })
+  const [showAddModal, setShowAddModal] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
@@ -29,22 +26,27 @@ export const FamilyShareModal = ({ isOpen, onClose }: FamilyShareModalProps) => 
     }
   }, [isOpen])
 
-  const handleCreate = () => {
-    const name = form.name.trim()
-    const email = form.email.trim()
+  const handleCreate = async (payload: AddFamilyMemberPayload) => {
+    const name = payload.name.trim()
+    const email = payload.email.trim().toLowerCase()
 
-    if (!name || !email) {
-      setError('Please fill in both name and email')
+    if (!name || !email || !payload.password) {
+      setError('Please fill Username, Gmail address, and Password.')
       return
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Please enter a valid email address')
+    if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
+      setError('Please use a valid Gmail address.')
+      return
+    }
+
+    if (payload.password.length < 8) {
+      setError('Password must be at least 8 characters long.')
       return
     }
 
     if (members.some(m => m.email.toLowerCase() === email.toLowerCase())) {
-      setError('This email is already in your family')
+      setError('This Gmail account is already in your family.')
       return
     }
 
@@ -55,16 +57,16 @@ export const FamilyShareModal = ({ isOpen, onClose }: FamilyShareModalProps) => 
       const newMember = familyStorageService.add({
         name,
         email,
-        role: form.role,
+        role: 'EDITOR',
       })
 
       setMembers(prev => [...prev, newMember])
-      setForm({ name: '', email: '', role: 'EDITOR' })
-      setNotice('Family member added successfully! They can now access shared data.')
+      setShowAddModal(false)
+      setNotice('Family member account created successfully.')
 
       setTimeout(() => setNotice(''), 3000)
     } catch {
-      setError('Could not add family member. Please try again.')
+      setError('Could not create account. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -164,110 +166,47 @@ export const FamilyShareModal = ({ isOpen, onClose }: FamilyShareModalProps) => 
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-          {/* Add Member Section */}
           <div
             style={{
-              marginBottom: 24,
+              marginBottom: 18,
               borderRadius: 12,
               border: '1px solid rgba(148,163,184,0.22)',
               background: 'linear-gradient(135deg, rgba(236,72,153,0.08), rgba(168,85,247,0.08))',
-              padding: 20,
+              padding: 14,
             }}
           >
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
-              Add family member
-            </h3>
-
-            <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
-              <input
-                type="text"
-                placeholder="Full name"
-                value={form.name}
-                onChange={e => {
-                  setForm(prev => ({ ...prev, name: e.target.value }))
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 3 }}>
+                  Invite and create account
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                  Add a family member to track or edit shared finances.
+                </div>
+              </div>
+              <button
+                type="button"
+                data-button-reset="true"
+                onClick={() => {
                   setError('')
+                  setShowAddModal(true)
                 }}
                 style={{
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid rgba(148,163,184,0.3)',
-                  background: 'rgba(15,23,42,0.8)',
-                  color: '#e2e8f0',
-                  fontSize: 13,
-                  outline: 'none',
-                }}
-              />
-              <input
-                type="email"
-                placeholder="Email address"
-                value={form.email}
-                onChange={e => {
-                  setForm(prev => ({ ...prev, email: e.target.value }))
-                  setError('')
-                }}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid rgba(148,163,184,0.3)',
-                  background: 'rgba(15,23,42,0.8)',
-                  color: '#e2e8f0',
-                  fontSize: 13,
-                  outline: 'none',
-                }}
-              />
-              <select
-                value={form.role}
-                onChange={e =>
-                  setForm(prev => ({
-                    ...prev,
-                    role: e.target.value === 'VIEWER' ? 'VIEWER' : 'EDITOR',
-                  }))
-                }
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid rgba(148,163,184,0.3)',
-                  background: 'rgba(15,23,42,0.8)',
-                  color: '#e2e8f0',
-                  fontSize: 13,
-                  outline: 'none',
+                  padding: '9px 12px',
+                  borderRadius: 9,
+                  border: '1px solid rgba(52,211,153,0.38)',
+                  background: 'linear-gradient(135deg, rgba(16,185,129,0.24), rgba(56,189,248,0.22))',
+                  color: '#ccfbf1',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
                 }}
               >
-                <option value="EDITOR">📝 Editor — can add & edit transactions</option>
-                <option value="VIEWER">👁️ Viewer — read-only access</option>
-              </select>
+                + Add to family
+              </button>
             </div>
-
-            <button
-              type="button"
-              data-button-reset="true"
-              onClick={() => void handleCreate()}
-              disabled={creating}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: 8,
-                border: '1px solid rgba(56,189,248,0.4)',
-                background: 'linear-gradient(135deg, rgba(56,189,248,0.25), rgba(99,102,241,0.25))',
-                color: '#dbeafe',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: creating ? 'wait' : 'pointer',
-              }}
-            >
-              {creating ? 'Adding...' : 'Add to family'}
-            </button>
-
-            {error && (
-              <div style={{ marginTop: 10, fontSize: 12, color: '#fda4af' }}>
-                {error}
-              </div>
-            )}
-            {notice && (
-              <div style={{ marginTop: 10, fontSize: 12, color: '#86efac' }}>
-                {notice}
-              </div>
-            )}
+            {error && <div style={{ marginTop: 10, fontSize: 12, color: '#fda4af' }}>{error}</div>}
+            {notice && <div style={{ marginTop: 10, fontSize: 12, color: '#86efac' }}>{notice}</div>}
           </div>
 
           {/* Members List */}
@@ -380,6 +319,15 @@ export const FamilyShareModal = ({ isOpen, onClose }: FamilyShareModalProps) => 
           </div>
         </div>
       </div>
+      <AddFamilyMemberModal
+        isOpen={showAddModal}
+        isSubmitting={creating}
+        onClose={() => {
+          if (creating) return
+          setShowAddModal(false)
+        }}
+        onSubmit={handleCreate}
+      />
     </div>
   )
 }

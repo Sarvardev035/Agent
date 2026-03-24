@@ -1,227 +1,39 @@
-# 💰 Finly — Personal Finance Web App
+# Finly
 
-A **security-first** personal finance management application built with React 18, TypeScript, Vite, and Tailwind CSS.
+Personal finance and banking web app built with React, TypeScript, and Vite.
 
-## ✨ Features
+## Setup
 
-- **🔐 Secure Authentication** — Token-based auth with expiry validation
-- **💳 Account Management** — Track multiple accounts (Card, Cash, Bank)
-- **📊 Expenses & Income** — Categorized tracking with smart date grouping
-- **🔄 Real-time Currency Exchange** — Convert any currency using live rates
-- **💱 Smart Transfers** — Between accounts with automatic exchange rates
-- **💳 Debt Tracking** — Track money lent/borrowed with due dates
-- **💰 Budget Management** — Set and monitor spending limits by category
-- **📈 Statistics** — Charts and analytics with period filtering
-- **📅 Calendar View** — Month-view expense/income visualization
-- **🛡️ XSS Prevention** — All user text sanitized with DOMPurify
-- **📝 Input Validation** — All forms validated with Zod schemas
-- **⚡ Rate Limiting** — Client-side protection against brute-force attacks
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+ (16+ with adjustments)
-- npm or yarn
-
-### Installation
+1. Install dependencies:
 
 ```bash
-# Clone or navigate to project
-cd finly
-
-# Install dependencies
 npm install
-
-# Create .env.local (copy from .env.example)
-cp .env.example .env.local
-
-# Add your API key for currency exchange
-# Get free key at https://www.exchangerate-api.com
 ```
 
-### Development
+2. Run development server:
 
 ```bash
 npm run dev
-# Starts dev server at http://localhost:5173
 ```
 
-### Production Build
+3. Build for production:
 
 ```bash
 npm run build
-npm run preview
 ```
 
-## 📁 Project Structure
+## Main Features
 
-```
-src/
-├── lib/
-│   ├── security.ts      # Token storage, Zod schemas, rate limiting
-│   ├── api.ts           # Axios instance with interceptors
-│   ├── currency.ts      # Real-time exchange rates
-│   └── helpers.ts       # Utilities (formatCurrency, category metadata)
-├── services/
-│   ├── auth.service.ts
-│   ├── accounts.service.ts
-│   ├── expenses.service.ts
-│   ├── income.service.ts
-│   ├── transfers.service.ts
-│   ├── debts.service.ts
-│   ├── budget.service.ts
-│   └── stats.service.ts
-├── store/
-│   ├── auth.store.ts    # Zustand auth state
-│   ├── finance.store.ts # Zustand finance state
-│   └── currency.store.ts# Real-time exchange rates cache
-├── components/
-│   ├── guards/
-│   │   └── ProtectedRoute.tsx   # Route protection
-│   └── Layout/
-│       └── AppShell.tsx         # Main layout with sidebar
-├── pages/
-│   ├── Auth/
-│   │   ├── Login.tsx
-│   │   └── Register.tsx
-│   ├── Dashboard.tsx
-│   ├── Expenses.tsx
-│   ├── Income.tsx
-│   ├── Transfers.tsx
-│   ├── Debts.tsx
-│   ├── Budget.tsx
-│   ├── Statistics.tsx
-│   └── CalendarView.tsx
-├── App.tsx              # Main router
-├── main.tsx             # Entry point
-└── index.css            # Global styles + CSS variables
-```
-
-## 🔐 Security Architecture
-
-### Token Storage
-- JWT tokens stored in localStorage with expiry checking
-- Automatic cleanup on expiration
-- Malformed tokens rejected
-
-### Input Validation
-- All forms validated with **Zod** schemas before submission
-- Type-safe form data with TypeScript inference
-- Automatic field transformation (trim, sanitize, lowercase)
-
-### XSS Prevention
-- User-generated text sanitized with **DOMPurify**
-- No `dangerouslySetInnerHTML` anywhere
-- All category names & descriptions cleaned
-
-### Request Security
-- CSRF protection header (`X-Requested-With`)
-- HTTPS enforcement in production
-- Automatic session refresh with 401 responses
-
-### Rate Limiting
-- Login attempts limited to 5 per 15 minutes
-- Client-side enforcement (server-side required too)
-
-## 💱 Currency Exchange
-
-### Features
-- Real-time rates from **ExchangeRate-API**
-- Automatic caching (1 hour) to reduce API calls
-- Fallback hardcoded rates if API fails
-- Support for: USD, EUR, UZS
-
-### How It Works
-
-```tsx
-import { useCurrencyStore } from '@/store/currency.store'
-
-// Get exchange rate
-const rate = await useCurrencyStore.getState().getRate('USD', 'EUR')
-
-// Convert amount
-const converted = await useCurrencyStore.getState().convert(100, 'USD', 'EUR')
-```
-
-### Setup
-
-1. Get free API key: https://www.exchangerate-api.com
-2. Add to `.env.local`:
-   ```
-   VITE_EXCHANGE_API_KEY=your_key_here
-   ```
-3. Rates are cached locally to reduce API usage
-
-## 📚 API Endpoints
-
-All requests automatically include JWT token via interceptor.
-
-```
-Authentication:
-  POST /auth/login        # { email, password }
-  POST /auth/register     # { name, email, password }
-  POST /auth/logout
-
-Accounts:
-  GET  /api/accounts
-  POST /api/accounts      # { name, type, currency, balance }
-  PUT  /api/accounts/:id
-  DELETE /api/accounts/:id
-
-Expenses:
-  GET  /api/expenses      # ?startDate=2024-01-01&endDate=2024-12-31
-  POST /api/expenses      # { amount, expenseDate, categoryId, currency, accountId, description? }
-  PUT  /api/expenses/:id
-  DELETE /api/expenses/:id
-
-Income:
-  GET  /api/incomes
-  POST /api/incomes       # { amount, incomeDate, categoryId, currency, accountId, description? }
-  PUT  /api/incomes/:id
-  DELETE /api/incomes/:id
-
-Transfers:
-  GET  /api/transfers
-  POST /api/transfers     # { fromAccountId, toAccountId, amount, transferDate, exchangeRate, description? }
-
-Debts:
-  GET  /api/debts
-  POST /api/debts         # { personName, amount, currency, dueDate, type, accountId? }
-  POST /api/debts/:id/repay # { paymentAmount, accountId? }
-  DELETE /api/debts/:id
-
-Budget:
-  GET  /api/budgets
-  POST /api/budgets          # { monthlyLimit, year, month }
-  POST /api/budgets/categories # { monthlyLimit, categoryId, type: 'MONTHLY', year, month }
-
-Analytics:
-  GET  /api/analytics/summary
-  GET  /api/analytics/monthly-expenses
-  GET  /api/analytics/expenses-by-category
-  GET  /api/analytics/income-vs-expense
-```
-
-## 🎨 Customization
-
-### Colors & Design
-- CSS variables in `src/index.css`
-- Modify `--blue`, `--green`, `--red` for brand colors
-- Tailwind alternative: can be added later
-
-### Categories
-- Edit `CATEGORY_META` in `src/lib/helpers.ts`
-- Add emoji, colors, labels for each category
-
-### Supported Currencies
-- Modify `supportedCurrencies` in `src/lib/currency.ts`
-- Update `ExpenseSchema.category` in `src/lib/security.ts`
-
-## 🚀 Deployment
+- Account, income, and expense tracking
+- Transfers, debts, budgets, and analytics
+- Calendar and notes views
+- Family sharing and user management flows
 
 ### Environment Variables
 - `VITE_EXCHANGE_API_KEY` — ExchangeRate API key
 - `VITE_API_URL` — Backend API base URL (optional)
+- `VITE_API_BASE_URL` — Backend API base URL override (preferred when both exist)
+- `VITE_USE_API_CREDENTIALS` — Set `true` for cookie-based auth/CORS credentials mode, `false` for Bearer token mode (default)
 
 ### Build & Deploy
 
@@ -302,6 +114,8 @@ npm install --save-dev vitest @testing-library/react @testing-library/user-event
 - Verify backend is running at configured URL
 - Check network tab in DevTools for actual error
 - Rate limiter might be active (wait 15 mins or clear localStorage)
+- For CORS/preflight failures, backend must allow your frontend origin and `Authorization` header
+- If using cross-site cookies, set `VITE_USE_API_CREDENTIALS=true` and enable backend CORS credentials (`Access-Control-Allow-Credentials: true`) with explicit allowed origin
 
 ### Build fails on older Node
 - Upgrade to Node 18+ or use `nvm use 18`
