@@ -184,8 +184,8 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
           className="sidebar-theme-dock"
           style={{
             display: 'flex',
-            justifyContent: isTablet ? 'center' : 'flex-end',
-            padding: isTablet ? '8px 2px 2px' : '10px 8px 4px',
+            justifyContent: 'flex-start',
+            padding: isTablet ? '8px 2px 2px' : '10px 0 4px',
             marginTop: 8,
           }}
         >

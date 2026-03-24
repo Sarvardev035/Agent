@@ -39,9 +39,7 @@ const extractToken = (value: unknown): string | null => {
 interface SocialBtnProps {
   name: string
   icon: ReactNode
-  bg: string
   border: string
-  hover: string
   shadow: string
 }
 
@@ -66,7 +64,7 @@ const FacebookIcon = () => (
   </svg>
 )
 
-const SocialButton = ({ name, icon, bg, border, hover, shadow }: SocialBtnProps) => {
+const SocialButton = ({ name, icon, border, shadow }: SocialBtnProps) => {
   const [isHovered, setIsHovered] = useState(false)
   const [isPressed, setIsPressed] = useState(false)
   const [isRippling, setIsRippling] = useState(false)
@@ -98,7 +96,7 @@ const SocialButton = ({ name, icon, bg, border, hover, shadow }: SocialBtnProps)
           position: 'relative',
           width: 64,
           height: 64,
-          background: isHovered ? hover : bg,
+          background: 'transparent',
           border: `1.5px solid ${isHovered ? border.replace('0.3', '0.7') : border}`,
           borderRadius: 16,
           cursor: 'pointer',
@@ -121,7 +119,6 @@ const SocialButton = ({ name, icon, bg, border, hover, shadow }: SocialBtnProps)
           transition:
             'transform 0.2s cubic-bezier(0.34,1.56,0.64,1),' +
             'box-shadow 0.2s ease,' +
-            'background 0.15s ease,' +
             'border-color 0.15s ease',
         }}
       >
@@ -317,10 +314,10 @@ export default function Register() {
             transition={{ delay: 0.1, type: 'spring', stiffness: 300 }}
             style={{
               width: '56px', height: '56px', borderRadius: '14px',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              background: 'transparent',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: '16px',
-              boxShadow: '0 12px 32px rgba(59, 130, 246, 0.3)',
+              boxShadow: 'none',
             }}
           >
             <Zap size={26} color="white" fill="white" />
@@ -562,25 +559,19 @@ export default function Register() {
               {
                 name: 'Google',
                 icon: <GoogleIcon />,
-                bg: 'rgba(66,133,244,0.08)',
                 border: 'rgba(66,133,244,0.25)',
-                hover: 'rgba(66,133,244,0.15)',
                 shadow: 'rgba(66,133,244,0.25)',
               },
               {
                 name: 'LinkedIn',
                 icon: <LinkedInIcon />,
-                bg: 'rgba(10,102,194,0.08)',
                 border: 'rgba(10,102,194,0.25)',
-                hover: 'rgba(10,102,194,0.15)',
                 shadow: 'rgba(10,102,194,0.25)',
               },
               {
                 name: 'Facebook',
                 icon: <FacebookIcon />,
-                bg: 'rgba(24,119,242,0.08)',
                 border: 'rgba(24,119,242,0.25)',
-                hover: 'rgba(24,119,242,0.15)',
                 shadow: 'rgba(24,119,242,0.25)',
               },
             ].map(social => (
