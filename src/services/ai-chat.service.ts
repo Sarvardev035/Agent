@@ -63,7 +63,10 @@ TOOLS:
 
 4. ANALYZE_STATS: { "query": "spending_habits" | "debt_risk" | "savings_progress" }
 
-RESPONSE:
+RESPONSE FORMAT (json only):
+- Return valid json only.
+- Do not include markdown fences.
+- Do not include explanatory text outside json.
 {
   "reply": "I've noted that Sardor owes you 50,000. I'll remind you next Monday.",
   "action": { "type": "ADD_DEBT", "payload": { ... } }
@@ -195,6 +198,11 @@ export const handleAIAction = async (action: any): Promise<string | null> => {
         const text = await res.text()
         throw new Error(`ADD_DEBT failed: ${res.status} ${text}`)
       }
+
+      const person = payload.person || payload.personName || 'Unknown person'
+      const amount = Number.isFinite(payload.amount) ? payload.amount : 0
+      await telegramService.sendMessage(`✅ <b>Success!</b>\nI added a debt of ${amount} UZS for <b>${person}</b>.`)
+
       return 'Debt recorded.'
     }
 
