@@ -61,11 +61,6 @@ interface SpeechRecognitionErrorEvent {
   error: string
 }
 
-interface Window {
-  webkitSpeechRecognition?: SpeechRecognitionCtor
-  SpeechRecognition?: SpeechRecognitionCtor
-}
-
 const BOT_RULES: BotRule[] = [
   {
     keywords: ['add expense', 'new expense', 'spend', 'spent'],
@@ -214,6 +209,7 @@ const WEATHER_CODE_LABELS: Record<number, string> = {
 const Chatbot = () => {
   const navigate = useNavigate()
   const isCompactLayout = useMediaQuery('(max-width: 1024px)')
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const [isOpen, setIsOpen] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -235,9 +231,13 @@ const Chatbot = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const shouldResumeVoiceRef = useRef(false)
+  const speechWindow =
+    typeof window !== 'undefined'
+      ? (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor })
+      : undefined
 
   const hasSpeechRecognition =
-    typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
+    Boolean(speechWindow?.SpeechRecognition || speechWindow?.webkitSpeechRecognition)
   const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window
 
   const scrollToBottom = () => {
@@ -341,11 +341,7 @@ const Chatbot = () => {
     if (isTyping) return
 
     if (!recognitionRef.current) {
-      const speechWindow = window as Window & {
-        SpeechRecognition?: SpeechRecognitionCtor
-        webkitSpeechRecognition?: SpeechRecognitionCtor
-      }
-      const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
+      const Recognition = speechWindow?.SpeechRecognition || speechWindow?.webkitSpeechRecognition
       if (!Recognition) {
         toast.error('Voice input is not supported in this browser.')
         return
@@ -792,25 +788,35 @@ const Chatbot = () => {
       {/* Chat Panel */}
       {isOpen && (
         <div
-          className="ledger-enter"
+          onClick={() => setIsOpen(false)}
           style={{
             position: 'fixed',
-            bottom: isCompactLayout ? 154 : 96,
-            right: isCompactLayout ? 12 : 24,
-            width: isCompactLayout ? 'calc(100vw - 24px)' : 'min(410px, calc(100vw - 24px))',
-            height: isCompactLayout ? 'min(560px, calc(100vh - 190px))' : 'min(620px, calc(100vh - 128px))',
-            background: 'linear-gradient(165deg, rgba(255,255,255,0.84), rgba(225,240,255,0.7))',
-            borderRadius: 22,
-            boxShadow: '0 28px 65px rgba(15,23,42,0.18), 0 16px 30px rgba(30,64,175,0.16)',
-            border: '1px solid rgba(255,255,255,0.78)',
-            backdropFilter: 'blur(18px) saturate(130%)',
-            WebkitBackdropFilter: 'blur(18px) saturate(130%)',
-            zIndex: 999,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
+            inset: 0,
+            background: 'transparent',
+            zIndex: 998,
           }}
         >
+          <div
+            className="ledger-enter"
+            onClick={e => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              bottom: isCompactLayout ? 154 : 96,
+              right: isCompactLayout ? 12 : 24,
+              width: isCompactLayout ? 'calc(100vw - 24px)' : 'min(410px, calc(100vw - 24px))',
+              height: isCompactLayout ? 'min(560px, calc(100vh - 190px))' : 'min(620px, calc(100vh - 128px))',
+              background: 'linear-gradient(165deg, rgba(255,255,255,0.84), rgba(225,240,255,0.7))',
+              borderRadius: 22,
+              boxShadow: '0 28px 65px rgba(15,23,42,0.18), 0 16px 30px rgba(30,64,175,0.16)',
+              border: '1px solid rgba(255,255,255,0.78)',
+              backdropFilter: 'blur(18px) saturate(130%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+              zIndex: 999,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
           {/* Header */}
           <div
             style={{
@@ -907,21 +913,23 @@ const Chatbot = () => {
               >
                 Voice Chat
               </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                type="button"
-                style={{
-                  background: 'rgba(255,255,255,0.12)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: 10,
-                  color: '#fff',
-                  cursor: 'pointer',
-                  padding: 6,
-                  display: 'inline-flex',
-                }}
-              >
-                <X size={20} />
-              </button>
+              {!isPhone && (
+                <button
+                  onClick={() => setIsOpen(false)}
+                  type="button"
+                  style={{
+                    background: 'rgba(255,255,255,0.12)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 10,
+                    color: '#fff',
+                    cursor: 'pointer',
+                    padding: 6,
+                    display: 'inline-flex',
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1212,6 +1220,7 @@ const Chatbot = () => {
             >
               <Send size={16} />
             </button>
+          </div>
           </div>
         </div>
       )}
