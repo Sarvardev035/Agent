@@ -2,6 +2,8 @@ import { startTransition, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bell } from 'lucide-react'
+import { differenceInCalendarDays } from 'date-fns'
+import toast from 'react-hot-toast'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
@@ -14,6 +16,8 @@ import Chatbot from '../Chatbot/Chatbot'
 import { AccessibilityBar } from '../ui/AccessibilityBar'
 import { GlobalSearch } from '../ui/GlobalSearch'
 import { SoundButton } from '../ui/SoundButton'
+import { debtsApi } from '../../api/debtsApi'
+import { sounds } from '../../lib/sounds'
 
 const AppShell = () => {
   const location = useLocation()
@@ -39,6 +43,59 @@ const AppShell = () => {
       })
       .catch(() => {})
     return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    const THRESHOLD_DAYS = 2
+    const REMINDER_KEY = 'finly_debt_reminders'
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+    const checkDebtReminders = async () => {
+      try {
+        const response = await debtsApi.getAll({ status: 'OPEN' })
+        const debts = safeArray<any>(response.data)
+        const stored = JSON.parse(localStorage.getItem(REMINDER_KEY) || '{}') as Record<string, number>
+        let changed = false
+
+        debts.forEach((debt: any) => {
+          const debtId = String(debt.id ?? '')
+          const dueDate = String(debt.dueDate ?? '')
+          if (!debtId || !dueDate) return
+
+          const daysLeft = differenceInCalendarDays(new Date(dueDate), new Date())
+          if (daysLeft > THRESHOLD_DAYS) return
+
+          const lastShownAt = stored[debtId] || 0
+          const shouldNotify = Date.now() - lastShownAt > ONE_DAY_MS
+          if (!shouldNotify) return
+
+          const label = daysLeft < 0 ? `${Math.abs(daysLeft)} day(s) overdue` : `${daysLeft} day(s) left`
+          const direction = debt.type === 'DEBT' ? `to ${debt.personName}` : `from ${debt.personName}`
+          toast(`Debt reminder: ${label} • ${direction}`, {
+            icon: '⏰',
+            duration: 5000,
+          })
+          sounds.notification()
+          stored[debtId] = Date.now()
+          changed = true
+        })
+
+        if (changed) {
+          localStorage.setItem(REMINDER_KEY, JSON.stringify(stored))
+        }
+      } catch {
+        // Keep silent to avoid noisy reminders when backend is unavailable.
+      }
+    }
+
+    void checkDebtReminders()
+    const timer = window.setInterval(() => {
+      void checkDebtReminders()
+    }, 60_000)
+
+    return () => {
+      window.clearInterval(timer)
+    }
   }, [])
 
   const handleRequestLogout = () => {
