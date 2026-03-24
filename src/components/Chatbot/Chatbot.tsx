@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
-import { aiChatService, type ChatAction } from '../../services/ai-chat.service'
+import { aiChatService, type ChatAction, type ChatActionType } from '../../services/ai-chat.service'
 import { accountsApi } from '../../api/accountsApi'
 import { categoriesService } from '../../services/categories.service'
 import { expensesApi } from '../../api/expensesApi'
@@ -228,9 +228,11 @@ const Chatbot = () => {
   const [voiceInputEnabled, setVoiceInputEnabled] = useState(true)
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true)
   const [voiceChatMode, setVoiceChatMode] = useState(false)
+  const [pendingIntent, setPendingIntent] = useState<ChatActionType | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const shouldResumeVoiceRef = useRef(false)
+  const speechGuardUntilRef = useRef(0)
   const speechWindow =
     typeof window !== 'undefined'
       ? (window as unknown as { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor })
@@ -304,6 +306,11 @@ const Chatbot = () => {
     const cleaned = text.replace(/\s+/g, ' ').trim()
     if (!cleaned) return
 
+    // Prevent the recognizer from hearing assistant speech and feeding it back.
+    speechGuardUntilRef.current = Date.now() + 1200
+    if (isListening) {
+      stopVoiceListening()
+    }
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(cleaned)
     utterance.rate = 1
@@ -311,6 +318,7 @@ const Chatbot = () => {
     utterance.onstart = () => setIsSpeaking(true)
     utterance.onend = () => {
       setIsSpeaking(false)
+      speechGuardUntilRef.current = Date.now() + 900
       if (voiceChatMode && shouldResumeVoiceRef.current && isOpen) {
         shouldResumeVoiceRef.current = false
         startVoiceListening()
@@ -318,6 +326,7 @@ const Chatbot = () => {
     }
     utterance.onerror = () => {
       setIsSpeaking(false)
+      speechGuardUntilRef.current = Date.now() + 900
       if (voiceChatMode && shouldResumeVoiceRef.current && isOpen) {
         shouldResumeVoiceRef.current = false
         startVoiceListening()
@@ -356,6 +365,9 @@ const Chatbot = () => {
       }
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
+        if (Date.now() < speechGuardUntilRef.current) {
+          return
+        }
         let transcript = ''
         for (let i = 0; i < event.results.length; i += 1) {
           transcript += event.results[i][0]?.transcript || ''
@@ -404,10 +416,28 @@ const Chatbot = () => {
       if (cash?.id) return String(cash.id)
     }
 
+    if (hint.includes('card')) {
+      const cards = accounts.filter((acc: any) => String(acc.type || '').toUpperCase() === 'BANK_CARD')
+      if (cards.length === 1 && cards[0]?.id) return String(cards[0].id)
+    }
+
     const exact = accounts.find((acc: any) => String(acc.name || '').toLowerCase() === hint)
     if (exact?.id) return String(exact.id)
     const fuzzy = accounts.find((acc: any) => String(acc.name || '').toLowerCase().includes(hint))
     return fuzzy?.id ? String(fuzzy.id) : null
+  }
+
+  const accountSelectionHint = async (preferCards = false): Promise<string> => {
+    const response = await accountsApi.getAll()
+    const allAccounts = safeArray<any>(response.data)
+    const filtered = preferCards
+      ? allAccounts.filter((acc: any) => String(acc.type || '').toUpperCase() === 'BANK_CARD')
+      : allAccounts
+    const choices = (filtered.length ? filtered : allAccounts).slice(0, 6)
+    if (!choices.length) return 'No accounts found yet. Please create an account first.'
+    return choices
+      .map((acc: any, idx: number) => `${idx + 1}. ${String(acc.name || 'Unnamed account')} (${String(acc.currency || 'UZS')})`)
+      .join('\n')
   }
 
   const resolveExpenseCategoryId = async (categoryHint?: string): Promise<string | null> => {
@@ -539,10 +569,13 @@ const Chatbot = () => {
       const amount = Number(data.amount)
       const expenseDate = data.expenseDate || new Date().toISOString().slice(0, 10)
       if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error('Please tell the expense amount (for example: 12000 UZS).')
+        throw new Error('What did you buy and how much did it cost? Example: groceries 12000 UZS.')
       }
       const accountId = await resolveAccountId(data.accountHint)
-      if (!accountId) throw new Error('Please tell me which account/card you used for this expense.')
+      if (!accountId) {
+        const suggestions = await accountSelectionHint(true)
+        throw new Error(`Which account/card was used for this expense?\n${suggestions}`)
+      }
       const categoryId = await resolveExpenseCategoryId(data.categoryHint)
       if (!categoryId) throw new Error('No expense category found.')
 
@@ -563,10 +596,13 @@ const Chatbot = () => {
       const amount = Number(data.amount)
       const incomeDate = data.incomeDate || data.expenseDate || new Date().toISOString().slice(0, 10)
       if (!Number.isFinite(amount) || amount <= 0) {
-        throw new Error('Please tell the income amount (for example: 250000 UZS).')
+        throw new Error('How much income did you receive? Example: 250000 UZS salary.')
       }
       const accountId = await resolveAccountId(data.accountHint)
-      if (!accountId) throw new Error('Please tell me which account/card should receive this income.')
+      if (!accountId) {
+        const suggestions = await accountSelectionHint(false)
+        throw new Error(`Which account should receive this income?\n${suggestions}`)
+      }
       const categoryId = await resolveIncomeCategoryId(data.categoryHint)
       if (!categoryId) throw new Error('No income category found.')
 
@@ -658,6 +694,31 @@ const Chatbot = () => {
     const messageText = (text || inputValue).trim()
     if (!messageText || isTyping) return
 
+    const normalized = messageText.toLowerCase()
+    const wantsDirectionChange = /(change direction|cancel|stop|nevermind|never mind|different task|different thing|exit)/.test(
+      normalized
+    )
+
+    if (wantsDirectionChange && pendingIntent) {
+      setPendingIntent(null)
+      setInputValue('')
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'user',
+          text: messageText,
+        },
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          text: 'Direction changed. What would you like to do now: expense, income, debt, transfer, or statistics?',
+        },
+      ])
+      speakText('Direction changed. What would you like to do now?')
+      return
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -670,9 +731,11 @@ const Chatbot = () => {
     setIsTyping(true)
 
     setTimeout(async () => {
+      let attemptedActionType: ChatActionType = 'NONE'
       try {
         const utilityReply = await handleUtilityQuery(messageText)
         if (utilityReply) {
+          setPendingIntent(null)
           setMessages(prev => [
             ...prev,
             {
@@ -686,6 +749,7 @@ const Chatbot = () => {
         }
 
         const aiResult = await aiChatService.respond(messageText, userSummary)
+  attemptedActionType = aiResult.action?.type || 'NONE'
         const fallback = getBotResponse(messageText)
         const displayText: string = (aiResult?.reply && aiResult.reply.trim()) ? aiResult.reply : fallback
 
@@ -708,19 +772,26 @@ const Chatbot = () => {
           : null
 
         setMessages(prev => [...prev, assistantMessage, ...(toolCallMessage ? [toolCallMessage] : [])])
+        setPendingIntent(actionOutcome ? null : (attemptedActionType !== 'NONE' ? attemptedActionType : null))
         speakText(displayText)
       } catch (error) {
         sounds.error()
         toast.error('I need a bit more detail before I can execute that.')
         const message = error instanceof Error ? error.message : 'Unexpected AI error'
+        const followupHint = attemptedActionType !== 'NONE'
+          ? ' If you want to change direction, say: "change direction".'
+          : ''
         setMessages(prev => [
           ...prev,
           {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            text: `I couldn't complete that automatically. ${message}`,
+            text: `I couldn't complete that automatically. ${message}${followupHint}`,
           },
         ])
+        if (attemptedActionType !== 'NONE') {
+          setPendingIntent(attemptedActionType)
+        }
         speakText(`I couldn't complete that automatically. ${message}`)
       } finally {
         setIsTyping(false)
