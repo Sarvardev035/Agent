@@ -75,7 +75,7 @@ const SocialButton = ({ name, icon, bg, border, hover, shadow }: SocialBtnProps)
     setIsRippling(true)
     setTimeout(() => setIsRippling(false), 400)
     setTimeout(() => {
-      window.location.href = 'https://www.inteullpo.online/login'
+      window.location.assign('/login')
     }, 200)
   }
 
