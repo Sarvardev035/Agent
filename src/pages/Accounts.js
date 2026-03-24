@@ -118,6 +118,7 @@ const Accounts = () => {
     const handleDeleteAccount = async (account) => {
         setDeletingId(account.id);
         try {
+            const moved = await moveBalanceBeforeDelete(account);
             await removeLinkedRecords(account.id);
             await api.delete(`/api/accounts/${account.id}`);
             sounds.expense();
@@ -134,7 +135,9 @@ const Accounts = () => {
             const existing = JSON.parse(localStorage.getItem('finly_activity_log') || '[]');
             existing.unshift(log);
             localStorage.setItem('finly_activity_log', JSON.stringify(existing.slice(0, 50)));
-            toast.success(`Account "${account.name}" deleted`);
+            toast.success(moved
+                ? `Account "${account.name}" deleted. ${formatCurrency(moved.amount, account.currency)} moved to "${moved.destinationName}".`
+                : `Account "${account.name}" deleted`);
             setConfirmDeleteAccount(null);
             await refreshAccounts();
         }
@@ -171,9 +174,47 @@ const Accounts = () => {
         await Promise.allSettled(debts.map((item) => debtsApi.delete(item.id)));
         await Promise.allSettled(transfers.map((item) => api.delete(`/api/transfers/${item.id}`)));
     };
+    const ensureDestinationAccount = async (source) => {
+        const preferred = accounts.find(a => String(a.id) !== String(source.id) && String(a.currency) === String(source.currency));
+        if (preferred)
+            return preferred;
+        const suffix = Date.now().toString().slice(-6);
+        const fallbackName = `Safe Balance ${source.currency} ${suffix}`;
+        const created = await api.post('/api/accounts', {
+            name: fallbackName,
+            type: 'CASH',
+            currency: source.currency,
+            initialBalance: 0,
+        });
+        const createdAccount = created?.data;
+        if (createdAccount?.id)
+            return createdAccount;
+        await refreshAccounts();
+        const fromStore = useFinanceStore.getState().accounts.find(a => String(a.name) === fallbackName && String(a.currency) === String(source.currency));
+        if (fromStore)
+            return fromStore;
+        throw new Error('Could not prepare destination account for balance transfer');
+    };
+    const moveBalanceBeforeDelete = async (source) => {
+        const amount = Number(source.balance);
+        if (!Number.isFinite(amount) || Math.abs(amount) < 0.000001) {
+            return null;
+        }
+        const destination = await ensureDestinationAccount(source);
+        await api.post('/api/transfers', {
+            fromAccountId: source.id,
+            toAccountId: destination.id,
+            amount,
+            description: `Auto-transfer before deleting ${source.name}`,
+            transferDate: format(new Date(), 'yyyy-MM-dd'),
+            exchangeRate: 1,
+        });
+        return { destinationName: destination.name, amount };
+    };
     const handleDeleteCard = async (account) => {
         try {
             setDeletingId(account.id);
+            const moved = await moveBalanceBeforeDelete(account);
             await removeLinkedRecords(account.id);
             await api.delete(`/api/accounts/${account.id}`);
             sounds.expense();
@@ -191,7 +232,9 @@ const Accounts = () => {
             const existing = JSON.parse(localStorage.getItem('finly_activity_log') || '[]');
             existing.unshift(log);
             localStorage.setItem('finly_activity_log', JSON.stringify(existing.slice(0, 50)));
-            toast.success(`Card "${account.name}" has been dropped`);
+            toast.success(moved
+                ? `Card "${account.name}" deleted. ${formatCurrency(moved.amount, account.currency)} moved to "${moved.destinationName}".`
+                : `Card "${account.name}" has been dropped`);
             setActiveQuickActionsFor(null);
             await refreshAccounts();
         }

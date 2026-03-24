@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { aiChatService } from '../../services/ai-chat.service';
@@ -24,7 +24,6 @@ const BOT_RULES = [
 3. Fill in: Amount, Date, Category, Account
 4. Click "Save expense"
 Your account balance updates automatically! 💸`,
-        action: { label: 'Go to Expenses', path: '/expenses' },
     },
     {
         keywords: ['add income', 'got paid', 'salary', 'received'],
@@ -33,7 +32,6 @@ Your account balance updates automatically! 💸`,
 2. Click "+ Add Income"
 3. Fill in: Amount, Date, Category, Account
 4. Save — your balance increases automatically! 💰`,
-        action: { label: 'Go to Income', path: '/income' },
     },
     {
         keywords: ['transfer', 'move money', 'send money'],
@@ -43,7 +41,6 @@ Your account balance updates automatically! 💸`,
 3. Select From Account and To Account
 4. Enter amount and date
 5. Save — both balances update instantly! ↔️`,
-        action: { label: 'Go to Transfers', path: '/transfers' },
     },
     {
         keywords: ['debt', 'loan', 'borrow', 'lend', 'owe'],
@@ -54,7 +51,6 @@ Your account balance updates automatically! 💸`,
    • "I Owe" (DEBT) = you borrowed from someone
    • "Owed to Me" (RECEIVABLE) = you lent to someone
 4. When paid, click "Repay" to mark it settled 🤝`,
-        action: { label: 'Go to Debts', path: '/debts' },
     },
     {
         keywords: ['budget', 'limit', 'plan', 'spending limit'],
@@ -63,7 +59,6 @@ Your account balance updates automatically! 💸`,
 2. Set your monthly income goal
 3. Set spending limits per category
 4. System warns you when approaching limits 🎯`,
-        action: { label: 'Go to Budget', path: '/budget' },
     },
     {
         keywords: ['account', 'card', 'wallet', 'cash'],
@@ -73,7 +68,6 @@ Your account balance updates automatically! 💸`,
 3. Choose type: Cash or Bank Card
 4. Set currency (UZS, USD, EUR)
 5. Enter initial balance 💳`,
-        action: { label: 'Go to Accounts', path: '/accounts' },
     },
     {
         keywords: ['category', 'categories'],
@@ -82,7 +76,6 @@ Your account balance updates automatically! 💸`,
 2. Switch between Expense/Income tabs
 3. Default categories are auto-created
 4. Add custom categories anytime 📂`,
-        action: { label: 'Go to Categories', path: '/categories' },
     },
     {
         keywords: ['statistics', 'stats', 'chart', 'analytics', 'report'],
@@ -92,7 +85,6 @@ Your account balance updates automatically! 💸`,
 3. See: Income vs Expenses chart
 4. Category ranking bars and balance trends
 5. Balance trend over time 📊`,
-        action: { label: 'Go to Statistics', path: '/statistics' },
     },
     {
         keywords: ['calendar', 'history', 'transactions by date'],
@@ -101,7 +93,6 @@ Your account balance updates automatically! 💸`,
 2. Click any date to see transactions
 3. Green dot = income that day
 4. Red dot = expense that day 📅`,
-        action: { label: 'Go to Calendar', path: '/calendar' },
     },
     {
         keywords: ['help', 'what can you do', 'features', 'how'],
@@ -168,20 +159,33 @@ const WEATHER_CODE_LABELS = {
 const Chatbot = () => {
     const navigate = useNavigate();
     const isCompactLayout = useMediaQuery('(max-width: 1024px)');
+    const isPhone = useMediaQuery('(max-width: 640px)');
     const [isOpen, setIsOpen] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [messages, setMessages] = useState([
         {
             id: '0',
             role: 'assistant',
-            text: 'Hi! I am your Finly guide. Ask me how to add expenses, move money, track debts, set budgets, or check your statistics. Or continue using the powerful Telegram bot for even faster access! 🤖',
+            text: 'Hi! I am your Finly guide. Ask me how to add expenses, move money, track debts, set budgets, or check your statistics. You can also use voice input, spoken replies, and full voice chat mode from the header controls. Or continue in Telegram for quick mobile access.',
             showTelegramButton: true,
         },
     ]);
     const [inputValue, setInputValue] = useState('');
     const [showSuggestions, setShowSuggestions] = useState(true);
     const [userSummary, setUserSummary] = useState('');
+    const [isListening, setIsListening] = useState(false);
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    const [voiceInputEnabled, setVoiceInputEnabled] = useState(true);
+    const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
+    const [voiceChatMode, setVoiceChatMode] = useState(false);
     const messagesEndRef = useRef(null);
+    const recognitionRef = useRef(null);
+    const shouldResumeVoiceRef = useRef(false);
+    const speechWindow = typeof window !== 'undefined'
+        ? window
+        : undefined;
+    const hasSpeechRecognition = Boolean(speechWindow?.SpeechRecognition || speechWindow?.webkitSpeechRecognition);
+    const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window;
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -222,6 +226,104 @@ const Chatbot = () => {
             cancelled = true;
         };
     }, []);
+    useEffect(() => {
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.onend = null;
+                recognitionRef.current.onerror = null;
+                recognitionRef.current.stop();
+            }
+            if (hasSpeechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+        };
+    }, [hasSpeechSynthesis]);
+    const speakText = (text) => {
+        if (!voiceOutputEnabled || !hasSpeechSynthesis)
+            return;
+        const cleaned = text.replace(/\s+/g, ' ').trim();
+        if (!cleaned)
+            return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(cleaned);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => {
+            setIsSpeaking(false);
+            if (voiceChatMode && shouldResumeVoiceRef.current && isOpen) {
+                shouldResumeVoiceRef.current = false;
+                startVoiceListening();
+            }
+        };
+        utterance.onerror = () => {
+            setIsSpeaking(false);
+            if (voiceChatMode && shouldResumeVoiceRef.current && isOpen) {
+                shouldResumeVoiceRef.current = false;
+                startVoiceListening();
+            }
+        };
+        window.speechSynthesis.speak(utterance);
+    };
+    const stopVoiceListening = () => {
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
+        setIsListening(false);
+    };
+    const startVoiceListening = () => {
+        if (!voiceInputEnabled || !hasSpeechRecognition) {
+            toast.error('Voice input is not supported in this browser.');
+            return;
+        }
+        if (isTyping)
+            return;
+        if (!recognitionRef.current) {
+            const Recognition = speechWindow?.SpeechRecognition || speechWindow?.webkitSpeechRecognition;
+            if (!Recognition) {
+                toast.error('Voice input is not supported in this browser.');
+                return;
+            }
+            const recognition = new Recognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            recognition.onstart = () => {
+                setIsListening(true);
+            };
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = 0; i < event.results.length; i += 1) {
+                    transcript += event.results[i][0]?.transcript || '';
+                }
+                const finalText = transcript.trim();
+                setInputValue(finalText);
+                const lastIndex = event.results.length - 1;
+                const isFinal = lastIndex >= 0 ? Boolean(event.results[lastIndex]?.isFinal) : false;
+                if (isFinal && finalText) {
+                    shouldResumeVoiceRef.current = voiceChatMode;
+                    handleSendMessage(finalText);
+                }
+            };
+            recognition.onerror = (event) => {
+                setIsListening(false);
+                if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                    toast.error(`Voice input error: ${event.error}`);
+                }
+            };
+            recognition.onend = () => {
+                setIsListening(false);
+            };
+            recognitionRef.current = recognition;
+        }
+        try {
+            recognitionRef.current.start();
+        }
+        catch {
+            // Ignore repeated start calls while recognition is already active.
+        }
+    };
     const resolveAccountId = async (accountHint) => {
         const response = await accountsApi.getAll();
         const accounts = safeArray(response.data);
@@ -490,6 +592,7 @@ const Chatbot = () => {
                             text: utilityReply,
                         },
                     ]);
+                    speakText(utilityReply);
                     return;
                 }
                 const aiResult = await aiChatService.respond(messageText, userSummary);
@@ -512,6 +615,7 @@ const Chatbot = () => {
                     }
                     : null;
                 setMessages(prev => [...prev, assistantMessage, ...(toolCallMessage ? [toolCallMessage] : [])]);
+                speakText(displayText);
             }
             catch (error) {
                 sounds.error();
@@ -525,6 +629,7 @@ const Chatbot = () => {
                         text: `I couldn't complete that automatically. ${message}`,
                     },
                 ]);
+                speakText(`I couldn't complete that automatically. ${message}`);
             }
             finally {
                 setIsTyping(false);
@@ -534,6 +639,20 @@ const Chatbot = () => {
     const openTelegramBot = () => {
         window.open('https://t.me/Finly_smart_bot', '_blank');
     };
+    useEffect(() => {
+        if (!isOpen) {
+            stopVoiceListening();
+            shouldResumeVoiceRef.current = false;
+            if (hasSpeechSynthesis) {
+                window.speechSynthesis.cancel();
+                setIsSpeaking(false);
+            }
+            return;
+        }
+        if (voiceChatMode && voiceInputEnabled && hasSpeechRecognition && !isTyping && !isListening) {
+            startVoiceListening();
+        }
+    }, [hasSpeechRecognition, hasSpeechSynthesis, isListening, isOpen, isTyping, voiceChatMode, voiceInputEnabled]);
     return (_jsxs(_Fragment, { children: [_jsx("button", { onClick: () => setIsOpen(!isOpen), type: "button", style: {
                     position: 'fixed',
                     bottom: isCompactLayout ? 86 : 24,
@@ -558,69 +677,171 @@ const Chatbot = () => {
                 }, onMouseLeave: e => {
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = '0 14px 34px rgba(30, 64, 175, 0.38)';
-                }, children: isOpen ? _jsx(X, { size: 24 }) : _jsx(MessageCircle, { size: 24 }) }), isOpen && (_jsxs("div", { className: "ledger-enter", style: {
+                }, children: isOpen ? _jsx(X, { size: 24 }) : _jsx(MessageCircle, { size: 24 }) }), isOpen && (_jsx("div", { onClick: () => setIsOpen(false), style: {
                     position: 'fixed',
-                    bottom: isCompactLayout ? 154 : 96,
-                    right: isCompactLayout ? 12 : 24,
-                    width: isCompactLayout ? 'calc(100vw - 24px)' : 'min(410px, calc(100vw - 24px))',
-                    height: isCompactLayout ? 'min(560px, calc(100vh - 190px))' : 'min(620px, calc(100vh - 128px))',
-                    background: 'linear-gradient(165deg, rgba(255,255,255,0.84), rgba(225,240,255,0.7))',
-                    borderRadius: 22,
-                    boxShadow: '0 28px 65px rgba(15,23,42,0.18), 0 16px 30px rgba(30,64,175,0.16)',
-                    border: '1px solid rgba(255,255,255,0.78)',
-                    backdropFilter: 'blur(18px) saturate(130%)',
-                    WebkitBackdropFilter: 'blur(18px) saturate(130%)',
-                    zIndex: 999,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                }, children: [_jsxs("div", { style: {
-                            background: 'linear-gradient(135deg, rgba(30,64,175,0.96) 0%, rgba(3,105,161,0.95) 100%)',
-                            color: '#e2ecff',
-                            padding: '14px 16px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            borderBottom: '1px solid rgba(255,255,255,0.16)',
-                        }, children: [_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 10 }, children: [_jsx("span", { style: {
-                                            width: 34,
-                                            height: 34,
-                                            borderRadius: 11,
-                                            background: 'rgba(255,255,255,0.2)',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            border: '1px solid rgba(255,255,255,0.24)',
-                                        }, children: _jsx(Bot, { size: 18 }) }), _jsxs("div", { children: [_jsx("div", { style: { fontWeight: 800, fontSize: 14, lineHeight: 1.1 }, children: "Finly Guide" }), _jsxs("div", { style: { fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }, children: [_jsx(Sparkles, { size: 12 }), "Streaming replies"] })] })] }), _jsx("button", { onClick: () => setIsOpen(false), type: "button", style: {
-                                    background: 'rgba(255,255,255,0.12)',
-                                    border: '1px solid rgba(255,255,255,0.2)',
-                                    borderRadius: 10,
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    padding: 6,
-                                    display: 'inline-flex',
-                                }, children: _jsx(X, { size: 20 }) })] }), _jsxs("div", { style: {
-                            flex: 1,
-                            overflow: 'auto',
-                            padding: 14,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 10,
-                        }, children: [messages.map(msg => (_jsx("div", { children: msg.role === 'user' ? (_jsx("div", { style: {
-                                        display: 'flex',
-                                        justifyContent: 'flex-end',
-                                        marginBottom: 2,
-                                    }, children: _jsx("div", { style: {
-                                            background: 'linear-gradient(135deg, #1d4ed8, #0ea5e9)',
-                                            color: '#fff',
-                                            borderRadius: 14,
-                                            padding: '10px 12px',
-                                            maxWidth: '86%',
-                                            wordBreak: 'break-word',
-                                            fontSize: 13.5,
-                                            whiteSpace: 'pre-wrap',
-                                            boxShadow: '0 10px 22px rgba(30,64,175,0.25)',
-                                        }, children: msg.text }) })) : msg.role === 'assistant' ? (_jsxs("div", { style: { display: 'flex', justifyContent: 'flex-start', gap: 8 }, children: [_jsx("span", { style: {
+                    inset: 0,
+                    background: 'transparent',
+                    zIndex: 998,
+                }, children: _jsxs("div", { className: "ledger-enter", onClick: e => e.stopPropagation(), style: {
+                        position: 'fixed',
+                        bottom: isCompactLayout ? 154 : 96,
+                        right: isCompactLayout ? 12 : 24,
+                        width: isCompactLayout ? 'calc(100vw - 24px)' : 'min(410px, calc(100vw - 24px))',
+                        height: isCompactLayout ? 'min(560px, calc(100vh - 190px))' : 'min(620px, calc(100vh - 128px))',
+                        background: 'linear-gradient(165deg, rgba(255,255,255,0.84), rgba(225,240,255,0.7))',
+                        borderRadius: 22,
+                        boxShadow: '0 28px 65px rgba(15,23,42,0.18), 0 16px 30px rgba(30,64,175,0.16)',
+                        border: '1px solid rgba(255,255,255,0.78)',
+                        backdropFilter: 'blur(18px) saturate(130%)',
+                        WebkitBackdropFilter: 'blur(18px) saturate(130%)',
+                        zIndex: 999,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                    }, children: [_jsxs("div", { style: {
+                                background: 'linear-gradient(135deg, rgba(30,64,175,0.96) 0%, rgba(3,105,161,0.95) 100%)',
+                                color: '#e2ecff',
+                                padding: '14px 16px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                borderBottom: '1px solid rgba(255,255,255,0.16)',
+                            }, children: [_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 10 }, children: [_jsx("span", { style: {
+                                                width: 34,
+                                                height: 34,
+                                                borderRadius: 11,
+                                                background: 'rgba(255,255,255,0.2)',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                border: '1px solid rgba(255,255,255,0.24)',
+                                            }, children: _jsx(Bot, { size: 18 }) }), _jsxs("div", { children: [_jsx("div", { style: { fontWeight: 800, fontSize: 14, lineHeight: 1.1 }, children: "Finly Guide" }), _jsxs("div", { style: { fontSize: 11, opacity: 0.9, display: 'flex', alignItems: 'center', gap: 4 }, children: [_jsx(Sparkles, { size: 12 }), "Streaming replies"] })] })] }), _jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 6 }, children: [_jsx("button", { onClick: () => {
+                                                const next = !voiceInputEnabled;
+                                                setVoiceInputEnabled(next);
+                                                if (!next)
+                                                    stopVoiceListening();
+                                            }, type: "button", title: voiceInputEnabled ? 'Disable voice input' : 'Enable voice input', style: {
+                                                background: voiceInputEnabled ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.12)',
+                                                border: '1px solid rgba(255,255,255,0.24)',
+                                                borderRadius: 9,
+                                                color: '#fff',
+                                                cursor: 'pointer',
+                                                padding: 6,
+                                                display: 'inline-flex',
+                                            }, children: voiceInputEnabled ? _jsx(Mic, { size: 15 }) : _jsx(MicOff, { size: 15 }) }), _jsx("button", { onClick: () => {
+                                                const next = !voiceOutputEnabled;
+                                                setVoiceOutputEnabled(next);
+                                                if (!next && hasSpeechSynthesis) {
+                                                    window.speechSynthesis.cancel();
+                                                    setIsSpeaking(false);
+                                                }
+                                            }, type: "button", title: voiceOutputEnabled ? 'Disable spoken replies' : 'Enable spoken replies', style: {
+                                                background: voiceOutputEnabled ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.12)',
+                                                border: '1px solid rgba(255,255,255,0.24)',
+                                                borderRadius: 9,
+                                                color: '#fff',
+                                                cursor: 'pointer',
+                                                padding: 6,
+                                                display: 'inline-flex',
+                                            }, children: voiceOutputEnabled ? _jsx(Volume2, { size: 15 }) : _jsx(VolumeX, { size: 15 }) }), _jsx("button", { onClick: () => setVoiceChatMode(prev => !prev), type: "button", title: voiceChatMode ? 'Disable voice chat mode' : 'Enable voice chat mode', style: {
+                                                background: voiceChatMode ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.12)',
+                                                border: '1px solid rgba(255,255,255,0.24)',
+                                                borderRadius: 9,
+                                                color: '#fff',
+                                                cursor: 'pointer',
+                                                padding: '6px 8px',
+                                                fontSize: 10,
+                                                fontWeight: 800,
+                                            }, children: "Voice Chat" }), !isPhone && (_jsx("button", { onClick: () => setIsOpen(false), type: "button", style: {
+                                                background: 'rgba(255,255,255,0.12)',
+                                                border: '1px solid rgba(255,255,255,0.2)',
+                                                borderRadius: 10,
+                                                color: '#fff',
+                                                cursor: 'pointer',
+                                                padding: 6,
+                                                display: 'inline-flex',
+                                            }, children: _jsx(X, { size: 20 }) }))] })] }), (isListening || isSpeaking || voiceChatMode) && (_jsxs("div", { style: {
+                                padding: '7px 12px',
+                                borderBottom: '1px solid rgba(214,227,255,0.82)',
+                                background: 'rgba(236,248,255,0.92)',
+                                color: '#0f3b75',
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                display: 'flex',
+                                gap: 10,
+                                flexWrap: 'wrap',
+                            }, children: [_jsx("span", { children: isListening ? 'Listening...' : 'Mic idle' }), _jsx("span", { children: isSpeaking ? 'Speaking reply...' : 'Speaker idle' }), _jsx("span", { children: voiceChatMode ? 'Voice chat mode ON' : 'Voice chat mode OFF' })] })), _jsxs("div", { style: {
+                                flex: 1,
+                                overflow: 'auto',
+                                padding: 14,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 10,
+                            }, children: [messages.map(msg => (_jsx("div", { children: msg.role === 'user' ? (_jsx("div", { style: {
+                                            display: 'flex',
+                                            justifyContent: 'flex-end',
+                                            marginBottom: 2,
+                                        }, children: _jsx("div", { style: {
+                                                background: 'linear-gradient(135deg, #1d4ed8, #0ea5e9)',
+                                                color: '#fff',
+                                                borderRadius: 14,
+                                                padding: '10px 12px',
+                                                maxWidth: '86%',
+                                                wordBreak: 'break-word',
+                                                fontSize: 13.5,
+                                                whiteSpace: 'pre-wrap',
+                                                boxShadow: '0 10px 22px rgba(30,64,175,0.25)',
+                                            }, children: msg.text }) })) : msg.role === 'assistant' ? (_jsxs("div", { style: { display: 'flex', justifyContent: 'flex-start', gap: 8 }, children: [_jsx("span", { style: {
+                                                    width: 28,
+                                                    height: 28,
+                                                    borderRadius: 10,
+                                                    background: 'rgba(30,64,175,0.12)',
+                                                    color: '#1d4ed8',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                    marginTop: 2,
+                                                }, children: _jsx(Bot, { size: 16 }) }), _jsxs("div", { style: { flex: 1 }, children: [_jsx("div", { style: {
+                                                            background: 'rgba(255,255,255,0.7)',
+                                                            borderRadius: 14,
+                                                            padding: '10px 12px',
+                                                            fontSize: 13.5,
+                                                            whiteSpace: 'pre-wrap',
+                                                            color: '#0f172a',
+                                                            border: '1px solid rgba(214,227,255,0.88)',
+                                                            backdropFilter: 'blur(8px)',
+                                                            WebkitBackdropFilter: 'blur(8px)',
+                                                        }, children: msg.text }), msg.showTelegramButton && (_jsxs("button", { onClick: openTelegramBot, type: "button", className: "banking-pulse", style: {
+                                                            marginTop: 10,
+                                                            background: 'linear-gradient(135deg, #0088cc, #00a8e8)',
+                                                            color: '#fff',
+                                                            border: 'none',
+                                                            borderRadius: 10,
+                                                            padding: '10px 14px',
+                                                            fontSize: 12,
+                                                            fontWeight: 700,
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 6,
+                                                        }, children: [_jsx("span", { children: "\uD83D\uDCAC" }), " Join Telegram Bot (@Finly_smart_bot)"] }))] })] })) : (_jsx("div", { style: {
+                                            display: 'flex',
+                                            justifyContent: 'flex-start',
+                                            paddingLeft: 36,
+                                        }, children: _jsxs("div", { style: {
+                                                width: '100%',
+                                                background: 'rgba(224,235,255,0.65)',
+                                                border: '1px dashed rgba(96,165,250,0.75)',
+                                                borderRadius: 12,
+                                                padding: '8px 10px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                color: '#1e3a8a',
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                            }, children: [_jsx(Wrench, { size: 14 }), _jsx("span", { style: { opacity: 0.8 }, children: msg.toolName || 'tool' }), _jsx("span", { style: { opacity: 0.55 }, children: "\u2022" }), _jsx("span", { children: msg.text })] }) })) }, msg.id))), isTyping && (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 8 }, children: [_jsx("span", { style: {
                                                 width: 28,
                                                 height: 28,
                                                 borderRadius: 10,
@@ -630,103 +851,72 @@ const Chatbot = () => {
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 flexShrink: 0,
-                                                marginTop: 2,
-                                            }, children: _jsx(Bot, { size: 16 }) }), _jsxs("div", { style: { flex: 1 }, children: [_jsx("div", { style: {
-                                                        background: 'rgba(255,255,255,0.7)',
-                                                        borderRadius: 14,
-                                                        padding: '10px 12px',
-                                                        fontSize: 13.5,
-                                                        whiteSpace: 'pre-wrap',
-                                                        color: '#0f172a',
-                                                        border: '1px solid rgba(214,227,255,0.88)',
-                                                        backdropFilter: 'blur(8px)',
-                                                        WebkitBackdropFilter: 'blur(8px)',
-                                                    }, children: msg.text }), msg.showTelegramButton && (_jsxs("button", { onClick: openTelegramBot, type: "button", className: "banking-pulse", style: {
-                                                        marginTop: 10,
-                                                        background: 'linear-gradient(135deg, #0088cc, #00a8e8)',
-                                                        color: '#fff',
-                                                        border: 'none',
-                                                        borderRadius: 10,
-                                                        padding: '10px 14px',
-                                                        fontSize: 12,
-                                                        fontWeight: 700,
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 6,
-                                                    }, children: [_jsx("span", { children: "\uD83D\uDCAC" }), " Join Telegram Bot (@Finly_smart_bot)"] }))] })] })) : (_jsx("div", { style: {
-                                        display: 'flex',
-                                        justifyContent: 'flex-start',
-                                        paddingLeft: 36,
-                                    }, children: _jsxs("div", { style: {
-                                            width: '100%',
-                                            background: 'rgba(224,235,255,0.65)',
-                                            border: '1px dashed rgba(96,165,250,0.75)',
-                                            borderRadius: 12,
-                                            padding: '8px 10px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 8,
-                                            color: '#1e3a8a',
-                                            fontSize: 12,
-                                            fontWeight: 600,
-                                        }, children: [_jsx(Wrench, { size: 14 }), _jsx("span", { style: { opacity: 0.8 }, children: msg.toolName || 'tool' }), _jsx("span", { style: { opacity: 0.55 }, children: "\u2022" }), _jsx("span", { children: msg.text })] }) })) }, msg.id))), isTyping && (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 8 }, children: [_jsx("span", { style: {
-                                            width: 28,
-                                            height: 28,
-                                            borderRadius: 10,
-                                            background: 'rgba(30,64,175,0.12)',
-                                            color: '#1d4ed8',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0,
-                                        }, children: _jsx(TerminalSquare, { size: 16 }) }), _jsx("div", { style: {
-                                            borderRadius: 12,
-                                            padding: '9px 12px',
-                                            background: 'rgba(255,255,255,0.72)',
-                                            border: '1px solid rgba(214,227,255,0.88)',
-                                            color: '#1e3a8a',
-                                            fontSize: 12.5,
-                                        }, children: "Agent is typing..." })] })), _jsx("div", { ref: messagesEndRef })] }), showSuggestions && messages.length === 1 && (_jsx("div", { style: { padding: '10px 12px', borderTop: '1px solid rgba(214,227,255,0.82)' }, children: _jsx("div", { style: {
-                                display: 'flex',
-                                gap: 7,
-                                flexWrap: 'wrap',
-                            }, children: QUICK_SUGGESTIONS.map(suggestion => (_jsx("button", { onClick: () => handleSendMessage(suggestion), type: "button", style: {
-                                    background: 'rgba(255,255,255,0.72)',
-                                    border: '1px solid rgba(214,227,255,0.95)',
-                                    borderRadius: 10,
-                                    padding: '7px 10px',
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: '#1e3a8a',
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap',
-                                }, children: suggestion }, suggestion))) }) })), _jsxs("div", { style: {
-                            display: 'flex',
-                            gap: 8,
-                            padding: 12,
-                            borderTop: '1px solid rgba(214,227,255,0.82)',
-                            background: 'rgba(245,250,255,0.82)',
-                        }, children: [_jsx("input", { type: "text", value: inputValue, onChange: e => setInputValue(e.target.value), onKeyDown: e => e.key === 'Enter' && handleSendMessage(), placeholder: "Ask your finance assistant...", style: {
-                                    flex: 1,
-                                    border: '1px solid rgba(191,219,254,0.9)',
-                                    borderRadius: 10,
-                                    padding: '10px 11px',
-                                    fontSize: 13.5,
-                                    outline: 'none',
-                                    background: 'rgba(255,255,255,0.9)',
-                                } }), _jsx("button", { onClick: () => handleSendMessage(), type: "button", style: {
-                                    background: 'linear-gradient(135deg, #1d4ed8, #0ea5e9)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 10,
-                                    padding: '9px 11px',
-                                    cursor: 'pointer',
+                                            }, children: _jsx(TerminalSquare, { size: 16 }) }), _jsx("div", { style: {
+                                                borderRadius: 12,
+                                                padding: '9px 12px',
+                                                background: 'rgba(255,255,255,0.72)',
+                                                border: '1px solid rgba(214,227,255,0.88)',
+                                                color: '#1e3a8a',
+                                                fontSize: 12.5,
+                                            }, children: "Agent is typing..." })] })), _jsx("div", { ref: messagesEndRef })] }), showSuggestions && messages.length === 1 && (_jsx("div", { style: { padding: '10px 12px', borderTop: '1px solid rgba(214,227,255,0.82)' }, children: _jsx("div", { style: {
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 10px 24px rgba(30,64,175,0.28)',
-                                }, children: _jsx(Send, { size: 16 }) })] })] })), _jsx("style", { children: `
+                                    gap: 7,
+                                    flexWrap: 'wrap',
+                                }, children: QUICK_SUGGESTIONS.map(suggestion => (_jsx("button", { onClick: () => handleSendMessage(suggestion), type: "button", style: {
+                                        background: 'rgba(255,255,255,0.72)',
+                                        border: '1px solid rgba(214,227,255,0.95)',
+                                        borderRadius: 10,
+                                        padding: '7px 10px',
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        color: '#1e3a8a',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                    }, children: suggestion }, suggestion))) }) })), _jsxs("div", { style: {
+                                display: 'flex',
+                                gap: 8,
+                                padding: 12,
+                                borderTop: '1px solid rgba(214,227,255,0.82)',
+                                background: 'rgba(245,250,255,0.82)',
+                            }, children: [_jsx("input", { type: "text", value: inputValue, onChange: e => setInputValue(e.target.value), onKeyDown: e => e.key === 'Enter' && handleSendMessage(), placeholder: "Ask your finance assistant...", style: {
+                                        flex: 1,
+                                        border: '1px solid rgba(191,219,254,0.9)',
+                                        borderRadius: 10,
+                                        padding: '10px 11px',
+                                        fontSize: 13.5,
+                                        outline: 'none',
+                                        background: 'rgba(255,255,255,0.9)',
+                                    } }), _jsx("button", { onClick: () => {
+                                        if (isListening) {
+                                            stopVoiceListening();
+                                        }
+                                        else {
+                                            startVoiceListening();
+                                        }
+                                    }, type: "button", title: isListening ? 'Stop voice input' : 'Start voice input', style: {
+                                        background: isListening ? 'linear-gradient(135deg, #dc2626, #f97316)' : 'linear-gradient(135deg, #2563eb, #0284c7)',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: 10,
+                                        padding: '9px 11px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 10px 24px rgba(30,64,175,0.22)',
+                                        opacity: voiceInputEnabled && hasSpeechRecognition ? 1 : 0.5,
+                                    }, disabled: !voiceInputEnabled || !hasSpeechRecognition, children: isListening ? _jsx(MicOff, { size: 16 }) : _jsx(Mic, { size: 16 }) }), _jsx("button", { onClick: () => handleSendMessage(), type: "button", style: {
+                                        background: 'linear-gradient(135deg, #1d4ed8, #0ea5e9)',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: 10,
+                                        padding: '9px 11px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: '0 10px 24px rgba(30,64,175,0.28)',
+                                    }, children: _jsx(Send, { size: 16 }) })] })] }) })), _jsx("style", { children: `
         @keyframes pulseFloat {
           0%, 100% {
             transform: scale(1);
