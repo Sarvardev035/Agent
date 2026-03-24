@@ -376,9 +376,11 @@ const Statistics = () => {
                 padding: '10px 12px',
                 borderRadius: 12,
                 border: period === p ? '1px solid var(--blue)' : '1px solid var(--border)',
-                background: period === p ? 'var(--blue-soft)' : '#fff',
-                color: period === p ? 'var(--blue)' : 'var(--text-1)',
-                fontWeight: 700,
+                background: period === p ? 'var(--blue-soft)' : 'var(--surface-muted)',
+                color: period === p ? 'var(--blue)' : 'var(--text-2)',
+                fontWeight: 800,
+                fontFamily: 'Inter, Segoe UI, sans-serif',
+                letterSpacing: '0.01em',
               }}
             >
               {p.charAt(0) + p.slice(1).toLowerCase()}

@@ -15,6 +15,7 @@ import { expensesApi } from '../api/expensesApi'
 import { incomeApi } from '../api/incomeApi'
 import { useFinance } from '../context/FinanceContext'
 import { formatCurrency, getCategoryMeta, safeArray } from '../lib/helpers'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 
 type CalendarTx = {
   id: string
@@ -48,6 +49,8 @@ const dateKey = (d: Date) => format(d, 'yyyy-MM-dd')
 
 const CalendarView = () => {
   const { accounts, refreshAccounts } = useFinance()
+  const isSmallScreen = useMediaQuery('(max-width: 900px)')
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const [transactions, setTransactions] = useState<CalendarTx[]>([])
   const [loading, setLoading] = useState(true)
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
@@ -156,8 +159,11 @@ const CalendarView = () => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(0,1.35fr) minmax(300px,0.65fr)',
-              gap: 14,
+              gridTemplateColumns: isSmallScreen ? '1fr' : 'minmax(0,1.35fr) minmax(300px,0.65fr)',
+              gap: isPhone ? 10 : 14,
+              alignItems: 'stretch',
+              width: '100%',
+              minWidth: 0,
             }}
           >
             <div
@@ -165,12 +171,13 @@ const CalendarView = () => {
                 borderRadius: 14,
                 border: '1px solid var(--border)',
                 background: 'linear-gradient(150deg, rgba(30,41,59,0.05), rgba(59,130,246,0.04))',
-                padding: 12,
+                padding: isPhone ? 10 : 12,
+                minWidth: 0,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                 <div style={{ fontWeight: 800, color: 'var(--text-1)' }}>{format(currentMonth, 'MMMM yyyy')}</div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, width: isPhone ? '100%' : 'auto' }}>
                   <select
                     aria-label="Select month"
                     value={currentMonth.getMonth()}
@@ -186,6 +193,7 @@ const CalendarView = () => {
                       background: 'var(--surface)',
                       color: 'var(--text-1)',
                       padding: '0 10px',
+                      flex: isPhone ? 1 : undefined,
                     }}
                   >
                     {MONTHS.map((month, idx) => (
@@ -210,6 +218,7 @@ const CalendarView = () => {
                       background: 'var(--surface)',
                       color: 'var(--text-1)',
                       padding: '0 10px',
+                      flex: isPhone ? 1 : undefined,
                     }}
                   >
                     {yearOptions.map(y => (
@@ -221,15 +230,15 @@ const CalendarView = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6, marginBottom: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isPhone ? 4 : 6, marginBottom: 6 }}>
                 {WEEK_DAYS.map(day => (
-                  <div key={day} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', padding: '2px 0' }}>
-                    {day}
+                  <div key={day} style={{ textAlign: 'center', fontSize: isPhone ? 10 : 11, fontWeight: 700, color: 'var(--text-3)', padding: '2px 0' }}>
+                    {isPhone ? day.slice(0, 1) : day}
                   </div>
                 ))}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: isPhone ? 4 : 6 }}>
                 {gridDays.map(day => {
                   const key = dateKey(day)
                   const dayItems = txByDate[key] || []
@@ -246,15 +255,15 @@ const CalendarView = () => {
                       onMouseEnter={() => setHoverDate(day)}
                       onMouseLeave={() => setHoverDate(null)}
                       style={{
-                        minHeight: 82,
-                        borderRadius: 12,
+                        minHeight: isPhone ? 56 : isSmallScreen ? 68 : 82,
+                        borderRadius: isPhone ? 10 : 12,
                         border: isSelected ? '1px solid #2563eb' : '1px solid rgba(148,163,184,0.2)',
                         background: isSelected
                           ? 'linear-gradient(145deg, rgba(59,130,246,0.14), rgba(20,184,166,0.12))'
                           : dayItems.length
                             ? 'linear-gradient(145deg, rgba(236,253,245,0.7), rgba(239,246,255,0.7))'
                             : 'var(--surface)',
-                        padding: 8,
+                        padding: isPhone ? 6 : 8,
                         textAlign: 'left',
                         cursor: 'pointer',
                         opacity: isInMonth ? 1 : 0.42,
@@ -264,12 +273,12 @@ const CalendarView = () => {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>{format(day, 'd')}</span>
+                        <span style={{ fontSize: isPhone ? 11 : 12, fontWeight: 700, color: 'var(--text-1)' }}>{format(day, 'd')}</span>
                         {dayItems.length > 0 && (
                           <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{dayItems.length}</span>
                         )}
                       </div>
-                      {dayItems.length > 0 && (
+                      {!isPhone && dayItems.length > 0 && (
                         <div style={{ display: 'grid', gap: 2 }}>
                           <div style={{ fontSize: 10, color: '#0f766e' }}>+ {formatCurrency(dayIncome)}</div>
                           <div style={{ fontSize: 10, color: '#b91c1c' }}>- {formatCurrency(dayExpense)}</div>
@@ -289,7 +298,8 @@ const CalendarView = () => {
                 padding: 12,
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 320,
+                minHeight: isSmallScreen ? 280 : 320,
+                minWidth: 0,
               }}
             >
               <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
