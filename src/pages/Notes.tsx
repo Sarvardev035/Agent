@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { screenReader } from '../lib/screenReader'
 
 interface Note {
@@ -25,6 +25,26 @@ const loadNotes = (): Note[] => {
 
 const saveNotes = (notes: Note[]) => {
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
+}
+
+const dayLabel = (isoDate: string) => {
+  const noteDate = new Date(isoDate)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+
+  const toDayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  const key = toDayKey(noteDate)
+
+  if (key === toDayKey(today)) return 'Today'
+  if (key === toDayKey(yesterday)) return 'Yesterday'
+
+  return noteDate.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 const Notes = () => {
@@ -133,9 +153,28 @@ const Notes = () => {
     saveNotes(updated)
   }
 
-  const filtered = notes
-    .filter(n => n.title.toLowerCase().includes(search.toLowerCase()) || n.body.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned))
+  const filtered = useMemo(
+    () =>
+      notes
+        .filter(n => n.title.toLowerCase().includes(search.toLowerCase()) || n.body.toLowerCase().includes(search.toLowerCase()))
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    [notes, search]
+  )
+
+  const calendarSections = useMemo(() => {
+    const grouped = new Map<string, Note[]>()
+
+    filtered.forEach(note => {
+      const label = dayLabel(note.updatedAt)
+      if (!grouped.has(label)) grouped.set(label, [])
+      grouped.get(label)!.push(note)
+    })
+
+    return Array.from(grouped.entries()).map(([label, sectionNotes]) => ({
+      label,
+      notes: sectionNotes,
+    }))
+  }, [filtered])
 
   return (
     <div className="page-content">
@@ -188,7 +227,7 @@ const Notes = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: active ? (isPhone ? '1fr' : '260px 1fr') : 'repeat(auto-fill,minmax(220px,1fr))',
+          gridTemplateColumns: active ? (isPhone ? '1fr' : '320px 1fr') : '1fr',
           gap: 16,
         }}
       >
@@ -206,61 +245,79 @@ const Notes = () => {
               <p>No notes yet. Create your first one!</p>
             </div>
           ) : (
-            filtered.map(note => (
-              <div
-                key={note.id}
-                onClick={() => setActive(note)}
-                style={{
-                  background: note.color,
-                  borderRadius: 14,
-                  padding: 14,
-                  cursor: 'pointer',
-                  border: active?.id === note.id ? '2px solid #7c3aed' : '2px solid transparent',
-                  transition: 'all 0.15s',
-                  position: 'relative',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  screenReader.speak(`Open note ${note.title || 'Untitled'}`)
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-              >
-                {note.pinned && (
-                  <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 12 }}>
-                    📌
-                  </span>
-                )}
+            calendarSections.map(section => (
+              <div key={section.label} style={{ display: 'grid', gap: 8 }}>
                 <div
                   style={{
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: '#1e293b',
-                    marginBottom: 4,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-3)',
+                    padding: '4px 4px 0',
                   }}
                 >
-                  {note.title || 'Untitled'}
+                  {section.label}
                 </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: '#475569',
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {note.body || 'Empty note...'}
-                </div>
-                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 8 }}>
-                  {new Date(note.updatedAt).toLocaleDateString()}
-                </div>
+
+                {section.notes.map(note => (
+                  <div
+                    key={note.id}
+                    onClick={() => setActive(note)}
+                    style={{
+                      background: note.color,
+                      borderRadius: 14,
+                      padding: 12,
+                      cursor: 'pointer',
+                      border: active?.id === note.id ? '2px solid #7c3aed' : '1px solid rgba(148,163,184,0.18)',
+                      transition: 'all 0.15s',
+                      position: 'relative',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = 'translateX(3px)'
+                      screenReader.speak(`Open note ${note.title || 'Untitled'}`)
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = 'translateX(0)'
+                    }}
+                  >
+                    {note.pinned && (
+                      <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 12 }}>
+                        📌
+                      </span>
+                    )}
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: '#1e293b',
+                        marginBottom: 4,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        paddingRight: 20,
+                      }}
+                    >
+                      {note.title || 'Untitled'}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#475569',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {note.body || 'Empty note...'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>
+                      {new Date(note.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                ))}
               </div>
             ))
           )}

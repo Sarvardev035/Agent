@@ -67,6 +67,30 @@ const rangeForPeriod = (period: Period) => {
   return { startDate: format(subYears(now, 1), 'yyyy-MM-dd'), endDate: format(now, 'yyyy-MM-dd') }
 }
 
+const normalizeFinanceLabel = (raw?: string | null) => {
+  const source = String(raw ?? '').trim()
+  if (!source) return ''
+
+  const upper = source.toUpperCase()
+  const meta = getCategoryMeta(upper)
+  if (meta && meta.label && meta.label.toLowerCase() !== 'other') {
+    return meta.label
+  }
+
+  return source
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
+}
+
+const formatFallbackPeriodLabel = (period: Period, idx: number) => {
+  if (period === 'DAILY') return `Day ${idx + 1}`
+  if (period === 'WEEKLY') return `Week ${idx + 1}`
+  if (period === 'MONTHLY') return `Month ${idx + 1}`
+  return `Year ${idx + 1}`
+}
+
 const Statistics = () => {
   const [period, setPeriod] = useState<Period>('MONTHLY')
   const [chartReady, setChartReady] = useState(false)
@@ -180,14 +204,14 @@ const Statistics = () => {
           cashflowData.map((item: any, idx: number) => ({
             label: item.date
               ? format(new Date(item.date), period === 'DAILY' ? 'MMM d' : 'MMM d')
-              : item.label || `P${idx + 1}`,
+              : normalizeFinanceLabel(item.label || item.categoryName || item.source) || formatFallbackPeriodLabel(period, idx),
             income: Number(item.income ?? 0),
             expense: Number(item.expense ?? 0),
           }))
         )
         setBalanceHistory(
           balanceHistoryData.map((item: any, idx: number) => ({
-            label: item.month || item.label || `M${idx + 1}`,
+            label: normalizeFinanceLabel(item.month || item.label) || formatFallbackPeriodLabel(period, idx),
             balance: Number(item.balance ?? 0),
           }))
         )
@@ -202,28 +226,29 @@ const Statistics = () => {
         setLargeExpenses(
           largeExpenseData.map((item: any) => ({
             id: item.id,
-            description: item.description || 'Expense',
-            categoryName: item.categoryName || 'Other',
+            description: item.description || normalizeFinanceLabel(item.categoryName || item.category) || 'Expense',
+            categoryName: normalizeFinanceLabel(item.categoryName || item.category) || 'Other',
             amount: Number(item.amount ?? 0),
             expenseDate: item.expenseDate,
           }))
         )
         setBreakdown(
           breakdownData.map((item: any) => ({
-            category: item.category || item.name || 'OTHER',
+            categoryKey: String(item.category || item.name || item.label || 'OTHER').toUpperCase(),
+            category: normalizeFinanceLabel(item.category || item.name || item.label) || 'Other',
             value: Number(item.total ?? item.value ?? item.amount ?? 0),
           }))
         )
         setVsData(
           vsIncomeData.map((item: any, idx: number) => ({
-            period: item.month || item.period || item.label || `P${idx + 1}`,
+            period: normalizeFinanceLabel(item.month || item.period || item.label) || formatFallbackPeriodLabel(period, idx),
             income: Number(item.income ?? item.amount ?? item.totalIncome ?? 0),
             expense: Number(item.expense ?? item.total ?? item.amount ?? 0),
           }))
         )
         setIncomeGrowth(
           incomeGrowthData.map((item: any, idx: number) => ({
-            month: item.month || item.label || `M${idx + 1}`,
+            month: normalizeFinanceLabel(item.month || item.label) || formatFallbackPeriodLabel(period, idx),
             amount: Number(item.amount ?? 0),
           }))
         )
@@ -290,6 +315,9 @@ const Statistics = () => {
     const { active, payload, label } = props
     if (!active || !payload?.length) return null
 
+    const primaryPoint = payload[0]?.payload
+    const categoryLabel = normalizeFinanceLabel(primaryPoint?.category || primaryPoint?.categoryName)
+
     return (
       <div
         style={{
@@ -300,7 +328,7 @@ const Statistics = () => {
           boxShadow: 'var(--shadow-lg)',
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>{categoryLabel || label}</div>
         {payload.map((p: any) => (
           <div key={p.dataKey} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
             <span>{p.name}</span>
@@ -487,9 +515,9 @@ const Statistics = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="label" />
                       <YAxis />
-                      <Tooltip content={customTooltip} />
-                      <Area type="monotone" dataKey="income" stroke="#10b981" fill="url(#cashIncome)" strokeWidth={2} name="Income" />
-                      <Area type="monotone" dataKey="expense" stroke="#ef4444" fill="url(#cashExpense)" strokeWidth={2} name="Expense" />
+                      <Tooltip content={customTooltip} cursor={false} />
+                      <Area type="monotone" dataKey="income" stroke="#10b981" fill="url(#cashIncome)" strokeWidth={2} name="Income" activeDot={false} />
+                      <Area type="monotone" dataKey="expense" stroke="#ef4444" fill="url(#cashExpense)" strokeWidth={2} name="Expense" activeDot={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -513,11 +541,11 @@ const Statistics = () => {
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                         <XAxis type="number" hide />
                         <YAxis type="category" dataKey="category" width={88} tick={{ fill: 'var(--text-2)', fontSize: 12 }} />
-                        <Tooltip content={customTooltip} />
-                        <Bar dataKey="value" radius={[0, 10, 10, 0]} name="Expense">
-                          {breakdown.slice(0, 6).map(item => {
-                            const meta = getCategoryMeta(item.category)
-                            return <Cell key={item.category} fill={meta.color} />
+                        <Tooltip content={customTooltip} cursor={false} />
+                        <Bar dataKey="value" radius={[0, 10, 10, 0]} name="Expense" activeBar={false}>
+                          {breakdown.slice(0, 6).map((item, idx) => {
+                            const meta = getCategoryMeta(item.categoryKey || item.category)
+                            return <Cell key={`${item.category}-${idx}`} fill={meta.color} />
                           })}
                         </Bar>
                       </BarChart>
@@ -580,8 +608,8 @@ const Statistics = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="label" />
                       <YAxis />
-                      <Tooltip content={customTooltip} />
-                      <Line type="monotone" dataKey="balance" stroke="#7c3aed" strokeWidth={3} dot={{ r: 4 }} name="Balance" />
+                      <Tooltip content={customTooltip} cursor={false} />
+                      <Line type="monotone" dataKey="balance" stroke="#7c3aed" strokeWidth={3} dot={false} activeDot={false} name="Balance" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -614,8 +642,8 @@ const Statistics = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="month" />
                       <YAxis />
-                      <Tooltip content={customTooltip} />
-                      <Bar dataKey="amount" fill="#0ea5e9" radius={[10, 10, 0, 0]} name="Income" />
+                      <Tooltip content={customTooltip} cursor={false} />
+                      <Bar dataKey="amount" fill="#0ea5e9" radius={[10, 10, 0, 0]} name="Income" activeBar={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -638,9 +666,9 @@ const Statistics = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="period" />
                       <YAxis />
-                      <Tooltip content={customTooltip} />
-                      <Bar dataKey="income" fill="#10b981" radius={[8, 8, 0, 0]} name="Income" />
-                      <Bar dataKey="expense" fill="#f43f5e" radius={[8, 8, 0, 0]} name="Expense" />
+                      <Tooltip content={customTooltip} cursor={false} />
+                      <Bar dataKey="income" fill="#10b981" radius={[8, 8, 0, 0]} name="Income" activeBar={false} />
+                      <Bar dataKey="expense" fill="#f43f5e" radius={[8, 8, 0, 0]} name="Expense" activeBar={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -679,8 +707,8 @@ const Statistics = () => {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="label" />
                       <YAxis />
-                      <Tooltip content={customTooltip} />
-                      <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#netGradient)" name="Net" />
+                      <Tooltip content={customTooltip} cursor={false} />
+                      <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#netGradient)" name="Net" activeDot={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

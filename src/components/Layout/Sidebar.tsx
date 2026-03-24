@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -21,7 +21,8 @@ import LanguageTranslator from '../ui/LanguageTranslator'
 import { SoundButton } from '../ui/SoundButton'
 import { UserProfileStorage } from '../../lib/security'
 import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
-import { settingsService, type FamilyMember, type SessionSummary } from '../../services/settings.service'
+import { SessionsModal } from './SessionsModal'
+import { FamilyShareModal } from './FamilyShareModal'
 
 type NavItem = {
   label: string
@@ -62,23 +63,9 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+  const [showSessions, setShowSessions] = useState(false)
+  const [showFamilyShare, setShowFamilyShare] = useState(false)
   const [accessibilityActive, setAccessibilityActive] = useState(screenReader.isActive())
-  const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [sessionsError, setSessionsError] = useState('')
-  const [sessionSummary, setSessionSummary] = useState<SessionSummary>({
-    activeUsers: null,
-    activeSessions: null,
-  })
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([])
-  const [familyMembersLoading, setFamilyMembersLoading] = useState(false)
-  const [familyError, setFamilyError] = useState('')
-  const [familyNotice, setFamilyNotice] = useState('')
-  const [memberForm, setMemberForm] = useState({
-    name: '',
-    email: '',
-    role: 'EDITOR' as 'EDITOR' | 'VIEWER',
-  })
-  const [creatingMember, setCreatingMember] = useState(false)
   const settingsRef = useRef<HTMLDivElement | null>(null)
   const isTablet = Boolean(collapsed)
   const storedProfile = UserProfileStorage.get()
@@ -117,63 +104,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   }, [])
 
   useEffect(() => onAccessibilityChange(setAccessibilityActive), [])
-
-  const loadSettingsData = useCallback(async () => {
-    setSessionsLoading(true)
-    setFamilyMembersLoading(true)
-    setSessionsError('')
-    setFamilyError('')
-
-    const [summaryResult, membersResult] = await Promise.allSettled([
-      settingsService.getSessionSummary(),
-      settingsService.listFamilyMembers(),
-    ])
-
-    if (summaryResult.status === 'fulfilled') {
-      setSessionSummary(summaryResult.value)
-    } else {
-      setSessionsError('Could not load session stats from backend.')
-    }
-
-    if (membersResult.status === 'fulfilled') {
-      setFamilyMembers(membersResult.value)
-    } else {
-      setFamilyError('Family sharing service is not available on backend yet.')
-    }
-
-    setSessionsLoading(false)
-    setFamilyMembersLoading(false)
-  }, [])
-
-  useEffect(() => {
-    if (!settingsOpen) return
-    void loadSettingsData()
-  }, [settingsOpen, loadSettingsData])
-
-  const handleCreateFamilyMember = async () => {
-    const name = memberForm.name.trim()
-    const email = memberForm.email.trim()
-    if (!name || !email) {
-      setFamilyNotice('Add both name and email to create a family member account.')
-      return
-    }
-
-    setCreatingMember(true)
-    setFamilyNotice('')
-    setFamilyError('')
-
-    try {
-      await settingsService.createFamilyMember({ name, email, role: memberForm.role })
-      setFamilyNotice('Family member account request created successfully.')
-      setMemberForm({ name: '', email: '', role: memberForm.role })
-      const members = await settingsService.listFamilyMembers()
-      setFamilyMembers(members)
-    } catch {
-      setFamilyError('Could not create member. Backend sharing endpoints may not be enabled.')
-    } finally {
-      setCreatingMember(false)
-    }
-  }
 
   return (
     <aside
@@ -389,29 +319,31 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
             className="settings-panel"
             style={{
               bottom: 'calc(100% + 10px)',
+              maxHeight: 'min(600px, calc(100vh - 200px))',
+              overflowY: 'auto',
               ...(isTablet
                 ? {
                     left: 'calc(100% + 10px)',
-                    width: 250,
+                    width: 'max(220px, 80vw)',
+                    maxWidth: 300,
                   }
                 : {
                     left: 8,
                     right: 8,
+                    minWidth: 240,
+                    maxWidth: 'calc(100% - 16px)',
                   }),
             }}
           >
             <div className="settings-panel__title">Settings</div>
 
+            {/* Language & Sound Row */}
             <div className="settings-panel__row" style={{ alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <span style={{ color: '#71e7ff' }}>🌐</span>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
-                    Live language
-                  </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
-                    Google Translate, 50+ languages
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>Language</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>50+ languages</div>
                 </div>
               </div>
               <LanguageTranslator compact />
@@ -421,12 +353,8 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                 <span style={{ color: '#a78bfa' }}>🔊</span>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>
-                    Sound effects
-                  </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
-                    Toggle click and success sounds
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'white' }}>Sounds</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Toggle effects</div>
                 </div>
               </div>
               <SoundButton />
@@ -434,195 +362,36 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
 
             <div className="settings-panel__divider" />
 
-            <div style={{ marginBottom: 10 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: 'rgba(255,255,255,0.5)',
-                  marginBottom: 6,
-                }}
-              >
-                Sessions
-              </div>
-              <div
-                style={{
-                  border: '1px solid rgba(148,163,184,0.22)',
-                  borderRadius: 10,
-                  background: 'rgba(15,23,42,0.45)',
-                  padding: 10,
-                  display: 'grid',
-                  gap: 6,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#e2e8f0' }}>
-                  <span>Users online now</span>
-                  <strong>{sessionsLoading ? '...' : sessionSummary.activeUsers ?? 'N/A'}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#e2e8f0' }}>
-                  <span>Your active sessions</span>
-                  <strong>{sessionsLoading ? '...' : sessionSummary.activeSessions ?? 'N/A'}</strong>
-                </div>
-                {sessionsError && (
-                  <div style={{ fontSize: 10, color: '#fda4af' }}>{sessionsError}</div>
-                )}
-                <button
-                  type="button"
-                  data-button-reset="true"
-                  onClick={() => void loadSettingsData()}
-                  style={{
-                    marginTop: 4,
-                    padding: '6px 8px',
-                    borderRadius: 8,
-                    border: '1px solid rgba(148,163,184,0.28)',
-                    background: 'rgba(30,41,59,0.8)',
-                    color: '#cbd5e1',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Refresh sessions
-                </button>
-              </div>
-            </div>
+            {/* Sessions & Family Sharing Buttons */}
+            <button
+              type="button"
+              data-button-reset="true"
+              onClick={() => setShowSessions(true)}
+              className="settings-panel__logout"
+              style={{ color: '#93c5fd' }}
+              onFocus={() => screenReader.speak('View sessions')}
+              onMouseEnter={() => screenReader.speak('View sessions')}
+            >
+              <span>⏱️ Active Sessions</span>
+              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>View & manage</span>
+            </button>
 
-            <div style={{ marginBottom: 8 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  color: 'rgba(255,255,255,0.5)',
-                  marginBottom: 6,
-                }}
-              >
-                Family Sharing
-              </div>
-              <div
-                style={{
-                  border: '1px solid rgba(148,163,184,0.22)',
-                  borderRadius: 10,
-                  background: 'rgba(15,23,42,0.45)',
-                  padding: 10,
-                  display: 'grid',
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontSize: 11, color: 'rgba(226,232,240,0.82)' }}>
-                  Invite a family member to help manage shared finances.
-                </div>
-
-                <input
-                  value={memberForm.name}
-                  onChange={event => setMemberForm(prev => ({ ...prev, name: event.target.value }))}
-                  placeholder="Full name"
-                  style={{
-                    width: '100%',
-                    borderRadius: 8,
-                    border: '1px solid rgba(148,163,184,0.3)',
-                    background: 'rgba(15,23,42,0.75)',
-                    color: '#e2e8f0',
-                    padding: '7px 9px',
-                    fontSize: 12,
-                    outline: 'none',
-                  }}
-                />
-                <input
-                  value={memberForm.email}
-                  onChange={event => setMemberForm(prev => ({ ...prev, email: event.target.value }))}
-                  placeholder="Email"
-                  type="email"
-                  style={{
-                    width: '100%',
-                    borderRadius: 8,
-                    border: '1px solid rgba(148,163,184,0.3)',
-                    background: 'rgba(15,23,42,0.75)',
-                    color: '#e2e8f0',
-                    padding: '7px 9px',
-                    fontSize: 12,
-                    outline: 'none',
-                  }}
-                />
-                <select
-                  value={memberForm.role}
-                  onChange={event =>
-                    setMemberForm(prev => ({
-                      ...prev,
-                      role: event.target.value === 'VIEWER' ? 'VIEWER' : 'EDITOR',
-                    }))
-                  }
-                  style={{
-                    width: '100%',
-                    borderRadius: 8,
-                    border: '1px solid rgba(148,163,184,0.3)',
-                    background: 'rgba(15,23,42,0.75)',
-                    color: '#e2e8f0',
-                    padding: '7px 9px',
-                    fontSize: 12,
-                    outline: 'none',
-                  }}
-                >
-                  <option value="EDITOR">Editor (can add and edit)</option>
-                  <option value="VIEWER">Viewer (read only)</option>
-                </select>
-
-                <button
-                  type="button"
-                  data-button-reset="true"
-                  onClick={() => void handleCreateFamilyMember()}
-                  disabled={creatingMember}
-                  style={{
-                    padding: '7px 9px',
-                    borderRadius: 8,
-                    border: '1px solid rgba(56,189,248,0.5)',
-                    background: 'linear-gradient(135deg, rgba(56,189,248,0.25), rgba(99,102,241,0.25))',
-                    color: '#dbeafe',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: creatingMember ? 'wait' : 'pointer',
-                  }}
-                >
-                  {creatingMember ? 'Creating...' : 'Create family account'}
-                </button>
-
-                {familyMembersLoading ? (
-                  <div style={{ fontSize: 10, color: 'rgba(226,232,240,0.6)' }}>Loading family members...</div>
-                ) : familyMembers.length > 0 ? (
-                  <div style={{ display: 'grid', gap: 6 }}>
-                    {familyMembers.slice(0, 4).map(member => (
-                      <div
-                        key={member.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          gap: 8,
-                          fontSize: 11,
-                          color: '#e2e8f0',
-                          padding: '5px 7px',
-                          borderRadius: 6,
-                          background: 'rgba(30,41,59,0.7)',
-                        }}
-                      >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {member.name}
-                        </span>
-                        <span style={{ color: '#93c5fd', flexShrink: 0 }}>{member.role}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 10, color: 'rgba(226,232,240,0.6)' }}>No shared members yet.</div>
-                )}
-
-                {familyError && <div style={{ fontSize: 10, color: '#fda4af' }}>{familyError}</div>}
-                {familyNotice && <div style={{ fontSize: 10, color: '#86efac' }}>{familyNotice}</div>}
-              </div>
-            </div>
+            <button
+              type="button"
+              data-button-reset="true"
+              onClick={() => setShowFamilyShare(true)}
+              className="settings-panel__logout"
+              style={{ color: '#86efac' }}
+              onFocus={() => screenReader.speak('Family sharing')}
+              onMouseEnter={() => screenReader.speak('Family sharing')}
+            >
+              <span>👨‍👩‍👧‍👦 Family Sharing</span>
+              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>Share data</span>
+            </button>
 
             <div className="settings-panel__divider" />
 
+            {/* Other Settings */}
             <button
               type="button"
               data-button-reset="true"
@@ -638,9 +407,9 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               onFocus={() => screenReader.speak('Accessibility mode toggle')}
               onMouseEnter={() => screenReader.speak('Accessibility mode toggle')}
             >
-              <span>♿ Accessibility Mode</span>
+              <span>♿ Accessibility</span>
               <span style={{ fontSize: 10, opacity: 0.65, marginLeft: 'auto' }}>
-                {accessibilityActive ? 'ON' : 'OFF'} · Screen reader
+                {accessibilityActive ? 'ON' : 'OFF'}
               </span>
             </button>
 
@@ -657,7 +426,7 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               onMouseEnter={() => screenReader.speak('VR mode')}
             >
               <span>🥽 VR Mode</span>
-              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>3D Dashboard</span>
+              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>3D</span>
             </button>
 
             <div className="settings-panel__divider" />
@@ -671,8 +440,8 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
               onFocus={() => screenReader.speak('About Finly')}
               onMouseEnter={() => screenReader.speak('About Finly')}
             >
-              <span>ℹ️ About Finly</span>
-              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>v1.0 · Hackathon 2026</span>
+              <span>ℹ️ About</span>
+              <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 'auto' }}>v1.0</span>
             </button>
 
             <button
@@ -749,6 +518,8 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
           </div>
         </div>
       )}
+      <SessionsModal isOpen={showSessions} onClose={() => setShowSessions(false)} />
+      <FamilyShareModal isOpen={showFamilyShare} onClose={() => setShowFamilyShare(false)} />
       {/* Profile Modal disabled - users cannot edit profile */}
       {/* {showProfile && (
         <ProfileModal onClose={() => setShowProfile(false)} />
