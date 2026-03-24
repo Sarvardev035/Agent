@@ -16,9 +16,9 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
 import BrandLogo from '../ui/BrandLogo'
-import { useTheme } from '../../contexts/ThemeContext'
 import LanguageTranslator from '../ui/LanguageTranslator'
 import { SoundButton } from '../ui/SoundButton'
+import { ThemeToggle } from '../ui/ThemeToggle'
 import { UserProfileStorage } from '../../lib/security'
 import { onAccessibilityChange, screenReader } from '../../lib/screenReader'
 import { SessionsModal } from './SessionsModal'
@@ -60,7 +60,6 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
   const navigate = useNavigate()
   const authStore = useAuthStore()
   const user = authStore.user
-  const { isDark } = useTheme()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [showSessions, setShowSessions] = useState(false)
@@ -180,6 +179,18 @@ const Sidebar = ({ collapsed, onRequestLogout }: SidebarProps) => {
             ))}
           </div>
         ))}
+
+        <div
+          className="sidebar-theme-dock"
+          style={{
+            display: 'flex',
+            justifyContent: isTablet ? 'center' : 'flex-end',
+            padding: isTablet ? '8px 2px 2px' : '10px 8px 4px',
+            marginTop: 8,
+          }}
+        >
+          <ThemeToggle compact />
+        </div>
       </nav>
 
       <div
