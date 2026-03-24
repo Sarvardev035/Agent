@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare } from 'lucide-react'
+import { MessageCircle, X, Send, Bot, Sparkles, Wrench, TerminalSquare, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { aiChatService, type ChatAction } from '../../services/ai-chat.service'
@@ -27,6 +27,43 @@ interface ChatMessage {
 interface BotRule {
   keywords: string[]
   response: string
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognition
+
+interface SpeechRecognition extends EventTarget {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onstart: (() => void) | null
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+
+interface SpeechRecognitionEvent {
+  results: ArrayLike<SpeechRecognitionResult>
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean
+  length: number
+  [index: number]: SpeechRecognitionAlternative
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string
+}
+
+interface Window {
+  webkitSpeechRecognition?: SpeechRecognitionCtor
+  SpeechRecognition?: SpeechRecognitionCtor
 }
 
 const BOT_RULES: BotRule[] = [
@@ -183,14 +220,25 @@ const Chatbot = () => {
     {
       id: '0',
       role: 'assistant',
-      text: 'Hi! I am your Finly guide. Ask me how to add expenses, move money, track debts, set budgets, or check your statistics. Or continue using the powerful Telegram bot for even faster access! 🤖',
+      text: 'Hi! I am your Finly guide. Ask me how to add expenses, move money, track debts, set budgets, or check your statistics. You can also use voice input, spoken replies, and full voice chat mode from the header controls. Or continue in Telegram for quick mobile access.',
       showTelegramButton: true,
     },
   ])
   const [inputValue, setInputValue] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(true)
   const [userSummary, setUserSummary] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [voiceInputEnabled, setVoiceInputEnabled] = useState(true)
+  const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true)
+  const [voiceChatMode, setVoiceChatMode] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const shouldResumeVoiceRef = useRef(false)
+
+  const hasSpeechRecognition =
+    typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
+  const hasSpeechSynthesis = typeof window !== 'undefined' && 'speechSynthesis' in window
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -236,6 +284,117 @@ const Chatbot = () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.onresult = null
+        recognitionRef.current.onend = null
+        recognitionRef.current.onerror = null
+        recognitionRef.current.stop()
+      }
+      if (hasSpeechSynthesis) {
+        window.speechSynthesis.cancel()
+      }
+    }
+  }, [hasSpeechSynthesis])
+
+  const speakText = (text: string) => {
+    if (!voiceOutputEnabled || !hasSpeechSynthesis) return
+    const cleaned = text.replace(/\s+/g, ' ').trim()
+    if (!cleaned) return
+
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(cleaned)
+    utterance.rate = 1
+    utterance.pitch = 1
+    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onend = () => {
+      setIsSpeaking(false)
+      if (voiceChatMode && shouldResumeVoiceRef.current && isOpen) {
+        shouldResumeVoiceRef.current = false
+        startVoiceListening()
+      }
+    }
+    utterance.onerror = () => {
+      setIsSpeaking(false)
+      if (voiceChatMode && shouldResumeVoiceRef.current && isOpen) {
+        shouldResumeVoiceRef.current = false
+        startVoiceListening()
+      }
+    }
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const stopVoiceListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+    }
+    setIsListening(false)
+  }
+
+  const startVoiceListening = () => {
+    if (!voiceInputEnabled || !hasSpeechRecognition) {
+      toast.error('Voice input is not supported in this browser.')
+      return
+    }
+    if (isTyping) return
+
+    if (!recognitionRef.current) {
+      const speechWindow = window as Window & {
+        SpeechRecognition?: SpeechRecognitionCtor
+        webkitSpeechRecognition?: SpeechRecognitionCtor
+      }
+      const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
+      if (!Recognition) {
+        toast.error('Voice input is not supported in this browser.')
+        return
+      }
+      const recognition = new Recognition()
+      recognition.continuous = false
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
+
+      recognition.onstart = () => {
+        setIsListening(true)
+      }
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let transcript = ''
+        for (let i = 0; i < event.results.length; i += 1) {
+          transcript += event.results[i][0]?.transcript || ''
+        }
+        const finalText = transcript.trim()
+        setInputValue(finalText)
+
+        const lastIndex = event.results.length - 1
+        const isFinal = lastIndex >= 0 ? Boolean(event.results[lastIndex]?.isFinal) : false
+        if (isFinal && finalText) {
+          shouldResumeVoiceRef.current = voiceChatMode
+          handleSendMessage(finalText)
+        }
+      }
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        setIsListening(false)
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          toast.error(`Voice input error: ${event.error}`)
+        }
+      }
+
+      recognition.onend = () => {
+        setIsListening(false)
+      }
+
+      recognitionRef.current = recognition
+    }
+
+    try {
+      recognitionRef.current.start()
+    } catch {
+      // Ignore repeated start calls while recognition is already active.
+    }
+  }
 
   const resolveAccountId = async (accountHint?: string): Promise<string | null> => {
     const response = await accountsApi.getAll()
@@ -526,6 +685,7 @@ const Chatbot = () => {
               text: utilityReply,
             },
           ])
+          speakText(utilityReply)
           return
         }
 
@@ -552,6 +712,7 @@ const Chatbot = () => {
           : null
 
         setMessages(prev => [...prev, assistantMessage, ...(toolCallMessage ? [toolCallMessage] : [])])
+        speakText(displayText)
       } catch (error) {
         sounds.error()
         toast.error('I need a bit more detail before I can execute that.')
@@ -564,6 +725,7 @@ const Chatbot = () => {
             text: `I couldn't complete that automatically. ${message}`,
           },
         ])
+        speakText(`I couldn't complete that automatically. ${message}`)
       } finally {
         setIsTyping(false)
       }
@@ -573,6 +735,22 @@ const Chatbot = () => {
   const openTelegramBot = () => {
     window.open('https://t.me/Finly_smart_bot', '_blank')
   }
+
+  useEffect(() => {
+    if (!isOpen) {
+      stopVoiceListening()
+      shouldResumeVoiceRef.current = false
+      if (hasSpeechSynthesis) {
+        window.speechSynthesis.cancel()
+        setIsSpeaking(false)
+      }
+      return
+    }
+
+    if (voiceChatMode && voiceInputEnabled && hasSpeechRecognition && !isTyping && !isListening) {
+      startVoiceListening()
+    }
+  }, [hasSpeechRecognition, hasSpeechSynthesis, isListening, isOpen, isTyping, voiceChatMode, voiceInputEnabled])
 
   return (
     <>
@@ -668,22 +846,104 @@ const Chatbot = () => {
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              type="button"
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                onClick={() => {
+                  const next = !voiceInputEnabled
+                  setVoiceInputEnabled(next)
+                  if (!next) stopVoiceListening()
+                }}
+                type="button"
+                title={voiceInputEnabled ? 'Disable voice input' : 'Enable voice input'}
+                style={{
+                  background: voiceInputEnabled ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.12)',
+                  border: '1px solid rgba(255,255,255,0.24)',
+                  borderRadius: 9,
+                  color: '#fff',
+                  cursor: 'pointer',
+                  padding: 6,
+                  display: 'inline-flex',
+                }}
+              >
+                {voiceInputEnabled ? <Mic size={15} /> : <MicOff size={15} />}
+              </button>
+              <button
+                onClick={() => {
+                  const next = !voiceOutputEnabled
+                  setVoiceOutputEnabled(next)
+                  if (!next && hasSpeechSynthesis) {
+                    window.speechSynthesis.cancel()
+                    setIsSpeaking(false)
+                  }
+                }}
+                type="button"
+                title={voiceOutputEnabled ? 'Disable spoken replies' : 'Enable spoken replies'}
+                style={{
+                  background: voiceOutputEnabled ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.12)',
+                  border: '1px solid rgba(255,255,255,0.24)',
+                  borderRadius: 9,
+                  color: '#fff',
+                  cursor: 'pointer',
+                  padding: 6,
+                  display: 'inline-flex',
+                }}
+              >
+                {voiceOutputEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              </button>
+              <button
+                onClick={() => setVoiceChatMode(prev => !prev)}
+                type="button"
+                title={voiceChatMode ? 'Disable voice chat mode' : 'Enable voice chat mode'}
+                style={{
+                  background: voiceChatMode ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.12)',
+                  border: '1px solid rgba(255,255,255,0.24)',
+                  borderRadius: 9,
+                  color: '#fff',
+                  cursor: 'pointer',
+                  padding: '6px 8px',
+                  fontSize: 10,
+                  fontWeight: 800,
+                }}
+              >
+                Voice Chat
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                type="button"
+                style={{
+                  background: 'rgba(255,255,255,0.12)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 10,
+                  color: '#fff',
+                  cursor: 'pointer',
+                  padding: 6,
+                  display: 'inline-flex',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {(isListening || isSpeaking || voiceChatMode) && (
+            <div
               style={{
-                background: 'rgba(255,255,255,0.12)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: 10,
-                color: '#fff',
-                cursor: 'pointer',
-                padding: 6,
-                display: 'inline-flex',
+                padding: '7px 12px',
+                borderBottom: '1px solid rgba(214,227,255,0.82)',
+                background: 'rgba(236,248,255,0.92)',
+                color: '#0f3b75',
+                fontSize: 11.5,
+                fontWeight: 700,
+                display: 'flex',
+                gap: 10,
+                flexWrap: 'wrap',
               }}
             >
-              <X size={20} />
-            </button>
-          </div>
+              <span>{isListening ? 'Listening...' : 'Mic idle'}</span>
+              <span>{isSpeaking ? 'Speaking reply...' : 'Speaker idle'}</span>
+              <span>{voiceChatMode ? 'Voice chat mode ON' : 'Voice chat mode OFF'}</span>
+            </div>
+          )}
 
           {/* Messages Area */}
           <div
@@ -907,6 +1167,33 @@ const Chatbot = () => {
                 background: 'rgba(255,255,255,0.9)',
               }}
             />
+            <button
+              onClick={() => {
+                if (isListening) {
+                  stopVoiceListening()
+                } else {
+                  startVoiceListening()
+                }
+              }}
+              type="button"
+              title={isListening ? 'Stop voice input' : 'Start voice input'}
+              style={{
+                background: isListening ? 'linear-gradient(135deg, #dc2626, #f97316)' : 'linear-gradient(135deg, #2563eb, #0284c7)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 10,
+                padding: '9px 11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 10px 24px rgba(30,64,175,0.22)',
+                opacity: voiceInputEnabled && hasSpeechRecognition ? 1 : 0.5,
+              }}
+              disabled={!voiceInputEnabled || !hasSpeechRecognition}
+            >
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
             <button
               onClick={() => handleSendMessage()}
               type="button"
