@@ -1,0 +1,351 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { startTransition, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
+import { Bitcoin, Plus, ShieldCheck } from 'lucide-react';
+import ProgressBar from '../components/ui/ProgressBar';
+import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
+import Modal from '../components/ui/Modal';
+import { budgetApi } from '../api/budgetApi';
+import { formatCurrency, getBudgetColor } from '../lib/helpers';
+import { useFinance } from '../context/FinanceContext';
+import { categoriesService } from '../services/categories.service';
+import { safeArray } from '../lib/helpers';
+import { sounds } from '../lib/sounds';
+const Budget = () => {
+    const { refreshAccounts } = useFinance();
+    const [loading, setLoading] = useState(true);
+    const [budgetLimit, setBudgetLimit] = useState(0);
+    const [totalSpent, setTotalSpent] = useState(0);
+    const [budgetPercentUsed, setBudgetPercentUsed] = useState(0);
+    const [budgetRemaining, setBudgetRemaining] = useState(0);
+    const [categories, setCategories] = useState([]);
+    const [goalModal, setGoalModal] = useState(false);
+    const [categoryModal, setCategoryModal] = useState(false);
+    const [goalInput, setGoalInput] = useState('');
+    const [goalCurrency, setGoalCurrency] = useState('UZS');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [categoryLimit, setCategoryLimit] = useState('');
+    const [categoryCurrency, setCategoryCurrency] = useState('UZS');
+    const [categoryOptions, setCategoryOptions] = useState([]);
+    const [savingGoal, setSavingGoal] = useState(false);
+    const [savingCategory, setSavingCategory] = useState(false);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const loadBudget = async () => {
+        try {
+            setLoading(true);
+            const [budgetRes, catsRes] = await Promise.allSettled([
+                budgetApi.get({ year: currentYear, month: currentMonth }),
+                categoriesService.getByType('EXPENSE'),
+            ]);
+            const catList = catsRes.status === 'fulfilled'
+                ? safeArray(catsRes.value.data).map(cat => ({
+                    id: cat.id ?? cat.categoryId ?? cat.name,
+                    name: cat.name ?? cat.category ?? 'Category',
+                }))
+                : [];
+            setCategoryOptions(catList);
+            if (!selectedCategory && catList[0])
+                setSelectedCategory(catList[0].id);
+            const budgetData = budgetRes.status === 'fulfilled' ? safeArray(budgetRes.value.data) : [];
+            const overallBudget = budgetData.find((item) => item.type === 'OVERALL');
+            const categoryBudgetItems = budgetData.filter((item) => item.type === 'EXPENSE' && item.categoryId);
+            const mapName = (id) => catList.find(cat => cat.id === id)?.name ||
+                budgetData.find(b => b.categoryId === id)?.category ||
+                'Category';
+            const nextBudgetLimit = overallBudget?.monthlyLimit ?? overallBudget?.limit ?? 0;
+            const nextTotalSpent = overallBudget?.spentAmount ?? overallBudget?.spent ?? 0;
+            const rawPercent = overallBudget?.percentageUsed
+                ?? (nextBudgetLimit > 0 ? (nextTotalSpent / nextBudgetLimit) * 100 : 0);
+            setBudgetLimit(nextBudgetLimit);
+            setTotalSpent(nextTotalSpent);
+            setBudgetPercentUsed(Math.min(Math.max(rawPercent, 0), 999));
+            setBudgetRemaining(overallBudget?.remainingAmount
+                ?? overallBudget?.remaining
+                ?? (nextBudgetLimit - nextTotalSpent));
+            if (overallBudget?.currency) {
+                setGoalCurrency(overallBudget.currency);
+            }
+            setCategories(categoryBudgetItems.map((item) => ({
+                categoryId: item.categoryId || item.category,
+                category: mapName(item.categoryId || item.category),
+                limit: item.monthlyLimit ?? item.limit ?? 0,
+                spent: item.spentAmount ?? item.spent ?? 0,
+                currency: item.currency ?? 'UZS',
+            })));
+        }
+        catch (err) {
+            console.error(err);
+            sounds.error();
+            toast.error('Failed to load budget');
+        }
+        finally {
+            setLoading(false);
+        }
+    };
+    useEffect(() => {
+        loadBudget();
+    }, []);
+    const handleSaveGoal = async () => {
+        const parsed = Number(goalInput || budgetLimit);
+        if (!parsed || parsed <= 0) {
+            sounds.error();
+            toast.error('Enter a valid budget amount');
+            return;
+        }
+        setSavingGoal(true);
+        try {
+            await budgetApi.set({
+                monthlyLimit: parsed,
+                type: 'OVERALL',
+                currency: goalCurrency,
+                year: currentYear,
+                month: currentMonth,
+            });
+            sounds.notification();
+            toast.success('Budget limit set! 🎯');
+            setGoalModal(false);
+            setBudgetLimit(parsed);
+            setGoalInput('');
+            await Promise.allSettled([loadBudget(), refreshAccounts()]);
+        }
+        catch (err) {
+            console.error(err);
+            sounds.error();
+            toast.error(err instanceof Error ? err.message : 'Failed to save goal');
+        }
+        finally {
+            setSavingGoal(false);
+        }
+    };
+    const handleSaveCategory = async () => {
+        if (!selectedCategory) {
+            sounds.error();
+            toast.error('Please select a category');
+            return;
+        }
+        const parsed = Number(categoryLimit);
+        if (!parsed || parsed <= 0) {
+            sounds.error();
+            toast.error('Limit must be positive');
+            return;
+        }
+        setSavingCategory(true);
+        try {
+            await budgetApi.setCategory({
+                categoryId: selectedCategory,
+                monthlyLimit: parsed,
+                type: 'EXPENSE',
+                currency: categoryCurrency,
+                year: currentYear,
+                month: currentMonth,
+            });
+            sounds.notification();
+            toast.success('Budget limit set! 🎯');
+            setCategoryModal(false);
+            setCategoryLimit('');
+            setSelectedCategory('');
+            setCategoryCurrency('UZS');
+            await Promise.allSettled([loadBudget(), refreshAccounts()]);
+        }
+        catch (err) {
+            console.error(err);
+            sounds.error();
+            toast.error(err instanceof Error ? err.message : 'Failed to save category limit');
+        }
+        finally {
+            setSavingCategory(false);
+        }
+    };
+    const goalCurrencySymbol = goalCurrency;
+    const ringPercent = Math.min(budgetPercentUsed, 100);
+    const pctColor = budgetPercentUsed >= 100 ? '#ef4444' : '#10b981';
+    return (_jsxs("div", { className: "page-content", style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            padding: 'clamp(16px,3vw,28px)',
+            paddingBottom: 12,
+            maxWidth: '100%',
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+        }, children: [_jsxs("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }, children: [_jsxs("div", { children: [_jsx("p", { style: { color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em', fontSize: 12 }, children: "BUDGET" }), _jsx("h1", { style: { margin: '4px 0', fontSize: 22, fontWeight: 800 }, children: "Stay within goals" }), _jsx("p", { style: { margin: 0, color: 'var(--text-2)' }, children: "Track overall and per-category budgets." })] }), _jsxs("button", { onClick: () => startTransition(() => setGoalModal(true)), type: "button", style: {
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            border: 'none',
+                            background: 'linear-gradient(135deg,#f59e0b,#f43f5e)',
+                            color: '#fff',
+                            padding: '10px 12px',
+                            borderRadius: 12,
+                            fontWeight: 800,
+                            boxShadow: '0 12px 30px rgba(244,63,94,0.28)',
+                            cursor: 'pointer',
+                        }, children: [_jsx(Plus, { size: 16 }), " Set monthly budget"] })] }), _jsxs("div", { style: {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,400px),1fr))',
+                    gap: 16,
+                    marginBottom: 20,
+                    width: '100%',
+                    overflow: 'hidden',
+                }, children: [_jsx("div", { className: "card", style: {
+                            background: 'var(--surface-strong)',
+                            borderRadius: 16,
+                            padding: 16,
+                            boxShadow: 'var(--shadow-md)',
+                            border: '1px solid var(--border)',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                            minHeight: 200,
+                        }, children: loading ? (_jsx(Skeleton, { height: 220 })) : budgetLimit ? (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', padding: 8 }, children: [_jsxs("div", { style: { flexShrink: 0, position: 'relative' }, children: [_jsxs("svg", { width: "90", height: "90", viewBox: "0 0 90 90", children: [_jsx("circle", { cx: "45", cy: "45", r: "38", fill: "none", stroke: "rgba(148,163,184,0.18)", strokeWidth: "8" }), _jsx("circle", { cx: "45", cy: "45", r: "38", fill: "none", stroke: pctColor, strokeWidth: "8", strokeDasharray: `${ringPercent * 2.39} 239`, strokeLinecap: "round", transform: "rotate(-90 45 45)", style: { transition: 'stroke-dasharray 0.8s ease' } })] }), _jsx("div", { style: {
+                                                position: 'absolute',
+                                                inset: 0,
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }, children: _jsxs("span", { style: {
+                                                    fontSize: 13,
+                                                    fontWeight: 800,
+                                                    color: pctColor,
+                                                    lineHeight: 1,
+                                                }, children: [Math.round(budgetPercentUsed), "%"] }) })] }), _jsxs("div", { style: { flex: 1, minWidth: 0 }, children: [_jsxs("div", { style: { fontSize: 12, color: 'var(--text-3)', marginBottom: 4, fontWeight: 500 }, children: ["Budget limit: ", formatCurrency(budgetLimit, goalCurrencySymbol)] }), _jsxs("div", { className: "stat-number", style: {
+                                                fontSize: 'clamp(14px,2.5vw,20px)',
+                                                fontWeight: 800,
+                                                color: 'var(--text-1)',
+                                                letterSpacing: '-0.02em',
+                                                marginBottom: 8,
+                                                wordBreak: 'break-word',
+                                                overflowWrap: 'break-word',
+                                            }, children: ["Spent: ", formatCurrency(totalSpent, goalCurrencySymbol)] }), _jsx("div", { style: {
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                                padding: '6px 14px',
+                                                background: budgetRemaining >= 0 ? '#ecfdf5' : '#fff1f2',
+                                                color: budgetRemaining >= 0 ? '#166534' : '#be123c',
+                                                borderRadius: 20,
+                                                fontSize: 13,
+                                                fontWeight: 600,
+                                                maxWidth: '100%',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                            }, children: budgetRemaining >= 0
+                                                ? `✓ ${formatCurrency(budgetRemaining, goalCurrencySymbol)} remaining`
+                                                : `⚠ Over by ${formatCurrency(Math.abs(budgetRemaining), goalCurrencySymbol)}` })] })] })) : (_jsx(EmptyState, { icon: _jsx(Bitcoin, { size: 34, color: "#f59e0b" }), title: "No monthly budget", description: "Set a monthly budget to start tracking progress.", actionLabel: "Set goal", onAction: () => startTransition(() => setGoalModal(true)) })) }), _jsxs("div", { className: "card", style: {
+                            background: 'var(--surface-strong)',
+                            borderRadius: 16,
+                            padding: 16,
+                            boxShadow: 'var(--shadow-md)',
+                            border: '1px solid var(--border)',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                        }, children: [_jsxs("h3", { style: {
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    color: 'var(--text-1)',
+                                    marginBottom: 12,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                }, children: [_jsx(Bitcoin, { size: 18, color: "#f59e0b" }), "Budget health"] }), _jsx("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 }, children: [
+                                    'Review your category caps',
+                                    'Keep below 90% to avoid alerts',
+                                    'Update anytime',
+                                ].map(tip => (_jsxs("p", { style: {
+                                        fontSize: 13,
+                                        color: 'var(--text-2)',
+                                        margin: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                    }, children: [_jsx("span", { style: { color: '#7c3aed' }, children: "\u2022" }), " ", tip] }, tip))) }), _jsx("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }, children: ['Review weekly', 'Automate savings', 'Track big purchases'].map(tip => (_jsxs("span", { style: {
+                                        padding: '5px 12px',
+                                        background: 'rgba(124,58,237,0.08)',
+                                        color: '#7c3aed',
+                                        borderRadius: 20,
+                                        fontSize: 12,
+                                        fontWeight: 500,
+                                        whiteSpace: 'nowrap',
+                                    }, children: ["\u2726 ", tip] }, tip))) }), _jsx("button", { onClick: () => startTransition(() => setCategoryModal(true)), type: "button", style: {
+                                    marginTop: 16,
+                                    padding: '8px 12px',
+                                    borderRadius: 10,
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text-1)',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                }, children: "Add category limit" })] })] }), _jsxs("div", { className: "card", style: {
+                    background: 'var(--surface-strong)',
+                    borderRadius: 16,
+                    padding: 16,
+                    boxShadow: 'var(--shadow-md)',
+                    border: '1px solid var(--border)',
+                    minHeight: 260,
+                    overflow: 'hidden',
+                }, children: [_jsxs("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }, children: [_jsx("h3", { style: { margin: 0, fontSize: 16, fontWeight: 800 }, children: "Category limits" }), _jsx("button", { onClick: () => startTransition(() => setCategoryModal(true)), type: "button", style: {
+                                    padding: '8px 12px',
+                                    borderRadius: 10,
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--surface)',
+                                    color: 'var(--text-1)',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                }, children: "Manage limits" })] }), loading ? (_jsx(Skeleton, { height: 200 })) : categories.length === 0 ? (_jsx(EmptyState, { icon: _jsx(Bitcoin, { size: 34, color: "#3b82f6" }), title: "No category limits", description: "Create limits to keep spending in check.", actionLabel: "Add limit", onAction: () => startTransition(() => setCategoryModal(true)) })) : (_jsx("div", { style: {
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,280px),1fr))',
+                            gap: 12,
+                            width: '100%',
+                            overflow: 'hidden',
+                        }, children: categories.map(cat => {
+                            const percent = cat.limit ? (cat.spent / cat.limit) * 100 : 0;
+                            const palette = getBudgetColor(percent);
+                            const warn = percent >= 90;
+                            return (_jsxs("div", { style: {
+                                    padding: 14,
+                                    borderRadius: 14,
+                                    border: warn ? `2px solid ${palette.bar}` : '1px solid var(--border)',
+                                    boxShadow: warn ? '0 0 0 6px rgba(244,63,94,0.08)' : 'var(--shadow-sm)',
+                                    background: 'var(--surface)',
+                                }, children: [_jsxs("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, children: [_jsx("div", { style: { fontWeight: 800 }, children: cat.category }), _jsxs("div", { className: "stat-number", style: { fontSize: 12, color: 'var(--text-3)', minWidth: 0, textAlign: 'right' }, children: [cat.currency, " ", formatCurrency(cat.spent, cat.currency).replace(`${cat.currency} `, ''), " / ", cat.currency, " ", formatCurrency(cat.limit, cat.currency).replace(`${cat.currency} `, '')] })] }), _jsx("div", { style: { marginTop: 8 }, children: _jsx(ProgressBar, { percent: percent, color: palette.bar, label: "Progress" }) }), warn && (_jsxs("div", { style: {
+                                            marginTop: 8,
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            background: palette.bg,
+                                            color: palette.text,
+                                            padding: '6px 10px',
+                                            borderRadius: 10,
+                                            fontWeight: 700,
+                                        }, children: [_jsx(ShieldCheck, { size: 14 }), "Nearing limit"] }))] }, cat.categoryId || cat.category));
+                        }) }))] }), _jsx(Modal, { open: goalModal, onClose: () => setGoalModal(false), title: "Set monthly budget", children: _jsxs("div", { style: { display: 'flex', flexDirection: 'column', gap: 12 }, children: [_jsxs("label", { style: { fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }, children: ["Monthly budget (", goalCurrencySymbol, ")"] }), _jsx("input", { type: "number", value: goalInput || budgetLimit || '', onChange: e => setGoalInput(e.target.value), placeholder: "0.00", style: { width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' } }), _jsxs("div", { children: [_jsx("label", { style: { fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }, children: "Currency *" }), _jsxs("select", { value: goalCurrency, onChange: e => setGoalCurrency(e.target.value), style: { width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }, children: [_jsx("option", { value: "UZS", children: "\uD83C\uDDFA\uD83C\uDDFF UZS" }), _jsx("option", { value: "USD", children: "\uD83C\uDDFA\uD83C\uDDF8 USD" }), _jsx("option", { value: "EUR", children: "\uD83C\uDDEA\uD83C\uDDFA EUR" })] })] }), _jsx("button", { onClick: handleSaveGoal, disabled: savingGoal, type: "button", style: {
+                                width: '100%',
+                                height: 48,
+                                borderRadius: 14,
+                                border: 'none',
+                                background: savingGoal ? '#cbd5e1' : 'linear-gradient(135deg,#f59e0b,#f43f5e)',
+                                color: '#fff',
+                                fontWeight: 800,
+                                cursor: savingGoal ? 'not-allowed' : 'pointer',
+                                boxShadow: savingGoal ? 'none' : '0 12px 30px rgba(244,63,94,0.35)',
+                            }, children: savingGoal ? 'Saving...' : 'Save goal' })] }) }), _jsx(Modal, { open: categoryModal, onClose: () => setCategoryModal(false), title: "Add category limit", children: _jsxs("div", { style: { display: 'flex', flexDirection: 'column', gap: 12 }, children: [_jsxs("div", { children: [_jsx("label", { style: { fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }, children: "Category *" }), _jsxs("select", { value: selectedCategory, onChange: e => setSelectedCategory(e.target.value), required: true, style: { width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }, children: [_jsx("option", { value: "", children: "Select a category" }), categoryOptions.map(cat => (_jsx("option", { value: cat.id, children: cat.name }, cat.id)))] }), categoryOptions.length === 0 && (_jsx("div", { style: {
+                                        fontSize: 12, color: '#f59e0b', marginTop: 4,
+                                    }, children: "No categories found. Add expense categories first." }))] }), _jsxs("div", { children: [_jsxs("label", { style: { fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }, children: ["Monthly limit (", categoryCurrency, ") *"] }), _jsx("input", { type: "number", value: categoryLimit, onChange: e => setCategoryLimit(e.target.value), placeholder: "e.g. 500000", min: "1", step: "any", required: true, style: { width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' } }), _jsx("div", { style: { fontSize: 11, color: '#94a3b8', marginTop: 4 }, children: "Limit is in your account currency" })] }), _jsxs("div", { children: [_jsx("label", { style: { fontWeight: 700, fontSize: 13, color: 'var(--text-2)' }, children: "Currency *" }), _jsxs("select", { value: categoryCurrency, onChange: e => setCategoryCurrency(e.target.value), style: { width: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 10, background: 'var(--surface)', color: 'var(--text-1)' }, children: [_jsx("option", { value: "UZS", children: "\uD83C\uDDFA\uD83C\uDDFF UZS" }), _jsx("option", { value: "USD", children: "\uD83C\uDDFA\uD83C\uDDF8 USD" }), _jsx("option", { value: "EUR", children: "\uD83C\uDDEA\uD83C\uDDFA EUR" })] })] }), _jsx("button", { onClick: handleSaveCategory, disabled: !selectedCategory || !categoryLimit || savingCategory, type: "button", style: {
+                                width: '100%',
+                                height: 48,
+                                borderRadius: 14,
+                                border: 'none',
+                                background: (!selectedCategory || !categoryLimit || savingCategory) ? '#cbd5e1' : 'linear-gradient(135deg,#1d4ed8,#3b82f6)',
+                                color: '#fff',
+                                fontWeight: 800,
+                                cursor: (!selectedCategory || !categoryLimit || savingCategory) ? 'not-allowed' : 'pointer',
+                                boxShadow: (!selectedCategory || !categoryLimit || savingCategory) ? 'none' : '0 12px 30px rgba(37,99,235,0.35)',
+                            }, children: savingCategory ? 'Saving...' : 'Save category limit' })] }) })] }));
+};
+export default Budget;

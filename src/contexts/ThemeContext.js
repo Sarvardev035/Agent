@@ -1,0 +1,70 @@
+import { jsx as _jsx } from "react/jsx-runtime";
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+const ThemeContext = createContext(undefined);
+export function ThemeProvider({ children }) {
+    const didMountRef = useRef(false);
+    const [theme, setThemeState] = useState(() => {
+        const stored = localStorage.getItem('theme');
+        return stored || 'auto';
+    });
+    const [isDark, setIsDark] = useState(false);
+    useEffect(() => {
+        const updateTheme = () => {
+            const root = document.documentElement;
+            let shouldBeDark = false;
+            if (theme === 'auto') {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    shouldBeDark = true;
+                }
+                else {
+                    const hour = new Date().getHours();
+                    shouldBeDark = hour >= 18 || hour < 6;
+                }
+            }
+            else {
+                shouldBeDark = theme === 'dark';
+            }
+            setIsDark(shouldBeDark);
+            root.classList.toggle('dark', shouldBeDark);
+            root.setAttribute('data-theme', shouldBeDark ? 'dark' : 'light');
+        };
+        const root = document.documentElement;
+        if (didMountRef.current) {
+            root.classList.add('theme-transitioning');
+            window.setTimeout(() => {
+                root.classList.remove('theme-transitioning');
+            }, 2000);
+        }
+        else {
+            didMountRef.current = true;
+        }
+        updateTheme();
+        localStorage.setItem('theme', theme);
+        if (theme === 'auto') {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            const handler = () => updateTheme();
+            mediaQuery.addEventListener('change', handler);
+            return () => mediaQuery.removeEventListener('change', handler);
+        }
+    }, [theme]);
+    useEffect(() => {
+        const saved = localStorage.getItem('theme');
+        if (!saved || saved === 'auto') {
+            const interval = setInterval(() => {
+                const hour = new Date().getHours();
+                const shouldBeDark = hour >= 18 || hour < 6;
+                const root = document.documentElement;
+                root.classList.toggle('dark', shouldBeDark);
+            }, 60 * 60 * 1000);
+            return () => clearInterval(interval);
+        }
+    }, []);
+    return (_jsx(ThemeContext.Provider, { value: { theme, setTheme: setThemeState, isDark }, children: children }));
+}
+export function useTheme() {
+    const context = useContext(ThemeContext);
+    if (!context) {
+        throw new Error('useTheme must be used within ThemeProvider');
+    }
+    return context;
+}
